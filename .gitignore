@@ -1,0 +1,30 @@
+# Dependencies
+node_modules/
+
+# Production build outputs
+dist/
+dist-electron/
+out/
+release/
+
+# macOS system files
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Logs & temp files
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.log
+
+# Environment & local settings
+.env
+.env.local
+.env.*.local
+
+# Electron build artifacts
+*.dmg
+*.zip
+*.blockmap
+
