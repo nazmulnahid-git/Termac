@@ -9,9 +9,10 @@ const RUNNERS = new Set(['sudo', 'env', 'time', 'npx', 'pnpm', 'yarn', 'bunx', '
 export function firstToken(cmd) {
   if (!cmd) return '';
   const parts = cmd.trim().split(/\s+/);
-  for (const p of parts) {
+  for (let i = 0; i < parts.length; i++) {
+    const p = parts[i];
     if (/^\w+=/.test(p) || RUNNERS.has(p) || p.startsWith('-')) continue;
-    if ((p === 'npm' || p === 'bun') && parts.length > 2) return parts.slice(parts.indexOf(p), parts.indexOf(p) + 3).join(' ');
+    if ((p === 'npm' || p === 'bun') && parts[i + 1] === 'run' && parts[i + 2]) return parts.slice(i, i + 3).join(' ');
     return p.split('/').pop();
   }
   return parts[0];
@@ -34,7 +35,7 @@ const KINDS = [
 
 export function kindOf(cmd) {
   if (!cmd) return '>_';
-  const c = cmd.trim().replace(/^(sudo|env|time|exec)\s+/, '');
+  const c = cmd.trim().replace(/^((sudo|env|time|exec)\s+|\w+=\S*\s+)+/, '');
   for (const [re, k] of KINDS) if (re.test(c)) return k;
   return '>_';
 }
@@ -79,10 +80,11 @@ export function procLabel(rt, shell) {
 export function formatDuration(ms) {
   if (ms == null) return '';
   const s = ms / 1000;
-  if (s < 10) return `${s.toFixed(2)}s`;
-  if (s < 60) return `${Math.round(s)}s`;
-  const m = Math.floor(s / 60);
-  if (m < 60) return `${m}m ${Math.round(s % 60)}s`;
+  if (s < 9.995) return `${s.toFixed(2)}s`;
+  const total = Math.round(s);
+  if (total < 60) return `${total}s`;
+  const m = Math.floor(total / 60);
+  if (m < 60) return `${m}m ${total % 60}s`;
   return `${Math.floor(m / 60)}h ${m % 60}m`;
 }
 
@@ -102,7 +104,7 @@ export function dayLabel(ts, now = Date.now()) {
   const d = new Date(ts);
   const today = new Date(now);
   today.setHours(0, 0, 0, 0);
-  const diff = (today - new Date(d.getFullYear(), d.getMonth(), d.getDate())) / 86400000;
+  const diff = Math.round((today - new Date(d.getFullYear(), d.getMonth(), d.getDate())) / 86400000);
   if (diff <= 0) return 'Today';
   if (diff === 1) return 'Yesterday';
   if (diff < 7) return 'This week';

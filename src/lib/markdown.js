@@ -3,12 +3,12 @@
 // numbers so the UI can toggle a checkbox by editing that line.
 
 export function parseBlocks(src) {
-  const lines = src.split('\n');
+  const lines = src.split(/\r?\n/);
   const blocks = [];
   let i = 0;
   while (i < lines.length) {
     const line = lines[i];
-    const fence = /^```(\w*)\s*$/.exec(line);
+    const fence = /^```([^`\s]*)\s*$/.exec(line);
     if (fence) {
       const start = i;
       const body = [];
@@ -18,7 +18,7 @@ export function parseBlocks(src) {
       blocks.push({ type: 'code', lang: fence[1], text: body.join('\n'), line: start });
       continue;
     }
-    const prov = /^>\s*pasted from (.+?)(?:\s*\{(\w+):(\d+)\})?\s*$/.exec(line);
+    const prov = /^>\s*pasted from (.+?)(?:\s*\{(\w+)(?::(\d+))?\})?\s*$/.exec(line);
     if (prov) {
       const start = i;
       const body = [];
@@ -50,7 +50,8 @@ export function parseBlocks(src) {
       continue;
     }
     const start = i;
-    const para = [];
+    // Always consume the first line so text no rule claims can't stall the loop.
+    const para = [lines[i++]];
     while (i < lines.length && lines[i].trim() && !/^(```|#{1,3}\s|\s*[-*]\s|>\s*pasted from)/.test(lines[i])) para.push(lines[i++]);
     blocks.push({ type: 'para', text: para.join(' '), line: start });
   }

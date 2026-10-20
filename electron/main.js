@@ -104,7 +104,10 @@ function hideQuick() {
 }
 
 async function toggleQuick() {
-  if (!quickWin) createQuickWindow();
+  if (!quickWin) {
+    createQuickWindow();
+    await new Promise((resolve) => quickWin.webContents.once('did-finish-load', resolve));
+  }
   if (quickWin.isVisible() && quickWin.isFocused()) return hideQuick();
   const display = screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
   const { x, y, width } = display.workArea;
@@ -208,6 +211,7 @@ ipcMain.on('pty:write', (_e, id, data) => ptys.write(id, data));
 ipcMain.on('pty:resize', (_e, id, cols, rows) => ptys.resize(id, cols, rows));
 ipcMain.on('pty:kill', (_e, id) => ptys.kill(id));
 ipcMain.on('pty:ack', (_e, id, bytes) => ptys.ack(id, bytes));
+ipcMain.handle('pty:hold', (_e, id) => ptys.hold(id));
 ipcMain.on('pty:release', (_e, id) => ptys.release(id));
 ipcMain.handle('pty:cwd', (_e, id) => ptys.cwdOf(id));
 
@@ -215,7 +219,7 @@ ipcMain.handle('state:load', () => ({ state, home: app.getPath('home'), dark: na
 ipcMain.on('state:save', (_e, next) => {
   state = next;
   stateWriter.save(next);
-  quickWin?.webContents.send('state:changed', { spaces: next.spaces, settings: next.settings, profiles: next.profiles });
+  quickWin?.webContents.send('state:changed', { spaces: next.spaces, settings: next.settings, profiles: next.profiles, activeSpaceId: next.activeSpaceId, defaultProfileId: next.defaultProfileId });
 });
 
 ipcMain.handle('scrollback:save', async (_e, id, data) => {
@@ -281,6 +285,7 @@ ipcMain.handle('menu:popup', (e, items) => {
 
 ipcMain.on('app:setMenu', (_e, bindings) => buildMenu(bindings));
 ipcMain.handle('app:setHotkey', (_e, accel) => setHotkey(accel));
+ipcMain.on('app:trafficLights', (e, visible) => BrowserWindow.fromWebContents(e.sender)?.setWindowButtonVisibility(!!visible));
 ipcMain.on('app:focusMain', () => {
   mainWin?.show();
   mainWin?.focus();

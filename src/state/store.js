@@ -40,3 +40,10 @@ export function shallow(a, b) {
   for (const k of ka) if (!Object.is(a[k], b[k])) return false;
   return true;
 }
+
+export function arrayEq(a, b) {
+  if (a === b) return true;
+  if (!a || !b || a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) if (!Object.is(a[i], b[i])) return false;
+  return true;
+}

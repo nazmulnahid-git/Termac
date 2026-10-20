@@ -17,6 +17,7 @@ export default defineConfig({
     outDir: 'dist',
     emptyOutDir: true,
     target: 'chrome130',
+    chunkSizeWarningLimit: 1500,
     rollupOptions: {
       input: { main: resolve(import.meta.dirname, 'index.html'), quick: resolve(import.meta.dirname, 'quick.html') },
     },

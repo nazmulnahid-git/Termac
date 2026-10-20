@@ -91,6 +91,9 @@ export const ui = createStore({
   dark: false,
   home: '',
   sshHosts: [],
+  termTheme: 'dark', // resolved terminal theme: dark | light
+  notify: null, // finished job in another Space { id, sid, spaceId, command, exit, dur, at }
+  prompt: null, // { title, value, resolve }
 });
 
 export function patchRt(sid, patch) {

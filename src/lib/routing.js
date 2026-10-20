@@ -46,6 +46,7 @@ export function sshTarget(command) {
   let i = parts[0] === 'sudo' ? 1 : 0;
   if (!/(^|\/)(ssh|mosh|autossh)$/.test(parts[i] || '')) return null;
   const withArg = new Set(['-p', '-i', '-l', '-o', '-F', '-J', '-L', '-R', '-D', '-b', '-c', '-E', '-e', '-m', '-O', '-Q', '-S', '-W', '-w', '-B', '-I']);
+  if (/autossh$/.test(parts[i])) withArg.add('-M');
   for (i = i + 1; i < parts.length; i++) {
     const a = parts[i];
     if (withArg.has(a)) {

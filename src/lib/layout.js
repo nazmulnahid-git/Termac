@@ -22,6 +22,14 @@ export function insert(node, target, sid, edge = 'right') {
   return walk(node);
 }
 
+// Put a whole subtree on one edge of the card (used when dragging a session onto it).
+export function insertRoot(node, sub, edge = 'right') {
+  if (leaves(node).length + leaves(sub).length > MAX_PANES) return node;
+  const dir = edge === 'left' || edge === 'right' ? 'row' : 'col';
+  const first = edge === 'left' || edge === 'top';
+  return { dir, ratio: 0.5, a: first ? sub : node, b: first ? node : sub };
+}
+
 export function remove(node, sid) {
   if (!node) return null;
   if (node.sid) return node.sid === sid ? null : node;

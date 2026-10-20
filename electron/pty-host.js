@@ -164,6 +164,19 @@ export class PtyHost {
     }
   }
 
+  // Stop delivering output (and pause the process) until release(); used before a handoff.
+  hold(id) {
+    const s = this.sessions.get(id);
+    if (!s) return false;
+    this.flush();
+    s.held = true;
+    if (!s.paused) {
+      s.paused = true;
+      s.p.pause();
+    }
+    return true;
+  }
+
   // Hand a live session to another window (Quick Terminal → main window). Output is
   // held until the new owner has written the transferred scrollback and calls release().
   transfer(id, owner) {
