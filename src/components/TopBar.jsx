@@ -1,9 +1,12 @@
-// Window-wide top bar (Warp-style). The traffic lights sit in its left inset; the bar
-// itself is a window drag region with buttons carved out.
+// Window title bar. The traffic lights sit in its left inset; the bar itself is a window
+// drag region with buttons carved out. The title reads like a terminal's (where you are,
+// what's running) and doubles as the command bar trigger.
 import { app, rt, ui } from '../state/model.js';
 import * as A from '../state/actions.js';
 import { formatAccel } from '../lib/keys.js';
-import { IconSidebar, IconFiles, IconGrid, IconSearch, IconReview, IconGear } from './icons.jsx';
+import { tildify } from '../lib/routing.js';
+import { procLabel } from '../lib/meta.js';
+import { IconSidebar, IconFiles, IconGrid, IconReview, IconGear } from './icons.jsx';
 import { openSettings } from './Sidebar.jsx';
 
 export default function TopBar() {
@@ -14,6 +17,10 @@ export default function TopBar() {
   const overlay = ui.use((s) => s.overlay);
   const sid = ui.use((s) => s.focusedSid);
   const changes = rt.use((s) => s[sid]?.changes);
+  const r = rt.use((s) => s[sid]);
+  const home = ui.use((s) => s.home);
+  const space = app.use((s) => A.activeSpace(s));
+  const cwd = r?.cwd || app.get().sessions[sid]?.cwd;
   const k = (id) => (bindings[id] ? `  ${formatAccel(bindings[id])}` : '');
 
   return (
@@ -29,9 +36,17 @@ export default function TopBar() {
           <IconGrid />
         </button>
       </div>
-      <button className="tb-search" onClick={() => ui.set((u) => ({ ...u, overlay: 'commandBar', overlayArg: null }))}>
-        <IconSearch size={15} />
-        <span className="ph">Search sessions, files, folders, actions…</span>
+      <button className="tb-title" title={`Command bar${k('commandBar')}`} onClick={() => ui.set((u) => ({ ...u, overlay: 'commandBar', overlayArg: null }))}>
+        <span className="tb-prompt">❯</span>
+        {sid && cwd ? (
+          <>
+            <span className="tb-path">{tildify(cwd, home) || '~'}</span>
+            <span className="tb-sep">—</span>
+            <span className="tb-proc">{procLabel(r, r?.shell)}</span>
+          </>
+        ) : (
+          <span className="tb-path">{space?.name.toLowerCase()}</span>
+        )}
         <kbd>{formatAccel(bindings.commandBar)}</kbd>
       </button>
       <div className="tb-group right">

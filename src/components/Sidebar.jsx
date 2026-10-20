@@ -1,14 +1,13 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { app, rt, ui } from '../state/model.js';
-import { arrayEq } from '../state/store.js';
 import * as A from '../state/actions.js';
 import { useTabView, StatusMark, Chip, FailTip } from './common.jsx';
 import { formatAccel } from '../lib/keys.js';
-import { shortName, sessionName, timeAgo, formatDuration } from '../lib/meta.js';
+import { shortName, sessionName, formatDuration } from '../lib/meta.js';
 import { tildify } from '../lib/routing.js';
 import { highlight } from '../lib/fuzzy.js';
 import { findTabs } from '../lib/tabfind.js';
-import { IconFolder, IconFolderOpen, IconFolderPlus, IconChevron, IconPlus, IconMore, IconSearch, IconClose, IconLibrary, IconActivity } from './icons.jsx';
+import { IconFolder, IconFolderOpen, IconFolderPlus, IconChevron, IconPlus, IconMore, IconSearch, IconClose } from './icons.jsx';
 import Rail from './SidebarRail.jsx';
 import { SpaceTrack, useSpaceMotion } from './space-motion.jsx';
 import { PANE_MIME, renameFolder, usePeek, closePeek, rowMenu, folderMenu, spaceMenu, newFolder, promptText } from './sidebar-shared.js';
@@ -155,7 +154,6 @@ function Expanded() {
         )}
       </div>
       <SidebarCards />
-      <BottomBar />
     </div>
   );
 }
@@ -230,11 +228,11 @@ function TabFind({ query, onQuery, hits, sel, onSel, onOpen, onEverywhere, accel
 
   return (
     <label className={`tab-find${query ? ' has-query' : ''}${dragTab ? ' drop-fav' : ''}${hot ? ' drop-into' : ''}`} data-drop-into={dragTab ? destAttr('fav') : undefined}>
-      <IconSearch size={13} />
+      <span className="slash">/</span>
       {dragTab && noFavorites ? (
         <span className="hint">Drop here to add to Favorites</span>
       ) : (
-        <input ref={ref} value={query} placeholder="Find a session" spellCheck={false} onChange={(e) => onQuery(e.target.value)} onKeyDown={onKeyDown} />
+        <input ref={ref} value={query} placeholder="filter sessions" spellCheck={false} onChange={(e) => onQuery(e.target.value)} onKeyDown={onKeyDown} />
       )}
       {query ? (
         <button
@@ -694,104 +692,5 @@ export function SidebarCards() {
   );
 }
 
-export function SpaceDots({ vertical }) {
-  const spaces = app.use((s) => s.spaces);
-  const activeId = app.use((s) => s.activeSpaceId);
-  const unseen = app.use((s) => [...new Set(s.activity.filter((a) => !a.seen).map((a) => a.spaceId))], arrayEq);
-  const dragTab = ui.use((s) => s.dragging?.kind === 'tab');
-  const hot = ui.use((s) => (s.dragging?.target?.kind === 'space' ? s.dragging.target.spaceId : null));
-  return (
-    <div className={`space-dots${vertical ? ' vertical' : ''}`}>
-      {spaces.map((sp, i) => (
-        <button
-          key={sp.id}
-          className={`space-dot${sp.id === activeId ? ' on' : ''}${hot === sp.id ? ' drop-into' : ''}`}
-          data-drop-space={dragTab ? sp.id : undefined}
-          style={{ '--c': sp.color }}
-          title={`${sp.name}  ⌃${i + 1}`}
-          onClick={() => A.switchSpace(sp.id)}
-          onDoubleClick={() => ui.set((u) => ({ ...u, overlay: 'spaceEditor', overlayArg: sp.id }))}
-        >
-          <i />
-          {unseen.includes(sp.id) && sp.id !== activeId && <span className="badge" />}
-        </button>
-      ))}
-      <button className="icon-btn sm" title="New Space" onClick={() => ui.set((u) => ({ ...u, overlay: 'spaceEditor', overlayArg: null }))}>
-        <IconPlus size={13} />
-      </button>
-    </div>
-  );
-}
-
-export function useActivityButton() {
-  const [open, setOpen] = useState(false);
-  const hasActivity = app.use((s) => s.activity.some((a) => !a.seen));
-  const button = (
-    <button className="icon-btn activity-btn" title="Finished jobs" onClick={() => setOpen((o) => !o)}>
-      <IconActivity />
-      {hasActivity && <span className="badge" />}
-    </button>
-  );
-  return { button, popover: open && <ActivityPopover onClose={() => setOpen(false)} /> };
-}
-
 export const openLibrary = () => ui.set((u) => ({ ...u, view: u.view === 'library' ? 'terminal' : 'library' }));
 export const openSettings = () => ui.set((u) => ({ ...u, overlay: 'settings', overlayArg: null }));
-
-function BottomBar() {
-  const view = ui.use((s) => s.view);
-  const activity = useActivityButton();
-  return (
-    <div className="sb-bottom">
-      <button className={`icon-btn${view === 'library' ? ' on' : ''}`} title="Library" onClick={openLibrary}>
-        <IconLibrary />
-      </button>
-      <SpaceDots />
-      {activity.button}
-      {activity.popover}
-    </div>
-  );
-}
-
-function ActivityPopover({ onClose }) {
-  const items = app.use((s) => s.activity);
-  const spaces = app.use((s) => s.spaces);
-  const ref = useRef(null);
-  useEffect(() => {
-    const off = (e) => !ref.current?.contains(e.target) && onClose();
-    setTimeout(() => window.addEventListener('mousedown', off), 0);
-    app.set((s) => (s.activity.some((a) => !a.seen) ? { ...s, activity: s.activity.map((a) => ({ ...a, seen: true })) } : s));
-    return () => window.removeEventListener('mousedown', off);
-  }, []);
-  return (
-    <div ref={ref} className="activity-pop">
-      <div className="modal-title" style={{ paddingBottom: 8 }}>
-        Finished jobs
-      </div>
-      <div style={{ overflowY: 'auto', padding: '0 8px 8px' }}>
-        {!items.length && <div className="dim" style={{ padding: '6px 12px 12px', fontSize: 12 }}>Commands that run longer than the notify threshold show up here.</div>}
-        {items.map((a) => (
-          <button
-            key={a.id}
-            className="row"
-            style={{ height: 'auto', padding: '6px 10px', width: 'calc(100% - 16px)', textAlign: 'left' }}
-            onClick={() => {
-              A.jumpTo(a.sid);
-              onClose();
-            }}
-          >
-            <StatusMark status={a.exit ? 'fail' : 'ok'} />
-            <span className="grow">
-              <div className="mono ellipsis" style={{ fontSize: 12 }}>
-                {a.command}
-              </div>
-              <div className="dim" style={{ fontSize: 11 }}>
-                {spaces.find((x) => x.id === a.spaceId)?.name} · {formatDuration(a.dur)} · {timeAgo(a.at)}
-              </div>
-            </span>
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}

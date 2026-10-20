@@ -3,10 +3,10 @@
 
 export const TERMINAL_THEMES = {
   dark: {
-    background: '#17181d',
+    background: '#131417',
     foreground: '#d8dae0',
     cursor: '#d8dae0',
-    cursorAccent: '#17181d',
+    cursorAccent: '#131417',
     selectionBackground: 'rgba(136,173,255,.28)',
     black: '#2a2c33',
     red: '#ff8080',

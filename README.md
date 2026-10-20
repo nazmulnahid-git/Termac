@@ -9,7 +9,8 @@ A macOS terminal where every session lives in a vertical sidebar, grouped into c
   - Favorites: always-on sessions shared by every Space.
   - Pinned: named sessions in collapsible folders.
   - Today: temporary sessions.
-  - Live status on every row: running, idle, ✓ done, ! failed (hover for the exit code, click to jump to the error), and a bell badge.
+  - Live status on every row: running, idle, ✓ done, ✗ failed (hover for the exit code, click to jump to the error), and a bell badge.
+- **Status line.** A tmux-style bar along the bottom lists Spaces as `1:work*` (`*` current, `#` unseen finished jobs; drop a session on one to move it there), plus finished jobs, the Library, the focused session's process and size, and a clock. The title bar shows the focused session's directory and process; click it for the command bar.
 - **Command bar (⌘T).** One fuzzy search over open sessions, recent directories, SSH hosts (`~/.ssh/config`), snippets and actions. Prefixes: `>` runs a command, `@` searches hosts, `/` searches snippets. ⇥ cycles filters.
 - **Splits.** ⌘D / ⇧⌘D, up to four panes per card. You can also drag a sidebar row onto a card edge. Dividers snap to ⅓, ½ and ⅔. Drag a pane header back to the sidebar to unsplit it.
 - **Peek.** Hover a row for 400 ms to see its last lines streaming live. ⇧-click keeps the peek open.
@@ -29,7 +30,7 @@ A macOS terminal where every session lives in a vertical sidebar, grouped into c
 | Layer | Notes |
 | --- | --- |
 | `electron/pty-host.js` | Owns every PTY (`node-pty`). Output is coalesced into one IPC message per window per ~4 ms. Ack-based flow control pauses runaway processes. The foreground process is polled every 1.5 s. |
-| `electron/shell-integration/` | Hooks for zsh, bash and fish. They emit OSC 633 marks (prompt, command, exit code, cwd) and still load your own dotfiles. These marks drive the status dots, names, notifications, ⇧⌘C and the Library. |
+| `electron/shell-integration/` | Hooks for zsh, bash and fish. They emit OSC 633 marks (prompt, command, exit code, cwd) and still load your own dotfiles. These marks drive the status marks, names, notifications, ⇧⌘C and the Library. |
 | `electron/library.js` | Archived sessions: a JSON index plus one ANSI scrollback file each. Search reads files lazily with a bounded cache. |
 | `src/term/registry.js` | One xterm.js instance per session. Off-screen terminals are parked, so xterm pauses their rendering. Only visible panes hold a WebGL context. Restored sessions get a shell only when first shown. |
 | `src/state/` | Three small stores (persisted app model, runtime status, UI) with selector subscriptions. All mutations live in `actions.js`. |

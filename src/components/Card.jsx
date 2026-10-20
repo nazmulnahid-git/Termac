@@ -178,11 +178,6 @@ function Pane({ sid, focused, multi, danger, look }) {
           <span className={`dot6${r.status === 'run' ? ' st-run' : ''}`} style={{ background: procColor }} />
           {procLabel(r, r.shell)}
         </span>
-        {r.cols && (
-          <span className="size">
-            {r.shell || 'zsh'} · {r.cols}×{r.rows}
-          </span>
-        )}
       </div>
       <div className="term-wrap">
         <div className="term-slot" ref={slot} />
@@ -295,27 +290,35 @@ function EmptySpace() {
   };
   return (
     <div className="empty">
-      <div className="tile">{space.glyph}</div>
-      <h2>{space.name} is ready</h2>
-      <p>Open a terminal to get going. Anything you pin here stays with this Space; everything else tidies itself away.</p>
-      <div className="actions">
-        <button className="btn primary" onClick={() => A.openTerminal()}>
-          New Terminal <kbd>{formatAccel(key)}</kbd>
-        </button>
-        <button className="btn" onClick={open}>
-          Open directory…
-        </button>
-      </div>
-      {recent.length > 0 && (
-        <div className="recent">
-          Recent:
+      <div className="empty-box">
+        <div className="motd">
+          <span style={{ color: space.color }}>{space.glyph}</span> <b>{space.name}</b> <span className="dim">— no open sessions</span>
+        </div>
+        <p>Open a terminal to get going. Anything you pin here stays with this Space; everything else tidies itself away.</p>
+        <div className="cmds">
+          <button className="cmd" onClick={() => A.openTerminal()}>
+            <span>new terminal</span>
+            <i />
+            <kbd>{formatAccel(key)}</kbd>
+          </button>
+          <button className="cmd" onClick={open}>
+            <span>open directory…</span>
+            <i />
+          </button>
           {recent.map((d) => (
-            <button key={d.path} className="tag" onClick={() => A.openTerminal({ cwd: d.path })}>
-              {d.path.replace(home, '~')}
+            <button key={d.path} className="cmd" onClick={() => A.openTerminal({ cwd: d.path })}>
+              <span>
+                <span className="dim">cd</span> {d.path.replace(home, '~')}
+              </span>
+              <i />
             </button>
           ))}
         </div>
-      )}
+        <div className="motd-prompt">
+          <span style={{ color: space.color }}>❯</span>
+          <span className="cursor" />
+        </div>
+      </div>
     </div>
   );
 }

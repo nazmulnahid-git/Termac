@@ -29,7 +29,7 @@ export function useTabView(tid) {
 
 export function StatusMark({ status, bell }) {
   if (status === 'bell') return <span className="status st-bell">{bell}</span>;
-  if (status === 'fail') return <span className="status st-fail">!</span>;
+  if (status === 'fail') return <span className="status st-fail">✗</span>;
   if (status === 'run') return <span className="status st-run" />;
   if (status === 'ok') return <span className="status st-ok">✓</span>;
   return <span className="status st-idle" />;

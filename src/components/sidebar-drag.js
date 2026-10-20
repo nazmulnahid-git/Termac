@@ -139,6 +139,9 @@ function hitTab(x, y) {
   const pane = drag.item.kind === 'pane';
   // Rows still shown during the drag: a pulled-out pane leaves its split row in place.
   const visible = (ids) => (pane ? ids : ids.filter((x) => x !== tid));
+  // Space tabs live in the status line, outside the sidebar.
+  const dot = el.closest('[data-drop-space]');
+  if (dot) return pane ? drag.target : { kind: 'space', spaceId: dot.dataset.dropSpace };
   if (!el.closest('.sidebar')) {
     const card = el.closest('.card');
     if (pane || !card || !canMerge(tid)) return null;
@@ -147,8 +150,6 @@ function hitTab(x, y) {
     return { kind: 'card', edge: Object.entries(d).sort((a, b) => a[1] - b[1])[0][0] };
   }
   if (el.closest('[data-drop-ph]')) return drag.target;
-  const dot = el.closest('[data-drop-space]');
-  if (dot) return pane ? drag.target : { kind: 'space', spaceId: dot.dataset.dropSpace };
   const item = el.closest('[data-drag-tid]');
   const list = item?.closest('[data-drop-list]');
   if (item && list) {

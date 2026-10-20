@@ -51,7 +51,7 @@ function createMainWindow() {
     show: false,
     titleBarStyle: 'hiddenInset',
     trafficLightPosition: { x: 16, y: 13 },
-    backgroundColor: nativeTheme.shouldUseDarkColors ? '#1b1c21' : '#eeeeec',
+    backgroundColor: nativeTheme.shouldUseDarkColors ? '#0f1013' : '#f2f2f0',
     webPreferences,
   });
   load(mainWin, 'index.html');
@@ -85,7 +85,7 @@ function createQuickWindow() {
     fullscreenable: false,
     hasShadow: true,
     roundedCorners: true,
-    backgroundColor: nativeTheme.shouldUseDarkColors ? '#17181d' : '#fcfcfa',
+    backgroundColor: nativeTheme.shouldUseDarkColors ? '#131417' : '#fcfcfa',
     webPreferences,
   });
   quickWin.setAlwaysOnTop(true, 'floating');

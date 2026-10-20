@@ -3,8 +3,8 @@ import { app, ui } from '../state/model.js';
 import * as A from '../state/actions.js';
 import { useTabView } from './common.jsx';
 import { formatAccel } from '../lib/keys.js';
-import { IconPlus, IconFolder, IconFolderOpen, IconLibrary } from './icons.jsx';
-import { SpaceDots, SidebarCards, useActivityButton, openLibrary } from './Sidebar.jsx';
+import { IconPlus, IconFolder, IconFolderOpen } from './icons.jsx';
+import { SidebarCards } from './Sidebar.jsx';
 import { usePeek, rowMenu, folderMenu } from './sidebar-shared.js';
 import { PH, pressTab, pressFolder, useDropList, useDropFolders, destAttr } from './sidebar-drag.js';
 import { SpaceTrack } from './space-motion.jsx';
@@ -14,11 +14,9 @@ import { SpaceTrack } from './space-motion.jsx';
 export default function Rail() {
   const favorites = app.use((s) => s.favorites);
   const bindings = app.use((s) => s.settings.keybindings);
-  const view = ui.use((s) => s.view);
   const dragging = ui.use((s) => !!s.dragging);
   const favs = useDropList(favorites, { section: 'fav' });
   const [tip, setTip] = useState(null);
-  const activity = useActivityButton();
   const showTip = (e, text) => {
     const r = e.currentTarget.getBoundingClientRect();
     setTip({ text, top: r.top + r.height / 2, left: r.right + 10 });
@@ -37,14 +35,6 @@ export default function Rail() {
         <SpaceTrack render={(space) => <RailBody space={space} bindings={bindings} tipProps={tipProps} onTip={showTip} onTipEnd={() => setTip(null)} />} />
       </div>
       <SidebarCardsCompact />
-      <div className="rail-bottom">
-        <SpaceDots vertical />
-        <button className={`rail-btn${view === 'library' ? ' on' : ''}`} onClick={openLibrary} {...tipProps('Library')}>
-          <IconLibrary />
-        </button>
-        {activity.button}
-      </div>
-      {activity.popover}
       {tip && !dragging && (
         <div className="rail-tip" style={{ top: tip.top, left: tip.left }}>
           {tip.text}
