@@ -39,8 +39,8 @@ const TOTAL_CAP = 40;
 const EMPTY_CAP = { session: 6, dir: 4 };
 const EMPTY_ACTIONS = ['newTerminal', 'openDir', 'splitRight', 'library', 'settings'];
 
-export default function CommandBar({ onClose }) {
-  const [query, setQuery] = useState('');
+export default function CommandBar({ onClose, initial = '' }) {
+  const [query, setQuery] = useState(initial);
   const [filter, setFilter] = useState('all');
   const [sel, setSel] = useState(0);
   const [pathOk, setPathOk] = useState(null);

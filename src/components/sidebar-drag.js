@@ -13,6 +13,7 @@ import { flushSync } from 'react-dom';
 import { app, ui } from '../state/model.js';
 import * as A from '../state/actions.js';
 import * as L from '../lib/layout.js';
+import { closePeek } from './sidebar-shared.js';
 
 export const PH = '\u0000ph';
 const THRESHOLD = 4;
@@ -20,7 +21,7 @@ const SPRING_MS = 550;
 const MERGE_MS = 420; // hover the middle of a row this long to merge into a split
 const SETTLE_MS = 170;
 const EASE = 'cubic-bezier(0.2, 0.8, 0.2, 1)';
-const FLIP_SEL = '.sidebar :is(.row, .fav, .folder, .sec-title, .today-head, .pin-empty, .folder-empty, .rail-tile, .rail-btn, .rail-space, .rail-sep):not(.space-ghost *)';
+const FLIP_SEL = '.sidebar :is(.row, .fav, .folder, .sec-title, .today-head, .pin-empty, .folder-empty, .rail-tile, .rail-btn, .rail-space, .rail-sep)';
 
 let drag = null;
 
@@ -102,6 +103,7 @@ function begin(el, item, sx, sy, pointerId) {
     origin = s.spaces.find((x) => x.id === item.spaceId)?.folders.findIndex((f) => f.id === item.folderId) ?? 0;
   }
   drag = { item, ghost, dx: sx - r.left, dy: sy - r.top, target: null, spring: null, springKey: null, mergeTimer: null };
+  closePeek();
   flip(() => ui.set((u) => ({ ...u, dragging: { ...item, origin, target: null }, peek: null })));
 }
 

@@ -22,7 +22,7 @@ export function usePeek(tid, sid, isActive) {
       clearTimeout(peekTimer);
       const el = e.currentTarget;
       if (ui.get().peek) show(el, ui.get().peek.pinned);
-      else peekTimer = setTimeout(() => show(el), 400);
+      else peekTimer = setTimeout(() => !ui.get().dragging && el.isConnected && show(el), 400);
     },
     onMouseLeave() {
       clearTimeout(peekTimer);

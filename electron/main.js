@@ -166,6 +166,7 @@ function buildMenu(bindings = {}) {
       submenu: [
         item('New Terminal', 'newTerminal'),
         item('Command Bar', 'commandBar'),
+        item('Find Session…', 'findTab'),
         { type: 'separator' },
         item('Split Right', 'splitRight'),
         item('Split Down', 'splitDown'),

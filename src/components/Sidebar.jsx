@@ -1,14 +1,16 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { app, rt, ui } from '../state/model.js';
 import { arrayEq } from '../state/store.js';
 import * as A from '../state/actions.js';
 import { useTabView, StatusMark, Chip, FailTip } from './common.jsx';
 import { formatAccel } from '../lib/keys.js';
-import { shortName, timeAgo, formatDuration } from '../lib/meta.js';
+import { shortName, sessionName, timeAgo, formatDuration } from '../lib/meta.js';
 import { tildify } from '../lib/routing.js';
-import { IconSidebar, IconFolder, IconFolderOpen, IconFolderPlus, IconChevron, IconPlus, IconMore, IconSearch, IconLibrary, IconActivity, IconGear } from './icons.jsx';
+import { highlight } from '../lib/fuzzy.js';
+import { findTabs } from '../lib/tabfind.js';
+import { IconFolder, IconFolderOpen, IconFolderPlus, IconChevron, IconPlus, IconMore, IconSearch, IconClose, IconLibrary, IconActivity } from './icons.jsx';
 import Rail from './SidebarRail.jsx';
-import { useSpaceMotion } from './space-motion.js';
+import { SpaceTrack, useSpaceMotion } from './space-motion.jsx';
 import { PANE_MIME, renameFolder, usePeek, closePeek, rowMenu, folderMenu, spaceMenu, newFolder, promptText } from './sidebar-shared.js';
 import { PH, pressTab, pressPane, pressFolder, useDropList, useDropFolders, destAttr } from './sidebar-drag.js';
 
@@ -18,6 +20,7 @@ const RAIL_WIDTH = 68;
 const HIDE_SLOP = 8; // px past the right edge before a revealed sidebar starts to hide
 const HIDE_DELAY = 150;
 const isPaneDrag = (e) => e.dataTransfer.types.includes(PANE_MIME);
+let findTickSeen = 0; // last ⌘J press the filter answered, so a remount doesn't steal focus
 
 export default function Sidebar({ floating, onLeave }) {
   const mode = app.use((s) => s.settings.sidebarMode);
@@ -25,7 +28,7 @@ export default function Sidebar({ floating, onLeave }) {
   const [dragW, setDragW] = useState(null);
   const ref = useRef(null);
   const loader = useRef(null);
-  const onWheel = useSpaceMotion(ref, loader);
+  const onWheel = useSpaceMotion(loader);
   const leave = useRef(onLeave);
   leave.current = onLeave;
   const compact = mode === 'compact' && !floating;
@@ -61,7 +64,7 @@ export default function Sidebar({ floating, onLeave }) {
       onWheel={onWheel}
       onMouseLeave={closePeek}
     >
-      {compact ? <Rail /> : <Expanded onDismiss={floating ? () => leave.current?.() : null} />}
+      {compact ? <Rail /> : <Expanded />}
       {/* Swiping past the last Space fills this ring; completing it makes a new Space. */}
       <div className="space-new" ref={loader} aria-hidden="true">
         <svg className="progress" viewBox="0 0 40 40">
@@ -98,14 +101,25 @@ function ResizeHandle({ width, onDrag }) {
 }
 
 // ---- Expanded -----------------------------------------------------------------------
-function Expanded({ onDismiss }) {
-  const space = app.use((s) => A.activeSpace(s));
+function Expanded() {
   const favorites = app.use((s) => s.favorites);
   const bindings = app.use((s) => s.settings.keybindings);
-  const pinned = useDropList(space.pinned, { section: 'pinned', spaceId: space.id });
-  const today = useDropList(space.today, { section: 'today', spaceId: space.id });
-  const folders = useDropFolders(space);
   const [paneOver, setPaneOver] = useState(false);
+  const [find, setFind] = useState({ query: '', sel: 0 });
+  const hits = useTabHits(find.query);
+  const finding = !!find.query.trim();
+  const sel = Math.min(find.sel, Math.max(0, hits.length - 1)); // sessions can close mid-search
+  const setQuery = (query) => setFind({ query, sel: 0 });
+  const setSel = (sel) => setFind((f) => ({ ...f, sel }));
+  const open = (hit) => {
+    setQuery('');
+    A.activateTab(hit.tid);
+  };
+  const everywhere = () => {
+    const q = find.query.trim();
+    setQuery('');
+    ui.set((u) => ({ ...u, overlay: 'commandBar', overlayArg: q }));
+  };
 
   // Panes dragged out of a split (HTML5 drag from the card header) land in Today.
   const dropPane = (e) => {
@@ -115,9 +129,6 @@ function Expanded({ onDismiss }) {
     e.preventDefault();
     A.unsplit(pane);
   };
-
-  const isEmpty = !pinned.length && !space.folders.length;
-  const todayEnd = destAttr('today', space.id);
 
   return (
     <div
@@ -131,34 +142,17 @@ function Expanded({ onDismiss }) {
       onDragLeave={(e) => !e.currentTarget.contains(e.relatedTarget) && setPaneOver(false)}
     >
       <div className="sb-top">
-        <Location bindings={bindings} noFavorites={!favorites.length} />
-        {/* Revealed over a hidden sidebar: just put it away again; don't leave focus mode. */}
-        <button className="icon-btn" title={onDismiss ? 'Hide sidebar' : `Collapse sidebar  ${formatAccel(bindings.toggleSidebar)}`} onClick={onDismiss || A.toggleSidebar}>
-          <IconSidebar />
-        </button>
+        <TabFind query={find.query} onQuery={setQuery} hits={hits} sel={sel} onSel={setSel} onOpen={open} onEverywhere={everywhere} accel={bindings.findTab} noFavorites={!favorites.length} />
       </div>
       <div className="sb-scroll">
-        <Favorites ids={favorites} />
-        <div className="space-pane">
-          <SpaceHeader space={space} />
-          <Section items={pinned} dest={{ section: 'pinned', spaceId: space.id }} />
-          {folders.map((f) => (f === PH ? <div key="folder-ph" className="folder-ph" data-drop-ph /> : <Folder key={f.id} folder={f} spaceId={space.id} />))}
-          {isEmpty && (
-            <div className="pin-empty" data-drop-into={destAttr('pinned', space.id, null, 0)}>
-              Drag a session here to keep it in {space.name}
-            </div>
-          )}
-          <TodayHeader space={space} />
-          <Section items={today} dest={{ section: 'today', spaceId: space.id }} />
-          <button className="row new" data-drop-into={todayEnd} onClick={() => A.openTerminal()}>
-            <span className="chip">
-              <IconPlus size={11} />
-            </span>
-            <span className="name">New Terminal</span>
-            <kbd>{formatAccel(bindings.newTerminal)}</kbd>
-          </button>
-          <div className="sb-fill" data-drop-into={todayEnd} />
-        </div>
+        {finding ? (
+          <FindResults query={find.query} hits={hits} sel={sel} onSel={setSel} onOpen={open} onEverywhere={everywhere} accel={bindings.commandBar} />
+        ) : (
+          <>
+            <Favorites ids={favorites} />
+            <SpaceTrack render={(space) => <SpaceBody space={space} bindings={bindings} />} />
+          </>
+        )}
       </div>
       <SidebarCards />
       <BottomBar />
@@ -166,25 +160,200 @@ function Expanded({ onDismiss }) {
   );
 }
 
-function Location({ bindings, noFavorites }) {
-  const sid = ui.use((s) => s.focusedSid);
-  const cwd = rt.use((s) => s[sid]?.cwd);
-  const host = rt.use((s) => s[sid]?.dangerHost);
-  const home = ui.use((s) => s.home);
+// One Space's sessions. The carousel renders this for neighbouring Spaces too while sliding.
+function SpaceBody({ space, bindings }) {
+  const pinned = useDropList(space.pinned, { section: 'pinned', spaceId: space.id });
+  const today = useDropList(space.today, { section: 'today', spaceId: space.id });
+  const folders = useDropFolders(space);
+  const isEmpty = !pinned.length && !space.folders.length;
+  const todayEnd = destAttr('today', space.id);
+  return (
+    <>
+      <SpaceHeader space={space} />
+      <Section items={pinned} dest={{ section: 'pinned', spaceId: space.id }} />
+      {folders.map((f) => (f === PH ? <div key="folder-ph" className="folder-ph" data-drop-ph /> : <Folder key={f.id} folder={f} spaceId={space.id} />))}
+      {isEmpty && (
+        <div className="pin-empty" data-drop-into={destAttr('pinned', space.id, null, 0)}>
+          Drag a session here to keep it in {space.name}
+        </div>
+      )}
+      <TodayHeader space={space} />
+      <Section items={today} dest={{ section: 'today', spaceId: space.id }} />
+      <button className="row new" data-drop-into={todayEnd} onClick={() => A.openTerminal()}>
+        <span className="chip">
+          <IconPlus size={11} />
+        </span>
+        <span className="name">New Terminal</span>
+        <kbd>{formatAccel(bindings.newTerminal)}</kbd>
+      </button>
+      <div className="sb-fill" data-drop-into={todayEnd} />
+    </>
+  );
+}
+
+// ---- Find ----------------------------------------------------------------------------
+// Inline session filter: it narrows the sidebar in place rather than opening the command
+// bar (the top bar's search covers files, folders and actions). While a session is being
+// dragged it doubles as the drop target for Favorites.
+function TabFind({ query, onQuery, hits, sel, onSel, onOpen, onEverywhere, accel, noFavorites }) {
+  const ref = useRef(null);
+  const tick = ui.use((s) => s.tabFind);
   const dragTab = ui.use((s) => s.dragging?.kind === 'tab');
   const hot = ui.use((s) => s.dragging?.target?.section === 'fav');
+
+  useEffect(() => {
+    if (tick === findTickSeen) return;
+    findTickSeen = tick;
+    ref.current?.focus();
+    ref.current?.select();
+  }, [tick]);
+
+  const backToTerminal = () => {
+    ref.current?.blur();
+    const sid = A.focusedSid();
+    if (sid) A.focusSession(sid);
+  };
+  const onKeyDown = (e) => {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (hits.length) onSel((sel + (e.key === 'ArrowDown' ? 1 : -1) + hits.length) % hits.length);
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (hits[sel]) onOpen(hits[sel]);
+      else if (query.trim()) onEverywhere();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      if (query) onQuery('');
+      else backToTerminal();
+    }
+  };
+
   return (
-    <button
-      className={`location${dragTab ? ' drop-fav' : ''}${hot ? ' drop-into' : ''}`}
-      title="Search sessions, folders, hosts and actions"
-      data-drop-into={dragTab ? destAttr('fav') : undefined}
-      onClick={() => ui.set((u) => ({ ...u, overlay: 'commandBar' }))}
-    >
-      <IconSearch size={14} />
-      {dragTab && noFavorites ? <span className="path hint">Drop here to add to Favorites</span> : <span className="path">&lrm;{host || tildify(cwd, home) || '~'}</span>}
-      <kbd>{formatAccel(bindings.commandBar)}</kbd>
-    </button>
+    <label className={`tab-find${query ? ' has-query' : ''}${dragTab ? ' drop-fav' : ''}${hot ? ' drop-into' : ''}`} data-drop-into={dragTab ? destAttr('fav') : undefined}>
+      <IconSearch size={13} />
+      {dragTab && noFavorites ? (
+        <span className="hint">Drop here to add to Favorites</span>
+      ) : (
+        <input ref={ref} value={query} placeholder="Find a session" spellCheck={false} onChange={(e) => onQuery(e.target.value)} onKeyDown={onKeyDown} />
+      )}
+      {query ? (
+        <button
+          className="clear"
+          title="Clear"
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => {
+            onQuery('');
+            ref.current?.focus();
+          }}
+        >
+          <IconClose size={11} />
+        </button>
+      ) : (
+        accel && !dragTab && <kbd>{formatAccel(accel)}</kbd>
+      )}
+    </label>
   );
+}
+
+// Every session in every Space (Favorites first), ranked against the query. Subscribes to
+// the stores only while there is a query, so an idle filter costs nothing.
+function useTabHits(query) {
+  const live = !!query.trim();
+  const s = app.use((st) => (live ? st : null));
+  const r = rt.use((st) => (live ? st : null));
+  const home = ui.use((u) => u.home);
+  return useMemo(() => {
+    if (!s) return [];
+    const items = [];
+    const add = (tid, spaceId) => {
+      const tab = s.tabs[tid];
+      if (!tab) return;
+      const sids = collectSids(tab.layout);
+      const name = tab.name || sids.map((sid) => sessionName(null, r[sid], home)).join(' · ') || '~';
+      const lead = tab.activeSid && sids.includes(tab.activeSid) ? tab.activeSid : sids[0];
+      items.push({ tid, name, path: tildify(r[lead]?.cwd || s.sessions[lead]?.cwd, home) || '', spaceId });
+    };
+    for (const tid of s.favorites) add(tid, null);
+    for (const sp of s.spaces) for (const tid of A.tabsOfSpace(sp)) add(tid, sp.id);
+    return findTabs(query, items, s.activeSpaceId);
+  }, [s, r, home, query]);
+}
+
+function FindResults({ query, hits, sel, onSel, onOpen, onEverywhere, accel }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    ref.current?.querySelector('.find-row.sel')?.scrollIntoView({ block: 'nearest' });
+  }, [sel]);
+
+  if (!hits.length) {
+    return (
+      <div className="find-empty">
+        <div className="t">No sessions match “{query.trim()}”</div>
+        <button className="find-more" onClick={onEverywhere}>
+          <IconSearch size={12} />
+          <span>Search files, folders & actions</span>
+          <kbd>↵</kbd>
+        </button>
+        {accel && <div className="dim">Command bar · {formatAccel(accel)}</div>}
+      </div>
+    );
+  }
+  return (
+    <div className="find-results" ref={ref}>
+      <div className="today-head">
+        {hits.length === 1 ? '1 session' : `${hits.length} sessions`}
+        <span className="rule" />
+      </div>
+      <div className="rows">
+        {hits.map((h, i) => (
+          <FindRow key={h.tid} hit={h} sel={i === sel} onHover={() => onSel(i)} onOpen={() => onOpen(h)} />
+        ))}
+      </div>
+      <div className="find-keys">
+        <span>
+          <kbd>↑</kbd>
+          <kbd>↓</kbd> move
+        </span>
+        <span>
+          <kbd>↵</kbd> open
+        </span>
+        <span>
+          <kbd>esc</kbd> clear
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function FindRow({ hit, sel, onHover, onOpen }) {
+  const v = useTabView(hit.tid);
+  const on = app.use((s) => A.activeTabId(s) === hit.tid);
+  // Sessions parked in another Space say where they live.
+  const elsewhere = app.use((s) => (hit.spaceId && hit.spaceId !== s.activeSpaceId ? s.spaces.find((x) => x.id === hit.spaceId) : null));
+  if (!v) return null;
+  const byPath = hit.on === 'path';
+  return (
+    <div className={`row find-row${on ? ' on' : ''}${sel ? ' sel' : ''}${v.dead ? ' dead' : ''}`} onMouseMove={sel ? undefined : onHover} onMouseDown={(e) => e.preventDefault()} onClick={onOpen}>
+      <Chip kind={v.active?.kind} />
+      <span className="name">{byPath ? hit.name : <Marked text={hit.name} indices={hit.indices} />}</span>
+      {(byPath || elsewhere) && (
+        <span className={`where${byPath ? ' path' : ''}`}>
+          {elsewhere && (
+            <span className="glyph" style={{ color: elsewhere.color }}>
+              {elsewhere.glyph}
+            </span>
+          )}
+          {byPath ? <span className="txt">&lrm;<Marked text={hit.path} indices={hit.indices} /></span> : <span className="txt">{elsewhere.name}</span>}
+        </span>
+      )}
+      {v.danger && <span className="prod">PROD</span>}
+      <StatusMark status={v.status} bell={v.bell} />
+    </div>
+  );
+}
+
+function Marked({ text, indices }) {
+  return highlight(text, indices).map((p, i) => (p.hit ? <mark key={i}>{p.text}</mark> : <span key={i}>{p.text}</span>));
 }
 
 function SpaceHeader({ space }) {
@@ -244,10 +413,13 @@ function Row({ tid, indent }) {
   const on = app.use((s) => A.activeTabId(s) === tid);
   const [hover, setHover] = useState(false);
   const [renaming, setRenaming] = useState(false);
+  // While a session hovers this row to merge, preview the split it would make.
   const merge = ui.use((s) => (s.dragging?.target?.tid === tid ? s.dragging.target.kind : null));
+  const incoming = useTabView(ui.use((s) => (s.dragging?.target?.tid === tid ? s.dragging.tabId : null)));
   const peek = usePeek(tid, v?.active?.sid, on);
   if (!v) return null;
-  const split = v.panes.length > 1 && !renaming;
+  const segs = merge && incoming ? [...v.panes, ...incoming.panes.map((p) => ({ ...p, incoming: true }))] : v.panes;
+  const split = segs.length > 1 && !renaming;
   const click = (e) => {
     if (e.shiftKey) return;
     if (v.status === 'fail' && !on) return A.jumpToFailure(v.fail.sid);
@@ -273,28 +445,47 @@ function Row({ tid, indent }) {
     >
       {split ? (
         // Arc-style split: one segment per pane on the same line. Click one to focus that
-        // pane; ⌥-drag one to pull it out into its own row.
+        // pane, ✕ closes just that pane, ⌥-drag pulls it out into its own row.
         <span className="segs" title={v.tab.name || undefined}>
-          {v.panes.map((p) => (
-            <span
-              key={p.sid}
-              className={`tab-seg${on && p.sid === v.tab.activeSid ? ' cur' : ''}`}
-              title={`${p.name}  ·  ⌥-drag to pull out`}
-              onPointerDown={(e) => {
-                if (!e.altKey) return;
-                e.stopPropagation();
-                pressPane(e, tid, p.sid);
-              }}
-              onClick={(e) => {
-                if (e.shiftKey) return;
-                e.stopPropagation();
-                A.focusSession(p.sid);
-              }}
-            >
-              <Chip kind={p.kind} />
-              <span className="name">{p.name}</span>
-            </span>
-          ))}
+          {segs.map((p) =>
+            p.incoming ? (
+              <span key={p.sid} className={`tab-seg incoming${merge === 'merge' ? ' ready' : ''}`}>
+                <Chip kind={p.kind} />
+                <span className="name">{p.name}</span>
+              </span>
+            ) : (
+              <span
+                key={p.sid}
+                className={`tab-seg${on && p.sid === v.tab.activeSid ? ' cur' : ''}`}
+                title={v.panes.length > 1 ? `${p.name}  ·  ⌥-drag to pull out` : p.name}
+                onPointerDown={(e) => {
+                  if (!e.altKey || v.panes.length < 2) return;
+                  e.stopPropagation();
+                  pressPane(e, tid, p.sid);
+                }}
+                onClick={(e) => {
+                  if (e.shiftKey) return;
+                  e.stopPropagation();
+                  A.focusSession(p.sid);
+                }}
+              >
+                <Chip kind={p.kind} />
+                <span className="name">{p.name}</span>
+                {v.panes.length > 1 && (
+                  <button
+                    className="seg-close"
+                    title="Close this pane"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      A.closePane(p.sid);
+                    }}
+                  >
+                    ✕
+                  </button>
+                )}
+              </span>
+            )
+          )}
         </span>
       ) : (
         <Chip kind={v.active?.kind} />
@@ -311,9 +502,11 @@ function Row({ tid, indent }) {
         <span className="name">{v.name}</span>
       )}
       {v.danger && <span className="prod">PROD</span>}
-      <button className="close" title="Close" onClick={(e) => (e.stopPropagation(), A.closeTab(tid))}>
-        ✕
-      </button>
+      {!split && (
+        <button className="close" title="Close" onClick={(e) => (e.stopPropagation(), A.closeTab(tid))}>
+          ✕
+        </button>
+      )}
       <StatusMark status={v.status} bell={v.bell} />
       {hover && v.status === 'fail' && !ui.get().peek && !ui.get().dragging && <FailTip rt={v.fail.rt} />}
     </div>
@@ -555,9 +748,6 @@ function BottomBar() {
       </button>
       <SpaceDots />
       {activity.button}
-      <button className="icon-btn" title="Settings" onClick={openSettings}>
-        <IconGear />
-      </button>
       {activity.popover}
     </div>
   );

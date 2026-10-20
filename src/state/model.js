@@ -104,6 +104,7 @@ export const ui = createStore({
   prompt: null, // { title, value, resolve }
   tools: null, // left tool panel: files | search
   searchFocus: 0, // bumped by ⌘P to refocus the find-file box
+  tabFind: 0, // bumped by ⌘J to focus the sidebar's session filter
   review: false, // code review panel (right)
   viewer: null, // { path, line } file shown over the terminal card
 });

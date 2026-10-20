@@ -85,11 +85,38 @@ input, textarea, select { font: inherit; color: inherit; }
 .sb-toggle { width: 16px; height: 12px; border: 1.5px solid currentColor; border-radius: 3px; position: relative; opacity: 0.8; }
 .sb-toggle::after { content: ''; position: absolute; left: 3px; top: 0; bottom: 0; border-left: 1.5px solid currentColor; }
 
-.location { margin: 0 10px; height: 34px; flex: none; display: flex; align-items: center; gap: 8px; padding: 0 10px; border-radius: 9px; background: var(--field); }
-.location:hover { background: var(--sel); }
-.location svg { color: var(--dim); flex: none; }
-.location .path { flex: 1; min-width: 0; font: 500 12px var(--mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; direction: rtl; text-align: left; }
-.location kbd { font: 11px var(--sans); color: var(--dim); }
+/* Inline session filter (TabFind in Sidebar.jsx) */
+.tab-find { flex: 1; min-width: 0; height: 32px; display: flex; align-items: center; gap: 8px; padding: 0 7px 0 10px; border-radius: 9px; background: var(--field); color: var(--dim); cursor: text; transition: background-color 0.12s, box-shadow 0.15s, color 0.12s; }
+.tab-find:hover { background: color-mix(in oklab, var(--sel) 60%, var(--field)); }
+.tab-find:focus-within { background: var(--input); color: var(--ink); box-shadow: 0 0 0 1.5px color-mix(in oklab, var(--space) 55%, transparent), 0 0 0 4px color-mix(in oklab, var(--space) 14%, transparent); }
+.tab-find svg { flex: none; }
+.tab-find input { flex: 1; min-width: 0; height: 100%; border: 0; outline: 0; padding: 0; background: none; color: var(--ink); font: 500 12.5px var(--sans); letter-spacing: -0.003em; }
+.tab-find input::placeholder { color: var(--dim); font-weight: 400; }
+.tab-find kbd { flex: none; padding: 1px 5px; border-radius: 5px; box-shadow: inset 0 0 0 1px var(--line); font: 10.5px/15px var(--sans); color: var(--dim); transition: opacity 0.12s; }
+.tab-find:focus-within kbd { opacity: 0; }
+.tab-find .clear { flex: none; width: 18px; height: 18px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; background: var(--line); color: var(--dim); animation: fade 0.12s ease-out; }
+.tab-find .clear:hover { background: color-mix(in oklab, var(--ink) 16%, transparent); color: var(--ink); }
+.tab-find .hint { flex: 1; min-width: 0; font: 500 12px var(--sans); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.find-results { display: flex; flex-direction: column; animation: fade 0.12s ease-out; }
+.find-results .today-head { padding-top: 12px; }
+.find-row.sel:not(.on) { background: var(--hover); }
+.find-row.sel { box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--space) 38%, transparent); }
+.find-row.on.sel { box-shadow: var(--sel-shadow), inset 0 0 0 1px color-mix(in oklab, var(--space) 38%, transparent); }
+.find-row mark { background: none; color: var(--accent); font-weight: 700; }
+.find-row .where { flex: 0 1 auto; max-width: 48%; min-width: 0; display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--dim); }
+.find-row .where .glyph { flex: none; font-size: 10px; }
+.find-row .where .txt { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.find-row .where.path .txt { font: 11px var(--mono); direction: rtl; text-align: left; }
+.find-keys { display: flex; justify-content: center; gap: 12px; padding: 14px 10px 4px; font-size: 11px; color: var(--faint); }
+.find-keys kbd { display: inline-block; min-width: 16px; margin-right: 2px; padding: 0 4px; border-radius: 4px; box-shadow: inset 0 0 0 1px var(--line); font: 10.5px/16px var(--sans); color: var(--dim); text-align: center; }
+.find-empty { margin: 20px 10px 0; display: flex; flex-direction: column; align-items: center; gap: 10px; font-size: 12px; text-align: center; animation: fade 0.12s ease-out; }
+.find-empty .t { max-width: 100%; color: var(--dim); overflow-wrap: anywhere; }
+.find-empty .dim { font-size: 11px; color: var(--faint); }
+.find-more { width: 100%; height: 32px; display: flex; align-items: center; gap: 8px; padding: 0 10px; border-radius: 9px; background: var(--tile); color: var(--ink); font-size: 12.5px; }
+.find-more:hover { background: var(--sel); }
+.find-more svg { flex: none; color: var(--dim); }
+.find-more span { flex: 1; min-width: 0; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.find-more kbd { font: 11px var(--sans); color: var(--dim); }
 
 .sb-scroll { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; padding-bottom: 8px; display: flex; flex-direction: column; }
 .sb-scroll > * { flex-shrink: 0; }
@@ -146,11 +173,16 @@ input, textarea, select { font: inherit; color: inherit; }
 .row.split.on .tab-seg.cur { background: var(--sel); box-shadow: var(--sel-shadow), inset 0 0 0 0.5px var(--line); }
 .row.split.on .tab-seg.cur .chip { background: color-mix(in oklab, var(--space) 22%, transparent); color: var(--ink); }
 .row.split.on .tab-seg.cur .name { font-weight: 600; }
-/* Hovering the middle of a row while dragging arms a merge (fill), then commits to it. */
-.row.merge-arming::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 0; z-index: -1; border-radius: inherit; background: color-mix(in oklab, var(--space) 16%, transparent); animation: mergeFill 0.42s linear forwards; }
-@keyframes mergeFill { to { width: 100%; } }
-.row.merge-merge { background: color-mix(in oklab, var(--space) 14%, var(--sel)); box-shadow: inset 0 0 0 1.5px var(--accent); }
-.row.merge-merge::after { content: 'Split'; position: absolute; right: 6px; padding: 2px 7px; border-radius: 6px; background: var(--accent); color: var(--accent-ink); font: 700 10px/14px var(--sans); animation: fade 0.12s ease-out; }
+.row.split .status { margin-left: 2px; }
+/* Each pane of a split closes on its own. */
+.tab-seg .seg-close { display: none; flex: none; width: 16px; height: 16px; margin: 0 -3px 0 auto; border-radius: 4px; color: var(--dim); font-size: 10px; line-height: 16px; text-align: center; }
+.tab-seg:hover .seg-close { display: block; }
+.tab-seg .seg-close:hover { background: var(--line); color: var(--ink); }
+/* Merge preview: the row shows the split it would become, the newcomer opening up beside it. */
+.row.merge-arming, .row.merge-merge { background: var(--hover); }
+.tab-seg.incoming { background: color-mix(in oklab, var(--space) 13%, transparent); box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--space) 38%, transparent); animation: segOpen 0.42s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.tab-seg.incoming.ready { background: color-mix(in oklab, var(--space) 20%, transparent); box-shadow: inset 0 0 0 1.5px var(--accent); }
+@keyframes segOpen { from { flex-grow: 0.001; opacity: 0; padding: 0; } }
 .prod { font: 700 8.5px var(--sans); letter-spacing: 0.05em; color: #fff; background: var(--fail); border-radius: 4px; padding: 2px 4px; flex: none; }
 .folder-wrap { position: relative; }
 .folder { height: 32px; display: flex; align-items: center; gap: 6px; padding: 0 6px 0 8px; margin: 0 8px; font-size: 13px; font-weight: 500; color: var(--ink); border-radius: 8px; }
@@ -426,7 +458,7 @@ select.field { padding-right: 4px; }
 .drag-ghost.drag-ghost { position: fixed !important; z-index: 1000; margin: 0 !important; pointer-events: none; background: var(--panel) !important; color: var(--ink); border-radius: 9px; box-shadow: 0 0 0 0.5px var(--panel-line), 0 2px 6px rgba(0, 0, 0, 0.08); transition: transform 0.16s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.16s, opacity 0.12s; will-change: left, top, transform; }
 .drag-ghost.drag-ghost.lifted { transform: scale(1.035); box-shadow: 0 0 0 0.5px var(--panel-line), 0 12px 32px rgba(0, 0, 0, 0.22); }
 .drag-ghost.drag-ghost.over-card { transform: scale(0.94); opacity: 0.85; }
-.drag-ghost.drag-ghost.over-merge { transform: translate(14px, 10px) scale(0.72); opacity: 0.6; }
+.drag-ghost.drag-ghost.over-merge { transform: translate(18px, 12px) scale(0.6); opacity: 0.2; }
 .drag-ghost.drag-ghost.dropped { transform: scale(0.9); opacity: 0; }
 .drag-ghost .close, .drag-ghost .folder-actions { display: none !important; }
 html.is-dragging, html.is-dragging * { cursor: grabbing !important; }
@@ -434,9 +466,8 @@ html.is-dragging .row:hover, html.is-dragging .fav:hover, html.is-dragging .fold
 html.is-dragging .row.on:hover { background: var(--sel); }
 html.is-dragging .row:hover .close { display: none; }
 html.is-dragging .row:hover .close + .status { display: inline-flex; }
-.location.drop-fav { box-shadow: inset 0 0 0 1.5px var(--line); }
-.location.drop-fav.drop-into { box-shadow: inset 0 0 0 1.5px var(--accent); background: color-mix(in oklab, var(--space) 12%, var(--field)); }
-.location .path.hint { direction: ltr; font: 500 12px var(--sans); color: var(--dim); }
+.tab-find.drop-fav { box-shadow: inset 0 0 0 1.5px var(--line); }
+.tab-find.drop-fav.drop-into { box-shadow: inset 0 0 0 1.5px var(--accent); background: color-mix(in oklab, var(--space) 12%, var(--field)); color: var(--ink); }
 .space-dot.drop-into { background: color-mix(in oklab, var(--c) 22%, transparent); box-shadow: inset 0 0 0 1.5px var(--c); }
 .sb-expanded.pane-over .sb-scroll { box-shadow: inset 0 0 0 1.5px var(--accent); border-radius: 10px; }
 .rail-list { display: flex; flex-direction: column; align-items: center; gap: 4px; flex: none; }
@@ -461,8 +492,7 @@ html.is-dragging .row:hover .close + .status { display: inline-flex; }
 .tb-search:hover { background: var(--sel); color: var(--ink); }
 .tb-search .ph { flex: 1; min-width: 0; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tb-search kbd { font: 11px var(--sans); }
-.sb-top { flex: none; display: flex; align-items: center; gap: 4px; padding: 0 6px 0 10px; }
-.sb-top .location { flex: 1; min-width: 0; margin: 0; }
+.sb-top { flex: none; display: flex; align-items: center; padding: 2px 10px 0; }
 .rail { padding-top: 2px; }
 
 /* ---------- Tool panels (ToolsPanel.jsx, ReviewPanel.jsx) ---------- */
@@ -581,12 +611,13 @@ html.is-dragging .row:hover .close + .status { display: inline-flex; }
 .ln.del .sign { color: var(--diff-del-ink); }
 .ln.meta { color: var(--dim); }
 
-/* ---------- Space motion (space-motion.js) ---------- */
+/* ---------- Space carousel (space-motion.jsx) ---------- */
 .sb-scroll, .rail-scroll { position: relative; }
-.space-pane { flex: 1 0 auto; display: flex; flex-direction: column; }
+.space-viewport { flex: 1 0 auto; width: 100%; display: flex; flex-direction: column; overflow: hidden; }
+.space-track { flex: 1 0 auto; display: flex; align-items: stretch; will-change: transform; }
+.space-pane { flex: 0 0 100%; min-width: 0; display: flex; flex-direction: column; }
 .space-pane > * { flex-shrink: 0; }
-.rail .space-pane { width: 100%; align-items: center; gap: 4px; }
-.space-ghost { z-index: 1; }
+.rail .space-pane { align-items: center; gap: 4px; }
 .space-new { --p: 0; position: absolute; top: 50%; right: 16px; z-index: 6; width: 44px; height: 44px; margin-top: -22px; display: flex; align-items: center; justify-content: center; color: var(--ink); pointer-events: none; opacity: 0; transform: scale(calc(0.55 + var(--p) * 0.45)); transition: opacity 0.18s; }
 .space-new.show { opacity: 1; }
 .space-new .progress { position: absolute; inset: 0; transform: rotate(-90deg); overflow: visible; }
@@ -599,4 +630,6 @@ html.is-dragging .row:hover .close + .status { display: inline-flex; }
 @keyframes spacePop { 40% { transform: scale(1.18); opacity: 1; } 100% { transform: scale(1); opacity: 0; } }
 .sidebar.compact .space-new { right: 12px; }
 .sidebar.compact .space-new .lbl { display: none; }
-@media (prefers-reduced-motion: reduce) { .row.merge-arming::before { animation: none; width: 100%; } }
+@media (prefers-reduced-motion: reduce) { .tab-seg.incoming { animation: none; } }
+.rail-tile.merge-arming { box-shadow: inset 0 0 0 1.5px color-mix(in oklab, var(--space) 45%, transparent); }
+.rail-tile.merge-merge { background: color-mix(in oklab, var(--space) 22%, var(--sel)); box-shadow: 0 0 0 2px var(--accent); }

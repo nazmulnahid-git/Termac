@@ -29,7 +29,7 @@ export default function TopBar() {
           <IconGrid />
         </button>
       </div>
-      <button className="tb-search" onClick={() => ui.set((u) => ({ ...u, overlay: 'commandBar' }))}>
+      <button className="tb-search" onClick={() => ui.set((u) => ({ ...u, overlay: 'commandBar', overlayArg: null }))}>
         <IconSearch size={15} />
         <span className="ph">Search sessions, files, folders, actions…</span>
         <kbd>{formatAccel(bindings.commandBar)}</kbd>

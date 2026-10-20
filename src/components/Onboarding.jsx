@@ -5,6 +5,7 @@ import * as A from '../state/actions.js';
 import { SPACE_COLORS, uid } from '../lib/meta.js';
 import { tildify } from '../lib/routing.js';
 import { formatAccel } from '../lib/keys.js';
+import { IconSearch } from './icons.jsx';
 
 const api = window.termac;
 const STEPS = ['welcome', 'import', 'spaces', 'tips'];
@@ -163,9 +164,10 @@ function MockRow({ kind, name, status, on }) {
 function MockSidebar() {
   return (
     <div className="ob-mock" aria-hidden>
-      <div className="location">
-        <span className="path">~/work/shell-app</span>
-        <kbd>⌘T</kbd>
+      <div className="tab-find">
+        <IconSearch size={13} />
+        <span className="hint">Find a session</span>
+        <kbd>⌘J</kbd>
       </div>
       <div className="sec-title">
         <span className="glyph">◆</span>

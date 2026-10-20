@@ -3,6 +3,7 @@
 
 export const ACTIONS = [
   { id: 'commandBar', label: 'Command bar', def: 'Cmd+T' },
+  { id: 'findTab', label: 'Find session in sidebar', def: 'Cmd+J' },
   { id: 'newTerminal', label: 'New terminal in current directory', def: 'Cmd+N' },
   { id: 'quickTerminal', label: 'Quick Terminal (global)', def: 'Alt+Space', global: true },
   { id: 'toggleSidebar', label: 'Collapse / expand sidebar', def: 'Cmd+S' },

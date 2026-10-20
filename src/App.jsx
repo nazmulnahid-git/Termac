@@ -28,6 +28,10 @@ export function runAction(action) {
   switch (action) {
     case 'commandBar':
       return toggleOverlay('commandBar');
+    case 'findTab':
+      // The filter lives in the expanded sidebar, so bring that out first.
+      if (app.get().settings.sidebarMode !== 'expanded') A.setSidebarMode('expanded');
+      return setUi((u) => ({ view: 'terminal', tabFind: (u.tabFind || 0) + 1 }));
     case 'newTerminal':
       return A.openTerminal();
     case 'toggleSidebar':
@@ -94,7 +98,7 @@ export function runAction(action) {
 }
 
 // Actions that still work while typing in a text field (not the terminal).
-const FROM_INPUTS = new Set(['commandBar', 'newTerminal', 'settings', 'library', 'notes', 'toggleSidebar', 'focusMode', 'prevSpace', 'nextSpace', 'overview', 'newSpace', 'toggleFiles', 'quickOpen', 'toggleReview']);
+const FROM_INPUTS = new Set(['commandBar', 'findTab', 'newTerminal', 'settings', 'library', 'notes', 'toggleSidebar', 'focusMode', 'prevSpace', 'nextSpace', 'overview', 'newSpace', 'toggleFiles', 'quickOpen', 'toggleReview']);
 
 function onKeyDown(e) {
   const u = ui.get();
@@ -247,7 +251,7 @@ export default function App() {
       </div>
       <Peek />
       {overlay && <div className={`backdrop${overlay === 'overview' ? ' dark' : ''}`} onMouseDown={close} />}
-      {overlay === 'commandBar' && <CommandBar onClose={close} />}
+      {overlay === 'commandBar' && <CommandBar onClose={close} initial={typeof overlayArg === 'string' ? overlayArg : ''} />}
       {overlay === 'settings' && <Settings onClose={close} initialTab={overlayArg} />}
       {overlay === 'spaceEditor' && <SpaceEditor key={overlayArg ?? 'new'} spaceId={overlayArg} onClose={close} />}
       {overlay === 'overview' && <Overview onClose={close} />}
