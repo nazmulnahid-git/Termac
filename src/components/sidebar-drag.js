@@ -17,17 +17,20 @@ import * as L from '../lib/layout.js';
 export const PH = '\u0000ph';
 const THRESHOLD = 4;
 const SPRING_MS = 550;
+const MERGE_MS = 420; // hover the middle of a row this long to merge into a split
 const SETTLE_MS = 170;
 const EASE = 'cubic-bezier(0.2, 0.8, 0.2, 1)';
-const FLIP_SEL = '.sidebar :is(.row, .fav, .folder, .sec-title, .today-head, .pin-empty, .folder-empty, .rail-tile, .rail-btn, .rail-space, .rail-sep)';
+const FLIP_SEL = '.sidebar :is(.row, .fav, .folder, .sec-title, .today-head, .pin-empty, .folder-empty, .rail-tile, .rail-btn, .rail-space, .rail-sep):not(.space-ghost *)';
 
 let drag = null;
 
 export const pressTab = (e, tid) => press(e, { kind: 'tab', tabId: tid });
+// ⌥-drag one segment of a split row to pull that pane out into its own row.
+export const pressPane = (e, tid, sid) => press(e, { kind: 'pane', tabId: tid, sid }, true);
 export const pressFolder = (e, spaceId, folderId) => press(e, { kind: 'folder', spaceId, folderId });
 
-function press(e, item) {
-  if (e.button !== 0 || e.shiftKey || e.metaKey || e.ctrlKey || drag) return;
+function press(e, item, altOk = false) {
+  if (e.button !== 0 || e.shiftKey || e.metaKey || e.ctrlKey || (e.altKey && !altOk) || drag) return;
   const ctl = e.target.closest('button, input');
   if (ctl && ctl !== e.currentTarget) return;
   const el = e.currentTarget;
@@ -95,58 +98,84 @@ function begin(el, item, sx, sy, pointerId) {
   if (item.kind === 'tab') {
     const loc = A.locate(item.tabId, s);
     if (loc) origin = { kind: 'list', ...loc, index: listIds(loc, s).indexOf(item.tabId) };
-  } else {
+  } else if (item.kind === 'folder') {
     origin = s.spaces.find((x) => x.id === item.spaceId)?.folders.findIndex((f) => f.id === item.folderId) ?? 0;
   }
-  drag = { item, ghost, dx: sx - r.left, dy: sy - r.top, target: null, spring: null, springKey: null };
+  drag = { item, ghost, dx: sx - r.left, dy: sy - r.top, target: null, spring: null, springKey: null, mergeTimer: null };
   flip(() => ui.set((u) => ({ ...u, dragging: { ...item, origin, target: null }, peek: null })));
 }
 
 function update(x, y) {
   drag.ghost.style.left = `${x - drag.dx}px`;
   drag.ghost.style.top = `${y - drag.dy}px`;
-  const t = drag.item.kind === 'tab' ? hitTab(x, y) : hitFolder(x, y);
+  const t = drag.item.kind === 'folder' ? hitFolder(x, y) : hitTab(x, y);
   drag.ghost.classList.toggle('over-card', t?.kind === 'card');
+  drag.ghost.classList.toggle('over-merge', t?.kind === 'arming' || t?.kind === 'merge');
   armSpring(t);
+  setTarget(t);
+}
+
+function setTarget(t) {
   if (sameTarget(t, drag.target)) return;
   drag.target = t;
+  // Arming a merge starts the dwell; anything else cancels it.
+  clearTimeout(drag.mergeTimer);
+  if (t?.kind === 'arming')
+    drag.mergeTimer = setTimeout(() => {
+      if (drag && !drag.settling && drag.target === t) setTarget({ ...t, kind: 'merge' });
+    }, MERGE_MS);
   flip(() => ui.set((u) => (u.dragging ? { ...u, dragging: { ...u.dragging, target: t } } : u)));
 }
+
+// While a merge is armed the gap stays wherever it was, so the list doesn't shift under the pointer.
+const holdOf = (t) => (t?.kind === 'list' ? t : t?.kind === 'arming' || t?.kind === 'merge' ? t.hold : null);
 
 function hitTab(x, y) {
   const el = document.elementFromPoint(x, y);
   if (!el) return null;
   const tid = drag.item.tabId;
+  const pane = drag.item.kind === 'pane';
+  // Rows still shown during the drag: a pulled-out pane leaves its split row in place.
+  const visible = (ids) => (pane ? ids : ids.filter((x) => x !== tid));
   if (!el.closest('.sidebar')) {
     const card = el.closest('.card');
-    if (!card || !canMerge(tid)) return null;
+    if (pane || !card || !canMerge(tid)) return null;
     const r = card.getBoundingClientRect();
     const d = { left: x - r.left, right: r.right - x, top: y - r.top, bottom: r.bottom - y };
     return { kind: 'card', edge: Object.entries(d).sort((a, b) => a[1] - b[1])[0][0] };
   }
   if (el.closest('[data-drop-ph]')) return drag.target;
   const dot = el.closest('[data-drop-space]');
-  if (dot) return { kind: 'space', spaceId: dot.dataset.dropSpace };
+  if (dot) return pane ? drag.target : { kind: 'space', spaceId: dot.dataset.dropSpace };
   const item = el.closest('[data-drag-tid]');
   const list = item?.closest('[data-drop-list]');
   if (item && list) {
-    if (item.dataset.dragTid === tid) return drag.target;
+    const over = item.dataset.dragTid;
+    if (over === tid) return drag.target;
     const dest = JSON.parse(list.dataset.dropList);
-    const ids = listIds(dest).filter((x) => x !== tid);
+    const ids = visible(listIds(dest));
     const r = item.getBoundingClientRect();
-    const after = list.dataset.axis === 'x' ? x > r.left + r.width / 2 : y > r.top + r.height / 2;
-    return { kind: 'list', ...dest, index: ids.indexOf(item.dataset.dragTid) + (after ? 1 : 0) };
+    const rel = (y - r.top) / r.height;
+    // The middle of another row (in a vertical list) merges the two into one split session.
+    if (!pane && list.dataset.axis !== 'x' && rel > 0.28 && rel < 0.72 && canMergeTabs(tid, over)) {
+      if ((drag.target?.kind === 'arming' || drag.target?.kind === 'merge') && drag.target.tid === over) return drag.target;
+      return { kind: 'arming', tid: over, hold: holdOf(drag.target) };
+    }
+    const after = list.dataset.axis === 'x' ? x > r.left + r.width / 2 : rel > 0.5;
+    return { kind: 'list', ...dest, index: ids.indexOf(over) + (after ? 1 : 0) };
   }
   const into = el.closest('[data-drop-into]');
   if (into) {
     const { index, ...dest } = JSON.parse(into.dataset.dropInto);
-    return { kind: 'list', ...dest, index: index ?? listIds(dest).filter((x) => x !== tid).length, spring: into.dataset.spring || null };
+    if (pane && dest.section === 'fav') return drag.target;
+    return { kind: 'list', ...dest, index: index ?? visible(listIds(dest)).length, spring: into.dataset.spring || null };
   }
   const bare = el.closest('[data-drop-list]');
   if (bare) {
     const dest = JSON.parse(bare.dataset.dropList);
     if (drag.target?.kind === 'list' && sameList(drag.target, dest)) return drag.target;
-    return { kind: 'list', ...dest, index: listIds(dest).filter((x) => x !== tid).length };
+    if (pane && dest.section === 'fav') return drag.target;
+    return { kind: 'list', ...dest, index: visible(listIds(dest)).length };
   }
   // Gaps between sections: keep whatever we had rather than flicker back to the origin.
   return drag.target;
@@ -181,8 +210,9 @@ function armSpring(t) {
 
 function finish(cancel) {
   const { item, ghost } = drag;
-  const t = cancel ? null : drag.target;
+  const t = cancel ? null : drag.target?.kind === 'arming' ? holdOf(drag.target) : drag.target;
   clearTimeout(drag.spring);
+  clearTimeout(drag.mergeTimer);
   drag.settling = true;
   swallowClick();
 
@@ -191,8 +221,11 @@ function finish(cancel) {
     document.documentElement.classList.remove('is-dragging');
     drag = null;
     flip(() => {
-      if (item.kind === 'tab') {
-        if (t?.kind === 'card') A.mergeIntoActive(item.tabId, t.edge);
+      if (item.kind === 'pane') {
+        if (t?.kind === 'list') A.unsplit(item.sid, { section: t.section, spaceId: t.spaceId, folderId: t.folderId || null, index: t.index });
+      } else if (item.kind === 'tab') {
+        if (t?.kind === 'merge') A.mergeTabs(item.tabId, t.tid);
+        else if (t?.kind === 'card') A.mergeIntoActive(item.tabId, t.edge);
         else if (t?.kind === 'list') A.moveTab(item.tabId, t);
         else if (t?.kind === 'space') {
           const loc = A.locate(item.tabId);
@@ -203,6 +236,15 @@ function finish(cancel) {
     });
   };
 
+  // A merge lands on the target row: shrink into it.
+  if (t?.kind === 'merge') {
+    const row = document.querySelector(`.sidebar [data-drag-tid="${CSS.escape(t.tid)}"]`)?.getBoundingClientRect();
+    ghost.style.transition = `left ${SETTLE_MS}ms ${EASE}, top ${SETTLE_MS}ms ${EASE}, transform ${SETTLE_MS}ms ${EASE}, opacity ${SETTLE_MS}ms`;
+    ghost.classList.remove('lifted');
+    ghost.classList.add('dropped');
+    if (row) Object.assign(ghost.style, { left: `${row.left}px`, top: `${row.top}px` });
+    return setTimeout(commit, SETTLE_MS);
+  }
   // Card and Space drops have no gap to land in: just let the ghost fade where it is.
   const ph = t?.kind === 'card' || t?.kind === 'space' ? null : document.querySelector('[data-drop-ph]');
   if (!ph) {
@@ -229,6 +271,13 @@ function swallowClick() {
   setTimeout(() => window.removeEventListener('click', stop, true), 0);
 }
 
+function canMergeTabs(src, target) {
+  const s = app.get();
+  const a = s.tabs[src];
+  const b = s.tabs[target];
+  return !!(a && b && L.leaves(a.layout).length + L.leaves(b.layout).length <= L.MAX_PANES);
+}
+
 function canMerge(tid) {
   const s = app.get();
   const target = A.activeTab(s);
@@ -251,6 +300,7 @@ function sameTarget(a, b) {
   if (!a || !b || a.kind !== b.kind) return false;
   if (a.kind === 'card') return a.edge === b.edge;
   if (a.kind === 'space') return a.spaceId === b.spaceId;
+  if (a.kind === 'arming' || a.kind === 'merge') return a.tid === b.tid;
   if (a.kind === 'folders') return a.index === b.index;
   return sameList(a, b) && a.index === b.index;
 }
@@ -297,9 +347,10 @@ export function flip(fn) {
 // A list of tab ids as it should render right now: the dragged one lifted out, PH where it would land.
 export function useDropList(list, dest) {
   const d = ui.use((s) => s.dragging);
-  if (d?.kind !== 'tab') return list;
-  const ids = list.filter((x) => x !== d.tabId);
-  const t = d.target?.kind === 'list' ? d.target : d.origin;
+  if (d?.kind !== 'tab' && d?.kind !== 'pane') return list;
+  const pane = d.kind === 'pane';
+  const ids = pane ? [...list] : list.filter((x) => x !== d.tabId);
+  const t = holdOf(d.target) || (pane ? null : d.origin);
   if (t && sameList(t, dest)) ids.splice(Math.max(0, Math.min(t.index, ids.length)), 0, PH);
   return ids;
 }

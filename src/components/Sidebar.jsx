@@ -8,8 +8,9 @@ import { shortName, timeAgo, formatDuration } from '../lib/meta.js';
 import { tildify } from '../lib/routing.js';
 import { IconSidebar, IconFolder, IconFolderOpen, IconFolderPlus, IconChevron, IconPlus, IconMore, IconSearch, IconLibrary, IconActivity, IconGear } from './icons.jsx';
 import Rail from './SidebarRail.jsx';
+import { useSpaceMotion } from './space-motion.js';
 import { PANE_MIME, renameFolder, usePeek, closePeek, rowMenu, folderMenu, spaceMenu, newFolder, promptText } from './sidebar-shared.js';
-import { PH, pressTab, pressFolder, useDropList, useDropFolders, destAttr } from './sidebar-drag.js';
+import { PH, pressTab, pressPane, pressFolder, useDropList, useDropFolders, destAttr } from './sidebar-drag.js';
 
 export { promptText };
 
@@ -21,10 +22,10 @@ const isPaneDrag = (e) => e.dataTransfer.types.includes(PANE_MIME);
 export default function Sidebar({ floating, onLeave }) {
   const mode = app.use((s) => s.settings.sidebarMode);
   const width = app.use((s) => s.settings.sidebarWidth);
-  const swipe = app.use((s) => s.settings.gestures.swipeSpaces);
   const [dragW, setDragW] = useState(null);
-  const swipeAcc = useRef({ dx: 0, lock: 0 });
   const ref = useRef(null);
+  const loader = useRef(null);
+  const onWheel = useSpaceMotion(ref, loader);
   const leave = useRef(onLeave);
   leave.current = onLeave;
   const compact = mode === 'compact' && !floating;
@@ -52,20 +53,6 @@ export default function Sidebar({ floating, onLeave }) {
     };
   }, [floating]);
 
-  const onWheel = (e) => {
-    if (!swipe || Math.abs(e.deltaX) <= Math.abs(e.deltaY) * 1.5) return;
-    const acc = swipeAcc.current;
-    if (Date.now() < acc.lock) return;
-    acc.dx += e.deltaX;
-    clearTimeout(acc.t);
-    acc.t = setTimeout(() => (acc.dx = 0), 180);
-    if (Math.abs(acc.dx) > 90) {
-      A.switchSpace(acc.dx > 0 ? 1 : -1);
-      acc.dx = 0;
-      acc.lock = Date.now() + 450;
-    }
-  };
-
   return (
     <aside
       ref={ref}
@@ -75,6 +62,15 @@ export default function Sidebar({ floating, onLeave }) {
       onMouseLeave={closePeek}
     >
       {compact ? <Rail /> : <Expanded onDismiss={floating ? () => leave.current?.() : null} />}
+      {/* Swiping past the last Space fills this ring; completing it makes a new Space. */}
+      <div className="space-new" ref={loader} aria-hidden="true">
+        <svg className="progress" viewBox="0 0 40 40">
+          <circle className="track" cx="20" cy="20" r="17" />
+          <circle className="ring" cx="20" cy="20" r="17" pathLength="100" />
+        </svg>
+        <IconPlus size={15} />
+        <span className="lbl">New Space</span>
+      </div>
       {!compact && !floating && <ResizeHandle width={width} onDrag={setDragW} />}
     </aside>
   );
@@ -143,24 +139,26 @@ function Expanded({ onDismiss }) {
       </div>
       <div className="sb-scroll">
         <Favorites ids={favorites} />
-        <SpaceHeader space={space} />
-        <Section items={pinned} dest={{ section: 'pinned', spaceId: space.id }} />
-        {folders.map((f) => (f === PH ? <div key="folder-ph" className="folder-ph" data-drop-ph /> : <Folder key={f.id} folder={f} spaceId={space.id} />))}
-        {isEmpty && (
-          <div className="pin-empty" data-drop-into={destAttr('pinned', space.id, null, 0)}>
-            Drag a session here to keep it in {space.name}
-          </div>
-        )}
-        <TodayHeader space={space} />
-        <Section items={today} dest={{ section: 'today', spaceId: space.id }} />
-        <button className="row new" data-drop-into={todayEnd} onClick={() => A.openTerminal()}>
-          <span className="chip">
-            <IconPlus size={11} />
-          </span>
-          <span className="name">New Terminal</span>
-          <kbd>{formatAccel(bindings.newTerminal)}</kbd>
-        </button>
-        <div className="sb-fill" data-drop-into={todayEnd} />
+        <div className="space-pane">
+          <SpaceHeader space={space} />
+          <Section items={pinned} dest={{ section: 'pinned', spaceId: space.id }} />
+          {folders.map((f) => (f === PH ? <div key="folder-ph" className="folder-ph" data-drop-ph /> : <Folder key={f.id} folder={f} spaceId={space.id} />))}
+          {isEmpty && (
+            <div className="pin-empty" data-drop-into={destAttr('pinned', space.id, null, 0)}>
+              Drag a session here to keep it in {space.name}
+            </div>
+          )}
+          <TodayHeader space={space} />
+          <Section items={today} dest={{ section: 'today', spaceId: space.id }} />
+          <button className="row new" data-drop-into={todayEnd} onClick={() => A.openTerminal()}>
+            <span className="chip">
+              <IconPlus size={11} />
+            </span>
+            <span className="name">New Terminal</span>
+            <kbd>{formatAccel(bindings.newTerminal)}</kbd>
+          </button>
+          <div className="sb-fill" data-drop-into={todayEnd} />
+        </div>
       </div>
       <SidebarCards />
       <BottomBar />
@@ -246,8 +244,10 @@ function Row({ tid, indent }) {
   const on = app.use((s) => A.activeTabId(s) === tid);
   const [hover, setHover] = useState(false);
   const [renaming, setRenaming] = useState(false);
+  const merge = ui.use((s) => (s.dragging?.target?.tid === tid ? s.dragging.target.kind : null));
   const peek = usePeek(tid, v?.active?.sid, on);
   if (!v) return null;
+  const split = v.panes.length > 1 && !renaming;
   const click = (e) => {
     if (e.shiftKey) return;
     if (v.status === 'fail' && !on) return A.jumpToFailure(v.fail.sid);
@@ -255,7 +255,7 @@ function Row({ tid, indent }) {
   };
   return (
     <div
-      className={`row${on ? ' on' : ''}${indent ? ' indent' : ''}${v.dead ? ' dead' : ''}`}
+      className={`row${on ? ' on' : ''}${indent ? ' indent' : ''}${v.dead ? ' dead' : ''}${split ? ' split' : ''}${merge ? ` merge-${merge}` : ''}`}
       data-drag-tid={tid}
       onPointerDown={(e) => !renaming && pressTab(e, tid)}
       onClick={click}
@@ -271,16 +271,35 @@ function Row({ tid, indent }) {
       }}
       onMouseDown={peek.onMouseDown}
     >
-      {v.panes.length > 1 ? (
-        <span className="panes-chip">
+      {split ? (
+        // Arc-style split: one segment per pane on the same line. Click one to focus that
+        // pane; ⌥-drag one to pull it out into its own row.
+        <span className="segs" title={v.tab.name || undefined}>
           {v.panes.map((p) => (
-            <Chip key={p.sid} kind={p.kind} />
+            <span
+              key={p.sid}
+              className={`tab-seg${on && p.sid === v.tab.activeSid ? ' cur' : ''}`}
+              title={`${p.name}  ·  ⌥-drag to pull out`}
+              onPointerDown={(e) => {
+                if (!e.altKey) return;
+                e.stopPropagation();
+                pressPane(e, tid, p.sid);
+              }}
+              onClick={(e) => {
+                if (e.shiftKey) return;
+                e.stopPropagation();
+                A.focusSession(p.sid);
+              }}
+            >
+              <Chip kind={p.kind} />
+              <span className="name">{p.name}</span>
+            </span>
           ))}
         </span>
       ) : (
         <Chip kind={v.active?.kind} />
       )}
-      {renaming ? (
+      {split ? null : renaming ? (
         <InlineName
           value={v.tab.name || v.name}
           onDone={(name) => {

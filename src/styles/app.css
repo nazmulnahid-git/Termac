@@ -115,14 +115,16 @@ input, textarea, select { font: inherit; color: inherit; }
 .today-head button:hover { background: var(--hover); color: var(--ink); }
 .pin-empty { margin: 4px 10px 0; padding: 12px; border-radius: 9px; border: 1.5px dashed var(--line); font-size: 12px; color: var(--dim); text-align: center; }
 
-.rows { display: flex; flex-direction: column; gap: 2px; }
-.row { position: relative; height: 30px; display: flex; align-items: center; gap: 9px; padding: 0 10px; margin: 0 8px; border-radius: 8px; transition: opacity 0.2s, transform 0.38s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.rows { display: flex; flex-direction: column; gap: 1px; }
+.row { position: relative; isolation: isolate; height: 32px; display: flex; align-items: center; gap: 8px; padding: 0 8px 0 7px; margin: 0 8px; border-radius: 9px; transition: opacity 0.2s, background-color 0.12s; }
 .row:hover { background: var(--hover); }
 .row.on { background: var(--sel); box-shadow: var(--sel-shadow); }
+.row.split { padding-left: 4px; gap: 6px; }
 .row.on .name { font-weight: 600; }
 .row.dead .name { color: var(--dim); }
-.row.indent { margin-left: 22px; padding-left: 8px; }
-.row .name { flex: 1; min-width: 0; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row.indent { margin-left: 20px; padding-left: 7px; }
+.row.split.indent { padding-left: 4px; }
+.row .name { flex: 1; min-width: 0; font-size: 13px; letter-spacing: -0.003em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .row input.rename { flex: 1; min-width: 0; font-size: 13px; border: 0; outline: 1.5px solid var(--accent); border-radius: 4px; background: var(--input); padding: 1px 4px; }
 .row .close { display: none; width: 16px; height: 16px; border-radius: 4px; color: var(--dim); font-size: 11px; line-height: 16px; text-align: center; }
 .row:hover .close { display: block; }
@@ -131,13 +133,27 @@ input, textarea, select { font: inherit; color: inherit; }
 .row.new { color: var(--dim); width: calc(100% - 16px); margin-top: 2px; text-align: left; }
 .row.new .chip { background: none; border: 1.5px dashed var(--faint); display: inline-flex; align-items: center; justify-content: center; }
 .row kbd { font: 11px var(--sans); color: var(--dim); }
-.chip { width: 18px; height: 18px; flex: none; border-radius: 5px; background: var(--tile); color: var(--dim); font: 700 7.5px/18px var(--mono); text-align: center; overflow: hidden; }
+.chip { width: 20px; height: 20px; flex: none; border-radius: 6px; background: var(--tile); color: var(--dim); font: 700 7.5px/20px var(--mono); text-align: center; overflow: hidden; }
 .row.on .chip { background: color-mix(in oklab, var(--space) 22%, transparent); color: var(--ink); }
-.panes-chip { display: flex; gap: 2px; padding: 2px; border-radius: 6px; background: var(--line); flex: none; }
-.panes-chip .chip { width: 14px; height: 14px; border-radius: 4px; font-size: 6.5px; line-height: 14px; }
+/* Split session: its panes side by side on one line (Arc's split tabs). */
+.row .segs { flex: 1; min-width: 0; height: 26px; display: flex; gap: 3px; }
+.tab-seg { flex: 1 1 0; min-width: 0; display: flex; align-items: center; gap: 6px; padding: 0 7px 0 4px; border-radius: 7px; background: color-mix(in oklab, var(--ink) 4%, transparent); box-shadow: inset 0 0 0 0.5px var(--line); transition: background-color 0.12s, box-shadow 0.12s; }
+.tab-seg:hover { background: var(--hover); }
+.tab-seg .chip { width: 18px; height: 18px; border-radius: 5px; font-size: 7px; line-height: 18px; }
+.tab-seg .name { font-size: 12.5px; }
+.row.split.on .tab-seg .name { font-weight: 400; }
+.row.split.on { background: color-mix(in oklab, var(--ink) 5%, transparent); box-shadow: none; }
+.row.split.on .tab-seg.cur { background: var(--sel); box-shadow: var(--sel-shadow), inset 0 0 0 0.5px var(--line); }
+.row.split.on .tab-seg.cur .chip { background: color-mix(in oklab, var(--space) 22%, transparent); color: var(--ink); }
+.row.split.on .tab-seg.cur .name { font-weight: 600; }
+/* Hovering the middle of a row while dragging arms a merge (fill), then commits to it. */
+.row.merge-arming::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 0; z-index: -1; border-radius: inherit; background: color-mix(in oklab, var(--space) 16%, transparent); animation: mergeFill 0.42s linear forwards; }
+@keyframes mergeFill { to { width: 100%; } }
+.row.merge-merge { background: color-mix(in oklab, var(--space) 14%, var(--sel)); box-shadow: inset 0 0 0 1.5px var(--accent); }
+.row.merge-merge::after { content: 'Split'; position: absolute; right: 6px; padding: 2px 7px; border-radius: 6px; background: var(--accent); color: var(--accent-ink); font: 700 10px/14px var(--sans); animation: fade 0.12s ease-out; }
 .prod { font: 700 8.5px var(--sans); letter-spacing: 0.05em; color: #fff; background: var(--fail); border-radius: 4px; padding: 2px 4px; flex: none; }
 .folder-wrap { position: relative; }
-.folder { height: 30px; display: flex; align-items: center; gap: 6px; padding: 0 6px 0 8px; margin: 0 8px; font-size: 13px; font-weight: 500; color: var(--ink); border-radius: 8px; }
+.folder { height: 32px; display: flex; align-items: center; gap: 6px; padding: 0 6px 0 8px; margin: 0 8px; font-size: 13px; font-weight: 500; color: var(--ink); border-radius: 8px; }
 .folder:hover { background: var(--hover); }
 .folder .chev { width: 12px; display: inline-flex; color: var(--dim); transition: transform 0.18s ease; }
 .folder .chev.open { transform: rotate(90deg); }
@@ -405,11 +421,12 @@ select.field { padding-right: 4px; }
 
 /* ---------- Sidebar drag (sidebar-drag.js) ---------- */
 /* The gap a dragged item will land in; same footprint as the thing it stands in for. */
-.row-ph, .folder-ph { height: 30px; margin: 0 8px; border-radius: 8px; background: color-mix(in oklab, var(--space) 10%, transparent); box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--space) 22%, transparent); }
-.row-ph.indent { margin-left: 22px; }
+.row-ph, .folder-ph { height: 32px; margin: 0 8px; border-radius: 8px; background: color-mix(in oklab, var(--space) 10%, transparent); box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--space) 22%, transparent); }
+.row-ph.indent { margin-left: 20px; }
 .drag-ghost.drag-ghost { position: fixed !important; z-index: 1000; margin: 0 !important; pointer-events: none; background: var(--panel) !important; color: var(--ink); border-radius: 9px; box-shadow: 0 0 0 0.5px var(--panel-line), 0 2px 6px rgba(0, 0, 0, 0.08); transition: transform 0.16s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.16s, opacity 0.12s; will-change: left, top, transform; }
 .drag-ghost.drag-ghost.lifted { transform: scale(1.035); box-shadow: 0 0 0 0.5px var(--panel-line), 0 12px 32px rgba(0, 0, 0, 0.22); }
 .drag-ghost.drag-ghost.over-card { transform: scale(0.94); opacity: 0.85; }
+.drag-ghost.drag-ghost.over-merge { transform: translate(14px, 10px) scale(0.72); opacity: 0.6; }
 .drag-ghost.drag-ghost.dropped { transform: scale(0.9); opacity: 0; }
 .drag-ghost .close, .drag-ghost .folder-actions { display: none !important; }
 html.is-dragging, html.is-dragging * { cursor: grabbing !important; }
@@ -563,3 +580,23 @@ html.is-dragging .row:hover .close + .status { display: inline-flex; }
 .ln.del { background: var(--diff-del); }
 .ln.del .sign { color: var(--diff-del-ink); }
 .ln.meta { color: var(--dim); }
+
+/* ---------- Space motion (space-motion.js) ---------- */
+.sb-scroll, .rail-scroll { position: relative; }
+.space-pane { flex: 1 0 auto; display: flex; flex-direction: column; }
+.space-pane > * { flex-shrink: 0; }
+.rail .space-pane { width: 100%; align-items: center; gap: 4px; }
+.space-ghost { z-index: 1; }
+.space-new { --p: 0; position: absolute; top: 50%; right: 16px; z-index: 6; width: 44px; height: 44px; margin-top: -22px; display: flex; align-items: center; justify-content: center; color: var(--ink); pointer-events: none; opacity: 0; transform: scale(calc(0.55 + var(--p) * 0.45)); transition: opacity 0.18s; }
+.space-new.show { opacity: 1; }
+.space-new .progress { position: absolute; inset: 0; transform: rotate(-90deg); overflow: visible; }
+.space-new > svg:not(.progress) { position: relative; }
+.space-new circle { stroke-width: 2.5; }
+.space-new .track { fill: var(--sel); stroke: var(--line); }
+.space-new .ring { fill: none; stroke: var(--accent); stroke-linecap: round; stroke-dasharray: 100; stroke-dashoffset: calc(100 - var(--p) * 100); }
+.space-new .lbl { position: absolute; top: 50px; white-space: nowrap; font-size: 11px; font-weight: 600; color: var(--dim); opacity: calc((var(--p) - 0.45) * 2.2); }
+.space-new.done { animation: spacePop 0.38s ease-out forwards; }
+@keyframes spacePop { 40% { transform: scale(1.18); opacity: 1; } 100% { transform: scale(1); opacity: 0; } }
+.sidebar.compact .space-new { right: 12px; }
+.sidebar.compact .space-new .lbl { display: none; }
+@media (prefers-reduced-motion: reduce) { .row.merge-arming::before { animation: none; width: 100%; } }

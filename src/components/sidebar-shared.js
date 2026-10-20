@@ -74,6 +74,7 @@ export async function rowMenu(e, tid, v, startRename) {
     { label: 'Move to Space', submenu: s.spaces.map((x) => ({ id: `space:${x.id}`, label: `${x.glyph}  ${x.name}`, enabled: x.id !== loc?.spaceId })) },
     { type: 'separator' },
     A.activeTabId(s) !== tid && { id: 'split', label: 'Open in Split Right' },
+    v.panes.length > 1 && { id: 'separate', label: 'Separate Panes' },
     { id: 'dup', label: 'New Terminal Here' },
     cwd && { id: 'copypath', label: 'Copy Path' },
     cwd && { id: 'finder', label: 'Open in Finder' },
@@ -100,12 +101,23 @@ export async function rowMenu(e, tid, v, startRename) {
   else if (id.startsWith('folder:')) A.moveTab(tid, { section: 'pinned', spaceId: sp.id, folderId: id.slice(7) });
   else if (id.startsWith('space:')) A.moveTab(tid, { section: loc?.section === 'pinned' ? 'pinned' : 'today', spaceId: id.slice(6) });
   else if (id === 'split') A.mergeIntoActive(tid, 'right');
+  else if (id === 'separate') {
+    const at = listIndex(loc, tid, s);
+    v.panes.slice(1).forEach((p, i) => A.unsplit(p.sid, loc && loc.section !== 'fav' ? { ...loc, index: at + 1 + i } : null));
+  }
   else if (id === 'dup') A.openTerminal({ cwd, viaRules: false });
   else if (id === 'copypath') navigator.clipboard.writeText(cwd);
   else if (id === 'finder') api.sys.reveal(cwd);
   else if (id.startsWith('fx:')) A.setTabEffects(tid, { [id.slice(3)]: !eff[id.slice(3)] });
   else if (id === 'archive') A.archiveTab(tid);
   else if (id === 'close') A.closeTab(tid);
+}
+
+function listIndex(loc, tid, s) {
+  if (!loc) return -1;
+  const sp = s.spaces.find((x) => x.id === loc.spaceId);
+  const list = loc.section === 'fav' ? s.favorites : loc.folderId ? sp?.folders.find((f) => f.id === loc.folderId)?.tabs : loc.section === 'pinned' ? sp?.pinned : sp?.today;
+  return list ? list.indexOf(tid) : -1;
 }
 
 export async function folderMenu(e, spaceId, folder, startRename) {

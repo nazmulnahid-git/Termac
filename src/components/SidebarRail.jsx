@@ -42,23 +42,25 @@ export default function Rail() {
             <div className="rail-sep" />
           </>
         )}
-        <div className="rail-space" style={{ color: space.color }} data-drop-into={destAttr('pinned', space.id, null, 0)} {...tipProps(space.name)} onDoubleClick={() => ui.set((u) => ({ ...u, overlay: 'spaceEditor', overlayArg: space.id }))}>
-          {space.glyph}
+        <div className="space-pane">
+          <div className="rail-space" style={{ color: space.color }} data-drop-into={destAttr('pinned', space.id, null, 0)} {...tipProps(space.name)} onDoubleClick={() => ui.set((u) => ({ ...u, overlay: 'spaceEditor', overlayArg: space.id }))}>
+            {space.glyph}
+          </div>
+          <RailList items={pinned} dest={destAttr('pinned', space.id)} onTip={showTip} onTipEnd={() => setTip(null)} />
+          {folders.map((f) =>
+            f === PH ? (
+              <div key="folder-ph" className="rail-ph folder" data-drop-ph />
+            ) : (
+              <RailFolder key={f.id} folder={f} spaceId={space.id} tipProps={tipProps} onTip={showTip} onTipEnd={() => setTip(null)} />
+            )
+          )}
+          {today.length > 0 && <div className="rail-sep" />}
+          <RailList items={today} dest={destAttr('today', space.id)} onTip={showTip} onTipEnd={() => setTip(null)} />
+          <button className="rail-btn new" data-drop-into={destAttr('today', space.id)} onClick={() => A.openTerminal()} {...tipProps(`New terminal  ${formatAccel(bindings.newTerminal)}`)}>
+            <IconPlus />
+          </button>
+          <div className="sb-fill" data-drop-into={destAttr('today', space.id)} />
         </div>
-        <RailList items={pinned} dest={destAttr('pinned', space.id)} onTip={showTip} onTipEnd={() => setTip(null)} />
-        {folders.map((f) =>
-          f === PH ? (
-            <div key="folder-ph" className="rail-ph folder" data-drop-ph />
-          ) : (
-            <RailFolder key={f.id} folder={f} spaceId={space.id} tipProps={tipProps} onTip={showTip} onTipEnd={() => setTip(null)} />
-          )
-        )}
-        {today.length > 0 && <div className="rail-sep" />}
-        <RailList items={today} dest={destAttr('today', space.id)} onTip={showTip} onTipEnd={() => setTip(null)} />
-        <button className="rail-btn new" data-drop-into={destAttr('today', space.id)} onClick={() => A.openTerminal()} {...tipProps(`New terminal  ${formatAccel(bindings.newTerminal)}`)}>
-          <IconPlus />
-        </button>
-        <div className="sb-fill" data-drop-into={destAttr('today', space.id)} />
       </div>
       <SidebarCardsCompact />
       <div className="rail-bottom">

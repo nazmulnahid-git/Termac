@@ -1,9 +1,9 @@
 // Everything that changes sessions, tabs and Spaces goes through here.
-import { app, rt, ui, patchRt, migrate } from './model.js';
+import { app, rt, ui, patchRt, migrate, newSpace } from './model.js';
 import * as reg from '../term/registry.js';
 import * as L from '../lib/layout.js';
 import { route, ruleMatches, sshTarget, expandHome, isRiskyCommand } from '../lib/routing.js';
-import { uid, formatDuration, leafOf } from '../lib/meta.js';
+import { uid, formatDuration, leafOf, SPACE_COLORS, SPACE_GLYPHS } from '../lib/meta.js';
 import { buildKeymap } from '../lib/keys.js';
 
 const api = window.termac;
@@ -336,6 +336,18 @@ export function createSpace(space) {
   syncFocus();
 }
 
+// A fresh, empty Space with the next unused color and glyph (swiping past the last Space).
+export function createBlankSpace() {
+  const s = app.get();
+  const used = new Set(s.spaces.map((x) => x.color.toLowerCase()));
+  const color = SPACE_COLORS.find((c) => !used.has(c)) || SPACE_COLORS[s.spaces.length % SPACE_COLORS.length];
+  const glyph = SPACE_GLYPHS[s.spaces.length % SPACE_GLYPHS.length];
+  const space = newSpace({ name: `Space ${s.spaces.length + 1}`, glyph, color });
+  createSpace(space);
+  toast({ title: `${space.name} created`, detail: 'Swipe back to return.', action: { label: 'Rename', run: () => ui.set((u) => ({ ...u, overlay: 'spaceEditor', overlayArg: space.id, toast: null })) } });
+  return space.id;
+}
+
 export function updateSpace(id, patch) {
   app.set((s) => ({ ...s, spaces: s.spaces.map((sp) => (sp.id === id ? { ...sp, ...patch } : sp)) }));
 }
@@ -437,8 +449,27 @@ export function mergeIntoActive(tid, edge) {
   syncFocus();
 }
 
-// Pull one pane out of a split into its own Today row.
-export function unsplit(sid) {
+// Drop one sidebar session onto another (Arc-style): they become one split session.
+export function mergeTabs(srcTid, targetTid, edge = 'right') {
+  const s = app.get();
+  const src = s.tabs[srcTid];
+  const target = s.tabs[targetTid];
+  if (!src || !target || srcTid === targetTid) return false;
+  if (L.leaves(target.layout).length + L.leaves(src.layout).length > L.MAX_PANES) {
+    toast({ title: 'That split is full', detail: `A session holds up to ${L.MAX_PANES} panes.` });
+    return false;
+  }
+  app.set((st) => {
+    const tabs = { ...st.tabs, [targetTid]: { ...target, layout: L.insertRoot(target.layout, src.layout, edge), activeSid: src.activeSid } };
+    delete tabs[srcTid];
+    return detach({ ...st, tabs }, srcTid);
+  });
+  activateTab(targetTid);
+  return true;
+}
+
+// Pull one pane out of a split into its own row: Today by default, or wherever it was dropped.
+export function unsplit(sid, dest = null) {
   const s = app.get();
   const tab = tabOfSession(sid, s);
   if (!tab || L.leaves(tab.layout).length < 2) return;
@@ -455,8 +486,9 @@ export function unsplit(sid) {
         [tid]: { id: tid, name: null, layout: L.leaf(sid), activeSid: sid, effects: { ...tab.effects }, createdAt: Date.now() },
       },
     };
-    return attach(next, tid, { section: 'today', spaceId });
+    return attach(next, tid, dest || { section: 'today', spaceId });
   });
+  return tid;
 }
 
 export function setRatio(tid, path, ratio) {
