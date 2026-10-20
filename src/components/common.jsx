@@ -47,8 +47,11 @@ export function FailTip({ rt: r }) {
   );
 }
 
-export function Chip({ kind }) {
-  return <span className="chip">{kind}</span>;
+// The gutter before a session's name: its chosen icon, else what it runs (git, npm,
+// ssh…). Plain shells leave it empty.
+export function Chip({ kind, icon }) {
+  if (icon) return <span className="chip icon">{icon}</span>;
+  return <span className="chip">{kind === '>_' ? '' : kind}</span>;
 }
 
 export function Switch({ on, onChange, disabled }) {

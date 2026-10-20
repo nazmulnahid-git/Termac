@@ -11,7 +11,7 @@ import { fuzzy, highlight } from '../lib/fuzzy.js';
 import { IconFolder, IconFolderOpen, IconBranch, IconPullRequest, IconCheck, IconArrowUp, IconClock, IconCopy, IconExternal, IconPlus, IconSearch, IconDiff } from './icons.jsx';
 
 const api = window.termac;
-const MENU_W = 340;
+const MENU_W = 420;
 
 export default function PaneChips({ sid, r, cwd }) {
   const home = ui.use((s) => s.home);

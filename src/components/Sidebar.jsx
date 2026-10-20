@@ -15,7 +15,7 @@ import { PH, pressTab, pressPane, pressFolder, useDropList, useDropFolders, dest
 
 export { promptText };
 
-const RAIL_WIDTH = 68;
+const RAIL_WIDTH = 72;
 const HIDE_SLOP = 8; // px past the right edge before a revealed sidebar starts to hide
 const HIDE_DELAY = 150;
 const isPaneDrag = (e) => e.dataTransfer.types.includes(PANE_MIME);
@@ -84,7 +84,7 @@ function ResizeHandle({ width, onDrag }) {
     const startX = e.clientX;
     let w = width;
     const move = (ev) => {
-      w = Math.min(380, Math.max(200, width + ev.clientX - startX));
+      w = Math.min(460, Math.max(240, width + ev.clientX - startX));
       onDrag(w);
     };
     const up = () => {
@@ -96,7 +96,7 @@ function ResizeHandle({ width, onDrag }) {
     window.addEventListener('mousemove', move);
     window.addEventListener('mouseup', up);
   };
-  return <div className="sb-resize" onMouseDown={onMouseDown} onDoubleClick={() => A.setSettings({ sidebarWidth: 256 })} title="Drag to resize · double-click to reset" />;
+  return <div className="sb-resize" onMouseDown={onMouseDown} onDoubleClick={() => A.setSettings({ sidebarWidth: 300 })} title="Drag to resize · double-click to reset" />;
 }
 
 // ---- Expanded -----------------------------------------------------------------------
@@ -331,8 +331,8 @@ function FindRow({ hit, sel, onHover, onOpen }) {
   if (!v) return null;
   const byPath = hit.on === 'path';
   return (
-    <div className={`row find-row${on ? ' on' : ''}${sel ? ' sel' : ''}${v.dead ? ' dead' : ''}`} onMouseMove={sel ? undefined : onHover} onMouseDown={(e) => e.preventDefault()} onClick={onOpen}>
-      <Chip kind={v.active?.kind} />
+    <div className={`row find-row${on ? ' on' : ''}${sel ? ' sel' : ''}${v.dead ? ' dead' : ''}${v.tab.color ? ' tinted' : ''}`} style={(v.tab.color ? { '--tc': v.tab.color } : undefined)} onMouseMove={sel ? undefined : onHover} onMouseDown={(e) => e.preventDefault()} onClick={onOpen}>
+      <Chip kind={v.active?.kind} icon={v.tab.icon} />
       <span className="name">{byPath ? hit.name : <Marked text={hit.name} indices={hit.indices} />}</span>
       {(byPath || elsewhere) && (
         <span className={`where${byPath ? ' path' : ''}`}>
@@ -389,8 +389,8 @@ function FavTile({ tid }) {
   if (!v) return null;
   const color = { run: 'var(--accent)', ok: 'var(--ok)', fail: 'var(--fail)', bell: 'var(--bell)', idle: 'var(--faint)' }[v.status];
   return (
-    <div className={`fav${on ? ' on' : ''}`} title={v.name} data-drag-tid={tid} onPointerDown={(e) => pressTab(e, tid)} onClick={(e) => !e.shiftKey && A.activateTab(tid)} onContextMenu={(e) => rowMenu(e, tid, v)} {...peek}>
-      {shortName(v.tab.name || v.active?.name)}
+    <div className={`fav${on ? ' on' : ''}${v.tab.color ? ' tinted' : ''}`} style={(v.tab.color ? { '--tc': v.tab.color } : undefined)} title={v.name} data-drag-tid={tid} onPointerDown={(e) => pressTab(e, tid)} onClick={(e) => !e.shiftKey && A.activateTab(tid)} onContextMenu={(e) => rowMenu(e, tid, v)} {...peek}>
+      {v.tab.icon ? <span className="fav-icon">{v.tab.icon}</span> : <span className="fav-name">{shortName(v.tab.name || v.active?.name)}</span>}
       <span className={`corner dot6${v.status === 'run' ? ' st-run' : ''}`} style={{ background: color }} />
       {v.bell > 0 && <span className="badge status st-bell">{v.bell}</span>}
     </div>
@@ -425,7 +425,8 @@ function Row({ tid, indent }) {
   };
   return (
     <div
-      className={`row${on ? ' on' : ''}${indent ? ' indent' : ''}${v.dead ? ' dead' : ''}${split ? ' split' : ''}${merge ? ` merge-${merge}` : ''}`}
+      className={`row${on ? ' on' : ''}${indent ? ' indent' : ''}${v.dead ? ' dead' : ''}${split ? ' split' : ''}${merge ? ` merge-${merge}` : ''}${v.tab.color ? ' tinted' : ''}`}
+      style={(v.tab.color ? { '--tc': v.tab.color } : undefined)}
       data-drag-tid={tid}
       onPointerDown={(e) => !renaming && pressTab(e, tid)}
       onClick={click}
@@ -441,6 +442,7 @@ function Row({ tid, indent }) {
       }}
       onMouseDown={peek.onMouseDown}
     >
+      {split && v.tab.icon && <Chip icon={v.tab.icon} />}
       {split ? (
         // Arc-style split: one segment per pane on the same line. Click one to focus that
         // pane, ✕ closes just that pane, ⌥-drag pulls it out into its own row.
@@ -486,7 +488,7 @@ function Row({ tid, indent }) {
           )}
         </span>
       ) : (
-        <Chip kind={v.active?.kind} />
+        <Chip kind={v.active?.kind} icon={v.tab.icon} />
       )}
       {split ? null : renaming ? (
         <InlineName

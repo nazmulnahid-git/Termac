@@ -50,7 +50,7 @@ function createMainWindow() {
     minHeight: 420,
     show: false,
     titleBarStyle: 'hiddenInset',
-    trafficLightPosition: { x: 16, y: 13 },
+    trafficLightPosition: { x: 18, y: 16 },
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#0f1013' : '#f2f2f0',
     webPreferences,
   });
@@ -221,7 +221,11 @@ ipcMain.on('pty:release', (_e, id) => ptys.release(id));
 ipcMain.handle('pty:cwd', (_e, id) => ptys.cwdOf(id));
 
 ipcMain.handle('state:load', () => ({ state, home: app.getPath('home'), dark: nativeTheme.shouldUseDarkColors }));
+// Set once the final state is on disk. Quitting kills every shell, and the renderer
+// would otherwise answer those exits by closing tabs and saving the result over it.
+let stateSealed = false;
 ipcMain.on('state:save', (_e, next) => {
+  if (stateSealed) return;
   state = next;
   stateWriter.save(next);
   quickWin?.webContents.send('state:changed', { spaces: next.spaces, settings: next.settings, profiles: next.profiles, activeSpaceId: next.activeSpaceId, defaultProfileId: next.defaultProfileId });
@@ -377,6 +381,7 @@ app.on('before-quit', (e) => {
 app.on('will-quit', () => {
   globalShortcut.unregisterAll();
   stateWriter.flushSync();
+  stateSealed = true;
   library.flushSync();
   ptys.killAll();
 });

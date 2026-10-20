@@ -108,7 +108,8 @@ function RailTile({ tid, onTip, onTipEnd }) {
   const label = v.panes.length > 1 ? `${v.panes.length}▦` : v.active?.kind === '>_' ? (v.tab.name || v.name).replace(/^[~/.]+/, '').slice(0, 2) || '>_' : v.active?.kind;
   return (
     <button
-      className={`rail-tile${on ? ' on' : ''}${v.danger ? ' danger' : ''}${merge ? ` merge-${merge}` : ''}`}
+      className={`rail-tile${on ? ' on' : ''}${v.danger ? ' danger' : ''}${merge ? ` merge-${merge}` : ''}${v.tab.color ? ' tinted' : ''}`}
+      style={v.tab.color ? { '--tc': v.tab.color } : undefined}
       data-drag-tid={tid}
       onPointerDown={(e) => pressTab(e, tid)}
       onClick={(e) => !e.shiftKey && A.activateTab(tid)}
@@ -123,7 +124,7 @@ function RailTile({ tid, onTip, onTipEnd }) {
       }}
       onMouseDown={peek.onMouseDown}
     >
-      <span className="lbl">{label}</span>
+      <span className={`lbl${v.tab.icon ? ' icon' : ''}`}>{v.tab.icon || label}</span>
       {color && <span className={`corner${v.status === 'run' ? ' st-run' : ''}`} style={{ background: color }} />}
       {v.bell > 0 && <span className="badge">{v.bell}</span>}
     </button>

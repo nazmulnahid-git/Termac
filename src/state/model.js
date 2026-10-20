@@ -25,7 +25,7 @@ export const DEFAULT_SETTINGS = {
   shellPriority: false,
   gestures: { swipeSpaces: true, pinch: true, edgeReveal: true, peek: true },
   sidebarMode: 'expanded', // expanded | compact | hidden
-  sidebarWidth: 256,
+  sidebarWidth: 300,
   toolsWidth: 300,
   reviewWidth: 520,
   clickToMove: true,

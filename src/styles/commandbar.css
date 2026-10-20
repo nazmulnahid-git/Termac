@@ -1,13 +1,13 @@
 /* Command bar additions on top of the global .palette shell. */
-.palette.cb .filter { border: 0; font: inherit; font-size: 11px; cursor: default; }
-.palette.cb input { font-size: 13.5px; }
+.palette.cb .filter { border: 0; font: inherit; cursor: default; }
+.palette.cb input { }
 .palette.cb .item { cursor: default; min-width: 0; }
 .palette.cb .item > .chip { flex: none; }
 .palette.cb .cb-label { flex: 0 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .palette.cb .item .sub { flex: 1 1 0; min-width: 0; }
 .palette.cb .item .hint { flex: none; display: flex; align-items: center; gap: 6px; padding-left: 8px; }
-.palette.cb .cb-mono { font-family: var(--mono); font-size: 12.5px; }
-.palette.cb .item .sub.cb-mono { font-size: 11.5px; }
-.palette.cb .cb-glyph { color: var(--c); font: 12px/22px var(--ui); }
+.palette.cb .cb-mono { font-family: var(--mono); }
+.palette.cb .item .sub.cb-mono { }
+.palette.cb .cb-glyph { color: var(--c); }
 .palette.cb .cb-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
 .palette.cb .results { scroll-padding: 28px 0 6px; }

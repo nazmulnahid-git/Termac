@@ -13,8 +13,9 @@ const RESTORED = (t) => `\r\n\x1b[2m──── restored · ${t} ────\x
 // ---- Persistence --------------------------------------------------------------------
 let saveTimer = null;
 let loaded = false;
+let quitting = false; // past the quit confirmation: the saved state is final
 app.subscribe(() => {
-  if (!loaded) return;
+  if (!loaded || quitting) return;
   clearTimeout(saveTimer);
   saveTimer = setTimeout(() => api.state.save(app.get()), 300);
 });
@@ -252,6 +253,8 @@ export function closeTab(tid) {
 }
 
 function onExit(sid, exitCode) {
+  // Shells die because we're quitting: keep their tabs for the next launch.
+  if (quitting) return;
   const s = app.get();
   const tab = tabOfSession(sid, s);
   const loc = tab && locate(tab.id, s);
@@ -398,6 +401,12 @@ export function moveTab(tid, dest) {
 
 export function renameTab(tid, name) {
   app.set((s) => ({ ...s, tabs: { ...s.tabs, [tid]: { ...s.tabs[tid], name: name.trim() || null } } }));
+}
+
+// Per-tab look: an icon shown in the sidebar gutter and a color that tints the row.
+// Either can be null to fall back to the defaults.
+export function setTabStyle(tid, patch) {
+  app.set((s) => (s.tabs[tid] ? { ...s, tabs: { ...s.tabs, [tid]: { ...s.tabs[tid], ...patch } } } : s));
 }
 
 export function setTabEffects(tid, effects) {
@@ -894,8 +903,21 @@ export async function boot() {
   syncFocus();
   api.sys.sshHosts().then((sshHosts) => ui.set((u) => ({ ...u, sshHosts })));
   setInterval(() => tidy(), 5 * 60 * 1000);
+  setInterval(checkpointScrollback, 60 * 1000);
   setTimeout(() => tidy(), 30 * 1000);
   return s;
+}
+
+// Scrollback is otherwise written only on a clean quit. Checkpoint sessions that printed
+// something since the last pass, so a crash or force-quit still restores their output.
+const checkpointedAt = new Map();
+function checkpointScrollback() {
+  const s = app.get();
+  for (const h of reg.allHandles()) {
+    if (!s.sessions[h.sid] || (checkpointedAt.get(h.sid) || 0) >= h.lastActivity) continue;
+    checkpointedAt.set(h.sid, Date.now());
+    api.scrollback.save(h.sid, reg.serializeBuffer(h.sid, 3000));
+  }
 }
 
 export async function prepareQuit({ running }) {
@@ -904,6 +926,7 @@ export async function prepareQuit({ running }) {
     const ok = await api.sys.confirm({ message: `Quit Termac with ${running} running process${running > 1 ? 'es' : ''}?`, detail: 'Running commands will be stopped. Sessions and scrollback are restored next launch.', ok: 'Quit' });
     if (!ok) return api.app.quitCancel();
   }
+  quitting = true;
   const writes = [];
   for (const h of reg.allHandles()) {
     if (s.sessions[h.sid]) writes.push(api.scrollback.save(h.sid, reg.serializeBuffer(h.sid, 3000)));

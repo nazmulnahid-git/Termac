@@ -18,6 +18,7 @@ import ToolsPanel from './components/ToolsPanel.jsx';
 import ReviewPanel from './components/ReviewPanel.jsx';
 import FileViewer from './components/FileViewer.jsx';
 import StatusBar from './components/StatusBar.jsx';
+import TabStyle from './components/TabStyle.jsx';
 import { terminalLook, mix } from './lib/termtheme.js';
 
 const api = window.termac;
@@ -275,6 +276,7 @@ export default function App() {
       {overlay === 'settings' && <Settings onClose={close} initialTab={overlayArg} />}
       {overlay === 'spaceEditor' && <SpaceEditor key={overlayArg ?? 'new'} spaceId={overlayArg} onClose={close} />}
       {overlay === 'overview' && <Overview onClose={close} />}
+      {overlay === 'tabStyle' && <TabStyle tid={overlayArg} onClose={close} />}
       {!onboarded && <Onboarding onDone={() => A.focusedSid() && reg.focus(A.focusedSid())} />}
       <Prompt />
       {hidden && !reveal && toast && (

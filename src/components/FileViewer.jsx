@@ -9,7 +9,7 @@ import { FileGlyph } from './ToolsPanel.jsx';
 import { IconClose, IconCopy, IconInsert, IconExternal, IconReview } from './icons.jsx';
 
 const api = window.termac;
-const ROW = 20;
+const ROW = 22.5; // 15px text at 1.5 line height (.vw-scroll)
 const IMAGE = /\.(png|jpe?g|gif|webp|bmp|ico)$/i;
 
 export default function FileViewer() {

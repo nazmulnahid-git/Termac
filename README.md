@@ -9,6 +9,7 @@ A macOS terminal where every session lives in a vertical sidebar, grouped into c
   - Favorites: always-on sessions shared by every Space.
   - Pinned: named sessions in collapsible folders.
   - Today: temporary sessions.
+  - Icon & Color… (right-click a row) gives a session its own icon and a tinted row.
   - Live status on every row: running, idle, ✓ done, ✗ failed (hover for the exit code, click to jump to the error), and a bell badge.
 - **Status line.** A tmux-style bar along the bottom lists Spaces as `1:work*` (`*` current, `#` unseen finished jobs; drop a session on one to move it there), plus finished jobs, the Library, the focused session's process and size, and a clock. The title bar shows the focused session's directory and process; click it for the command bar.
 - **Command bar (⌘T).** One fuzzy search over open sessions, recent directories, SSH hosts (`~/.ssh/config`), snippets and actions. Prefixes: `>` runs a command, `@` searches hosts, `/` searches snippets. ⇥ cycles filters.

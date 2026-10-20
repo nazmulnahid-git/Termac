@@ -64,6 +64,7 @@ export async function rowMenu(e, tid, v, startRename) {
   const cwd = v.active?.rt.cwd;
   const items = [
     startRename && { id: 'rename', label: 'Rename…' },
+    { id: 'style', label: 'Icon & Color…' },
     { type: 'separator' },
     loc?.section === 'today' ? { id: 'pin', label: 'Pin to Space' } : { id: 'unpin', label: 'Move to Today' },
     loc?.section === 'fav' ? { id: 'unfav', label: 'Remove from Favorites' } : { id: 'fav', label: 'Add to Favorites' },
@@ -94,6 +95,7 @@ export async function rowMenu(e, tid, v, startRename) {
   const id = await api.app.popupMenu(items);
   if (!id) return;
   if (id === 'rename') startRename();
+  else if (id === 'style') ui.set((u) => ({ ...u, overlay: 'tabStyle', overlayArg: tid }));
   else if (id === 'pin') A.moveTab(tid, { section: 'pinned', spaceId: loc.spaceId });
   else if (id === 'unpin' || id === 'unfav') A.moveTab(tid, { section: 'today', spaceId: loc?.spaceId || sp.id });
   else if (id === 'fav') A.moveTab(tid, { section: 'fav', spaceId: null });

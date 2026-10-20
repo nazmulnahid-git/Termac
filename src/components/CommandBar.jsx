@@ -246,7 +246,7 @@ function buildCandidates() {
       label,
       sub: where + status,
       extra: [cwd && tildify(cwd, home), ...names].filter(Boolean).join(' '),
-      chip: kindOf(cur.command || meta.command),
+      chip: tab.icon || kindOf(cur.command || meta.command),
       selHint: 'Switch to session ↵',
       recency,
       spaceId,

@@ -2,6 +2,7 @@
 // throttled with ack-based flow control so a runaway process can't flood the renderer.
 import pty from 'node-pty';
 import os from 'node:os';
+import fs from 'node:fs';
 import path from 'node:path';
 import { execFile } from 'node:child_process';
 
@@ -72,7 +73,8 @@ export class PtyHost {
         name: 'xterm-256color',
         cols: Math.max(2, cols | 0 || 80),
         rows: Math.max(1, rows | 0 || 24),
-        cwd: cwd || os.homedir(),
+        // A restored session's folder may be gone; a shell that can't start would close its tab.
+        cwd: cwd && fs.existsSync(cwd) ? cwd : os.homedir(),
         env,
       });
     } catch (e) {
