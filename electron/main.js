@@ -183,7 +183,8 @@ function buildMenu(bindings = {}) {
     {
       label: 'View',
       submenu: [
-        item('Toggle Sidebar', 'toggleSidebar'),
+        item('Collapse Sidebar', 'toggleSidebar'),
+        item('Focus Mode', 'focusMode'),
         item('Library', 'library'),
         item('Notes', 'notes'),
         item('All Spaces', 'overview'),
@@ -242,6 +243,22 @@ ipcMain.handle('sys:chooseDir', async (e, defaultPath) => {
   const win = BrowserWindow.fromWebContents(e.sender);
   const r = await dialog.showOpenDialog(win, { properties: ['openDirectory', 'createDirectory'], defaultPath });
   return r.canceled ? null : r.filePaths[0];
+});
+ipcMain.handle('sys:chooseImage', async (e) => {
+  const win = BrowserWindow.fromWebContents(e.sender);
+  const r = await dialog.showOpenDialog(win, { properties: ['openFile'], filters: [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif', 'heic'] }] });
+  return r.canceled ? null : r.filePaths[0];
+});
+// Background images are read once and handed over as data URLs (CSP allows data: images).
+ipcMain.handle('sys:readImage', async (_e, file) => {
+  try {
+    const st = await fsp.stat(file);
+    if (st.size > 20 * 1024 * 1024) return null;
+    const ext = path.extname(file).slice(1).toLowerCase().replace('jpg', 'jpeg');
+    return `data:image/${ext};base64,${(await fsp.readFile(file)).toString('base64')}`;
+  } catch {
+    return null;
+  }
 });
 ipcMain.on('sys:reveal', (_e, p) => shell.openPath(p));
 ipcMain.on('sys:openExternal', (_e, url) => {

@@ -4,6 +4,8 @@ import { app, ui, newSpace } from '../state/model.js';
 import * as A from '../state/actions.js';
 import { SPACE_COLORS, SPACE_GLYPHS } from '../lib/meta.js';
 import { expandHome, tildify } from '../lib/routing.js';
+import { BG_PRESETS, DEFAULT_LOOK, resolveBg, terminalLook } from '../lib/termtheme.js';
+import { useImageUrl } from './common.jsx';
 
 const api = window.termac;
 const ARCHIVE = [
@@ -14,6 +16,10 @@ const ARCHIVE = [
   [72, '3 days'],
   [0, 'Never'],
 ];
+
+const PRESET_BGS = new Set(BG_PRESETS.filter((p) => p.bg && p.bg !== 'tint').map((p) => p.bg.toLowerCase()));
+const isCustomBg = (bg) => !!bg && bg !== 'tint' && !PRESET_BGS.has(bg.toLowerCase());
+const fileName = (p) => (p ? p.split('/').pop() : '');
 
 function hoursLabel(h) {
   if (!h) return 'never';
@@ -26,9 +32,40 @@ export default function SpaceEditor({ spaceId, onClose }) {
   const spaceCount = app.use((s) => s.spaces.length);
   const defaultHours = app.use((s) => s.settings.archiveAfterH);
   const [form, setForm] = useState(() => initialForm(spaceId));
+  const [orig] = useState(() => (form.id ? form.term : null)); // look to restore on cancel
+  const termTheme = ui.use((u) => u.termTheme);
   const nameRef = useRef(null);
+  const saved = useRef(false);
+  const pendingLook = useRef(null);
+  const lookTimer = useRef(0);
   const editing = !!form.id;
   const set = (patch) => setForm((f) => ({ ...f, ...patch }));
+
+  // Editing an existing Space previews the look live on its terminals; sliders are debounced.
+  const flushLook = () => {
+    clearTimeout(lookTimer.current);
+    const p = pendingLook.current;
+    pendingLook.current = null;
+    if (p && form.id) A.setSpaceLook(form.id, p);
+  };
+  const setTerm = (patch, slow) => {
+    setForm((f) => ({ ...f, term: { ...f.term, ...patch } }));
+    if (!form.id) return;
+    pendingLook.current = { ...pendingLook.current, ...patch };
+    clearTimeout(lookTimer.current);
+    if (slow) lookTimer.current = setTimeout(flushLook, 90);
+    else flushLook();
+  };
+
+  // Any close without saving (Cancel, Esc, backdrop, another overlay) restores the original look.
+  useEffect(
+    () => () => {
+      clearTimeout(lookTimer.current);
+      pendingLook.current = null;
+      if (orig && !saved.current) A.setSpaceLook(form.id, orig);
+    },
+    [],
+  );
 
   useEffect(() => {
     nameRef.current?.focus();
@@ -48,8 +85,12 @@ export default function SpaceEditor({ spaceId, onClose }) {
     const name = form.name.trim();
     if (!name) return nameRef.current?.focus();
     const fields = { name, glyph: form.glyph, color: form.color, profileId: form.profileId || null, startDir: form.startDir.trim() || '~', archiveAfterH: form.archiveAfterH };
-    if (editing) A.updateSpace(form.id, fields);
-    else A.createSpace({ ...newSpace(fields), archiveAfterH: fields.archiveAfterH });
+    const term = { ...form.term };
+    saved.current = true;
+    clearTimeout(lookTimer.current);
+    pendingLook.current = null;
+    if (editing) A.updateSpace(form.id, { ...fields, term });
+    else A.createSpace({ ...newSpace(fields), archiveAfterH: fields.archiveAfterH, term });
     onClose();
   };
 
@@ -64,7 +105,16 @@ export default function SpaceEditor({ spaceId, onClose }) {
     if (!app.get().spaces.some((x) => x.id === form.id)) onClose();
   };
 
+  const chooseImage = async () => {
+    const picked = await api.sys.chooseImage();
+    if (picked) setTerm({ image: picked });
+  };
+
   const custom = !SPACE_COLORS.includes(form.color.toLowerCase());
+  const t = form.term;
+  const look = terminalLook({ color: form.color, term: t }, termTheme);
+  const preset = BG_PRESETS.find((p) => p.bg === t.bg);
+  const bgName = preset ? preset.name : `Custom ${t.bg}`;
 
   return (
     <form className="modal se" style={{ '--c': form.color }} onSubmit={submit}>
@@ -125,6 +175,59 @@ export default function SpaceEditor({ spaceId, onClose }) {
             ))}
           </select>
         </div>
+
+        <div className="se-sec">Terminal</div>
+        <div className="se-term">
+          <div className="form">
+            <label>Background</label>
+            <div>
+              <div className="se-bgs">
+                {BG_PRESETS.map((p) => {
+                  const bg = p.bg === 'tint' ? resolveBg({ bg: 'tint' }, form.color) : p.bg;
+                  return <button type="button" key={p.id} className={`se-bg${t.bg === p.bg ? ' on' : ''}${p.bg ? '' : ' def'}`} style={bg ? { '--bg': bg } : undefined} title={p.name} aria-label={p.name} onClick={() => setTerm({ bg: p.bg })} />;
+                })}
+                <label className={`se-bg se-bg-custom${isCustomBg(t.bg) ? ' on' : ''}`} style={isCustomBg(t.bg) ? { '--bg': t.bg } : undefined} title="Custom color">
+                  {isCustomBg(t.bg) ? '' : '+'}
+                  <input type="color" value={look.bg} onChange={(e) => setTerm({ bg: e.target.value }, true)} />
+                </label>
+              </div>
+              <div className="se-bgname">{bgName}</div>
+            </div>
+
+            <label>Image</label>
+            <div className="row-inline se-img">
+              {t.image && (
+                <span className="se-file ellipsis" title={t.image}>
+                  {fileName(t.image)}
+                </span>
+              )}
+              <button type="button" className="btn" onClick={chooseImage}>
+                {t.image ? 'Change…' : 'Choose image…'}
+              </button>
+              {t.image && (
+                <button type="button" className="btn" onClick={() => setTerm({ image: null })}>
+                  Remove
+                </button>
+              )}
+            </div>
+
+            {t.image && (
+              <>
+                <label htmlFor="se-dim">Dim</label>
+                <div className="se-range">
+                  <input id="se-dim" type="range" min={0} max={95} step={1} value={Math.round(t.dim * 100)} onChange={(e) => setTerm({ dim: Number(e.target.value) / 100 }, true)} />
+                  <span>{Math.round(t.dim * 100)}%</span>
+                </div>
+                <label htmlFor="se-blur">Blur</label>
+                <div className="se-range">
+                  <input id="se-blur" type="range" min={0} max={20} step={1} value={t.blur} onChange={(e) => setTerm({ blur: Number(e.target.value) }, true)} />
+                  <span>{t.blur}px</span>
+                </div>
+              </>
+            )}
+          </div>
+          <TermPreview look={look} />
+        </div>
       </div>
       <div className="modal-foot">
         {editing && spaceCount > 1 && (
@@ -143,12 +246,35 @@ export default function SpaceEditor({ spaceId, onClose }) {
   );
 }
 
+// Fake terminal lines painted with the Space's resolved look.
+function TermPreview({ look }) {
+  const url = useImageUrl(look.image);
+  const x = look.xterm;
+  return (
+    <div className="se-prev" style={{ background: look.bg, color: x.foreground }}>
+      {look.image && url && <div className="se-prev-img" style={{ backgroundImage: `url("${url}")`, filter: look.blur ? `blur(${look.blur / 2}px)` : undefined }} />}
+      {look.image && <div className="se-prev-dim" style={{ background: look.bg, opacity: look.dim }} />}
+      <div className="se-prev-lines">
+        <div>
+          <span style={{ color: x.blue }}>~/work/api</span> <span style={{ color: x.magenta }}>main</span> <span style={{ color: x.green }}>❯</span> npm test
+        </div>
+        <div style={{ color: x.green }}>✓ 42 passing (1.3s)</div>
+        <div style={{ color: x.red }}>✗ 1 failing (auth.spec.ts)</div>
+        <div style={{ color: x.brightBlack }}>Done in 2.14s</div>
+        <div>
+          <span style={{ color: x.green }}>❯</span> <i className="se-prev-cur" style={{ background: x.cursor }} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function initialForm(spaceId) {
   const s = app.get();
   const sp = spaceId && s.spaces.find((x) => x.id === spaceId);
-  if (sp) return { id: sp.id, name: sp.name, glyph: sp.glyph, color: sp.color, profileId: sp.profileId, startDir: sp.startDir || '~', archiveAfterH: sp.archiveAfterH ?? null };
+  if (sp) return { id: sp.id, name: sp.name, glyph: sp.glyph, color: sp.color, profileId: sp.profileId, startDir: sp.startDir || '~', archiveAfterH: sp.archiveAfterH ?? null, term: { ...DEFAULT_LOOK, ...sp.term } };
   // New Space: first color and glyph not already taken.
   const color = SPACE_COLORS.find((c) => !s.spaces.some((x) => x.color.toLowerCase() === c)) || SPACE_COLORS[s.spaces.length % SPACE_COLORS.length];
   const glyph = SPACE_GLYPHS.find((g) => !s.spaces.some((x) => x.glyph === g)) || SPACE_GLYPHS[0];
-  return { id: null, name: '', glyph, color, profileId: null, startDir: '~', archiveAfterH: null };
+  return { id: null, name: '', glyph, color, profileId: null, startDir: '~', archiveAfterH: null, term: { ...DEFAULT_LOOK } };
 }

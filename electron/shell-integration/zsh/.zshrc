@@ -1,3 +1,7 @@
+# /etc/zshrc derives HISTFILE from ZDOTDIR, which points here; keep history in the user's file.
+if [[ -z "$HISTFILE" || "$HISTFILE" == "$ZDOTDIR/.zsh_history" ]]; then
+  HISTFILE="$TERMAC_USER_ZDOTDIR/.zsh_history"
+fi
 if [[ -f "$TERMAC_USER_ZDOTDIR/.zshrc" ]]; then
   TERMAC_ZDOTDIR="$ZDOTDIR"; ZDOTDIR="$TERMAC_USER_ZDOTDIR"
   . "$ZDOTDIR/.zshrc"

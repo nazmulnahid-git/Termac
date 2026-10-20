@@ -2,6 +2,7 @@
 import { createStore } from './store.js';
 import { defaultBindings } from '../lib/keys.js';
 import { uid } from '../lib/meta.js';
+import { DEFAULT_LOOK } from '../lib/termtheme.js';
 
 export const DEFAULT_SETTINGS = {
   onLaunch: 'restore', // restore | fresh
@@ -23,7 +24,8 @@ export const DEFAULT_SETTINGS = {
   keybindings: defaultBindings(),
   shellPriority: false,
   gestures: { swipeSpaces: true, pinch: true, edgeReveal: true, peek: true },
-  sidebarHidden: false,
+  sidebarMode: 'expanded', // expanded | compact | hidden
+  sidebarWidth: 256,
 };
 
 export function defaultProfile() {
@@ -31,7 +33,7 @@ export function defaultProfile() {
 }
 
 export function newSpace({ name = 'Space', glyph = '◆', color = '#3b82f6', startDir = '~', profileId = null } = {}) {
-  return { id: uid('sp'), name, glyph, color, startDir, profileId, archiveAfterH: null, pinned: [], folders: [], today: [], activeTabId: null };
+  return { id: uid('sp'), name, glyph, color, startDir, profileId, archiveAfterH: null, term: { ...DEFAULT_LOOK }, pinned: [], folders: [], today: [], activeTabId: null };
 }
 
 export function initialState() {
@@ -62,7 +64,10 @@ export function migrate(saved) {
   if (!saved || saved.version !== 2) return base;
   const s = { ...base, ...saved };
   s.settings = { ...DEFAULT_SETTINGS, ...saved.settings, keybindings: { ...DEFAULT_SETTINGS.keybindings, ...saved.settings?.keybindings }, gestures: { ...DEFAULT_SETTINGS.gestures, ...saved.settings?.gestures } };
+  if (saved.settings?.sidebarHidden && !saved.settings?.sidebarMode) s.settings.sidebarMode = 'hidden';
+  delete s.settings.sidebarHidden;
   if (!s.spaces?.length) s.spaces = base.spaces;
+  s.spaces = s.spaces.map((sp) => ({ ...sp, term: { ...DEFAULT_LOOK, ...sp.term } }));
   if (!s.spaces.some((sp) => sp.id === s.activeSpaceId)) s.activeSpaceId = s.spaces[0].id;
   if (!s.profiles?.length) s.profiles = [defaultProfile()];
   return s;

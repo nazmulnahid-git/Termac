@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { app, rt, ui } from '../state/model.js';
 import { arrayEq } from '../state/store.js';
 import * as L from '../lib/layout.js';
@@ -64,4 +65,23 @@ export function Seg({ value, options, onChange }) {
       ))}
     </span>
   );
+}
+
+// Background images are read through the main process once and cached as data URLs.
+const imageCache = new Map();
+export function useImageUrl(file) {
+  const [url, setUrl] = useState(() => (file ? imageCache.get(file) || null : null));
+  useEffect(() => {
+    if (!file) return setUrl(null);
+    if (imageCache.has(file)) return setUrl(imageCache.get(file));
+    let live = true;
+    window.termac.sys.readImage(file).then((data) => {
+      if (data) imageCache.set(file, data);
+      if (live) setUrl(data);
+    });
+    return () => {
+      live = false;
+    };
+  }, [file]);
+  return url;
 }

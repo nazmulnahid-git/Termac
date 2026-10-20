@@ -856,3 +856,41 @@ export function adopt({ sessionId, spaceId, pinned, content, cwd, meta }) {
   ui.set((u) => ({ ...u, view: 'terminal' }));
   syncFocus();
 }
+
+// ---- Sidebar modes ------------------------------------------------------------------
+let lastVisibleMode = 'expanded';
+export function setSidebarMode(mode) {
+  const cur = app.get().settings.sidebarMode;
+  if (cur !== 'hidden') lastVisibleMode = cur;
+  setSettings({ sidebarMode: mode });
+}
+
+// ⌘S: expanded ↔ compact rail (and back out of focus mode).
+export function toggleSidebar() {
+  const cur = app.get().settings.sidebarMode;
+  setSidebarMode(cur === 'expanded' ? 'compact' : 'expanded');
+}
+
+// ⌃⌘S: hide completely, then restore whichever mode was showing.
+export function toggleFocusMode() {
+  const cur = app.get().settings.sidebarMode;
+  setSidebarMode(cur === 'hidden' ? lastVisibleMode : 'hidden');
+}
+
+export function setSpaceLook(spaceId, patch) {
+  app.set((s) => ({ ...s, spaces: s.spaces.map((sp) => (sp.id === spaceId ? { ...sp, term: { ...sp.term, ...patch } } : sp)) }));
+}
+
+export function moveFolder(spaceId, folderId, toIndex) {
+  app.set((s) => ({
+    ...s,
+    spaces: s.spaces.map((sp) => {
+      if (sp.id !== spaceId) return sp;
+      const folders = sp.folders.filter((f) => f.id !== folderId);
+      const f = sp.folders.find((x) => x.id === folderId);
+      if (!f) return sp;
+      folders.splice(Math.max(0, Math.min(toIndex, folders.length)), 0, f);
+      return { ...sp, folders };
+    }),
+  }));
+}

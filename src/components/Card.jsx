@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { app, rt, ui } from '../state/model.js';
 import { arrayEq } from '../state/store.js';
 import * as A from '../state/actions.js';
@@ -6,6 +6,8 @@ import * as reg from '../term/registry.js';
 import * as L from '../lib/layout.js';
 import { splitCwd, procLabel, clockTime, formatDuration, sessionName } from '../lib/meta.js';
 import { formatAccel } from '../lib/keys.js';
+import { terminalLook } from '../lib/termtheme.js';
+import { useImageUrl } from './common.jsx';
 
 const api = window.termac;
 const TAB_MIME = 'application/x-termac-tab';
@@ -17,6 +19,9 @@ export default function Card() {
   const sids = tab ? L.leaves(tab.layout) : [];
   const sshDanger = rt.use((s) => sids.some((id) => s[id]?.sshEffects?.danger));
   const dragging = ui.use((s) => s.dragging);
+  const space = app.use((s) => A.activeSpace(s));
+  const look = useMemo(() => terminalLook(space, theme), [space.term, space.color, theme]);
+  const image = useImageUrl(look.image);
   const [edge, setEdge] = useState(null);
 
   if (!tab) return <EmptySpace />;
@@ -39,23 +44,29 @@ export default function Card() {
   };
 
   return (
-    <div className={`card t-${theme}${danger ? ' danger' : ''}`} onDragOver={onDragOver} onDragLeave={(e) => !e.currentTarget.contains(e.relatedTarget) && setEdge(null)} onDrop={onDrop}>
-      <Layout node={tab.layout} tid={tab.id} path={[]} activeSid={tab.activeSid} multi={sids.length > 1} danger={danger} />
+    <div className={`card t-${look.dark ? 'dark' : 'light'}${danger ? ' danger' : ''}`} style={{ ...look.vars, background: look.bg }} onDragOver={onDragOver} onDragLeave={(e) => !e.currentTarget.contains(e.relatedTarget) && setEdge(null)} onDrop={onDrop}>
+      {look.image && image && (
+        <>
+          <div className="card-bg" style={{ backgroundImage: `url(${image})`, filter: look.blur ? `blur(${look.blur}px)` : undefined, inset: look.blur ? -look.blur * 2 : 0 }} />
+          <div className="card-dim" style={{ background: look.bg, opacity: look.dim }} />
+        </>
+      )}
+      <Layout node={tab.layout} tid={tab.id} path={[]} activeSid={tab.activeSid} multi={sids.length > 1} danger={danger} look={look} />
       {canDrop && <EdgeZones edge={edge} tabId={dragging.tabId} />}
     </div>
   );
 }
 
-function Layout({ node, tid, path, activeSid, multi, danger }) {
-  if (node.sid) return <Pane sid={node.sid} focused={node.sid === activeSid} multi={multi} danger={danger} />;
+function Layout({ node, tid, path, activeSid, multi, danger, look }) {
+  if (node.sid) return <Pane sid={node.sid} focused={node.sid === activeSid} multi={multi} danger={danger} look={look} />;
   return (
     <div className={`split split-${node.dir}`}>
       <div className="slot" style={{ flex: `${node.ratio} 1 0` }}>
-        <Layout node={node.a} tid={tid} path={[...path, 'a']} activeSid={activeSid} multi={multi} danger={danger} />
+        <Layout node={node.a} tid={tid} path={[...path, 'a']} activeSid={activeSid} multi={multi} danger={danger} look={look} />
       </div>
       <Divider node={node} tid={tid} path={path} />
       <div className="slot" style={{ flex: `${1 - node.ratio} 1 0` }}>
-        <Layout node={node.b} tid={tid} path={[...path, 'b']} activeSid={activeSid} multi={multi} danger={danger} />
+        <Layout node={node.b} tid={tid} path={[...path, 'b']} activeSid={activeSid} multi={multi} danger={danger} look={look} />
       </div>
     </div>
   );
@@ -120,7 +131,7 @@ function EdgeZones({ edge, tabId }) {
 }
 
 // ---- Pane ----------------------------------------------------------------------------
-function Pane({ sid, focused, multi, danger }) {
+function Pane({ sid, focused, multi, danger, look }) {
   const slot = useRef(null);
   const r = rt.use((s) => s[sid]) || {};
   const home = ui.use((s) => s.home);
@@ -130,19 +141,30 @@ function Pane({ sid, focused, multi, danger }) {
   const find = ui.use((s) => s.find && s.focusedSid === sid);
 
   useLayoutEffect(() => {
-    const el = slot.current;
     reg.create(sid);
+    reg.setLook(sid, look);
+  }, [sid, look.key]);
+
+  useLayoutEffect(() => {
+    const el = slot.current;
     reg.mount(sid, el);
     A.ensureStarted(sid);
-    let raf = 0;
+    // Throttled refit: animations (sidebar collapse, divider drags) shouldn't spam the PTY with resizes.
+    let timer = 0;
+    let last = 0;
+    const refit = () => {
+      timer = 0;
+      last = performance.now();
+      reg.fit(sid);
+    };
     const ro = new ResizeObserver(() => {
-      cancelAnimationFrame(raf);
-      raf = requestAnimationFrame(() => reg.fit(sid));
+      if (timer) return;
+      timer = setTimeout(refit, Math.max(0, 90 - (performance.now() - last)));
     });
     ro.observe(el);
     return () => {
       ro.disconnect();
-      cancelAnimationFrame(raf);
+      clearTimeout(timer);
       reg.unmount(sid, el);
     };
   }, [sid]);

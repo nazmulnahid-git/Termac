@@ -27,7 +27,9 @@ export function runAction(action) {
     case 'newTerminal':
       return A.openTerminal();
     case 'toggleSidebar':
-      return A.setSettings({ sidebarHidden: !app.get().settings.sidebarHidden });
+      return A.toggleSidebar();
+    case 'focusMode':
+      return A.toggleFocusMode();
     case 'splitRight':
       return A.splitActive('right');
     case 'splitDown':
@@ -82,7 +84,7 @@ export function runAction(action) {
 }
 
 // Actions that still work while typing in a text field (not the terminal).
-const FROM_INPUTS = new Set(['commandBar', 'newTerminal', 'settings', 'library', 'notes', 'toggleSidebar', 'prevSpace', 'nextSpace', 'overview', 'newSpace']);
+const FROM_INPUTS = new Set(['commandBar', 'newTerminal', 'settings', 'library', 'notes', 'toggleSidebar', 'focusMode', 'prevSpace', 'nextSpace', 'overview', 'newSpace']);
 
 function onKeyDown(e) {
   const u = ui.get();
@@ -141,7 +143,8 @@ function onKeyDown(e) {
 
 export default function App() {
   const color = app.use((s) => A.activeSpace(s)?.color);
-  const hidden = app.use((s) => s.settings.sidebarHidden);
+  const mode = app.use((s) => s.settings.sidebarMode);
+  const hidden = mode === 'hidden';
   const edgeReveal = app.use((s) => s.settings.gestures.edgeReveal);
   const onboarded = app.use((s) => s.onboarded);
   const spaceId = app.use((s) => s.activeSpaceId);

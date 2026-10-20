@@ -6,7 +6,8 @@ import { THEMES } from '../term/registry.js';
 import { ACTIONS, defaultBindings, eventToAccel, normalizeAccel, formatAccel } from '../lib/keys.js';
 import { route, expandHome } from '../lib/routing.js';
 import { uid } from '../lib/meta.js';
-import { Switch, Seg } from './common.jsx';
+import { BG_PRESETS, terminalLook } from '../lib/termtheme.js';
+import { Switch, Seg, useImageUrl } from './common.jsx';
 
 const api = window.termac;
 const RULE_MIME = 'application/x-termac-rule';
@@ -353,14 +354,119 @@ function AppearanceTab() {
             <Switch on={s.cursorBlink} onChange={setSetting('cursorBlink')} />
           </span>
         </Row>
-        <Row label="Terminal theme">
+        <Row label="Default terminal theme" hint="Used by Spaces without a custom background">
           <Seg value={s.termTheme} onChange={setSetting('termTheme')} options={[['system', 'Follow system'], ['dark', 'Dark'], ['light', 'Light']]} />
         </Row>
         <Row label="Scrollback lines">
           <Select value={s.scrollback} onChange={setSetting('scrollback')} options={[[1000, '1,000'], [5000, '5,000'], [10000, '10,000'], [50000, '50,000']]} />
         </Row>
       </Group>
+      <SidebarGroup s={s} />
+      <SpaceLooks />
     </div>
+  );
+}
+
+function SidebarGroup({ s }) {
+  const kb = s.keybindings;
+  const hint = [kb.toggleSidebar && `${formatAccel(kb.toggleSidebar)} collapses to icons`, kb.focusMode && `${formatAccel(kb.focusMode)} hides it (hover the left edge to peek)`].filter(Boolean).join(' · ');
+  return (
+    <Group title="Sidebar">
+      <Row label="Sidebar" hint={hint || null}>
+        <Seg value={s.sidebarMode} onChange={(m) => A.setSidebarMode(m)} options={[['expanded', 'Expanded'], ['compact', 'Compact'], ['hidden', 'Hidden']]} />
+      </Row>
+      {s.sidebarMode === 'expanded' && (
+        <Row label="Width">
+          <WidthSlider value={s.sidebarWidth} />
+        </Row>
+      )}
+    </Group>
+  );
+}
+
+// Local draft while dragging; the store is written debounced and on release.
+function WidthSlider({ value }) {
+  const [v, setV] = useState(value);
+  const timer = useRef(0);
+  const pending = useRef(null);
+  const flush = () => {
+    clearTimeout(timer.current);
+    if (pending.current == null) return;
+    const x = pending.current;
+    pending.current = null;
+    A.setSettings({ sidebarWidth: x });
+  };
+  useEffect(() => {
+    if (pending.current == null) setV(value);
+  }, [value]);
+  useEffect(() => flush, []);
+  return (
+    <span className="st-range">
+      <input
+        type="range"
+        min={200}
+        max={380}
+        step={4}
+        value={v}
+        onChange={(e) => {
+          const x = Number(e.target.value);
+          setV(x);
+          pending.current = x;
+          clearTimeout(timer.current);
+          timer.current = setTimeout(flush, 150);
+        }}
+        onPointerUp={flush}
+        onKeyUp={flush}
+        onBlur={flush}
+      />
+      <span>{v}px</span>
+    </span>
+  );
+}
+
+function lookLabel(term) {
+  const bg = term?.bg ?? null;
+  const p = BG_PRESETS.find((x) => x.bg === bg);
+  const name = p ? p.name : `Custom ${bg}`;
+  return term?.image ? `${name} · ${term.image.split('/').pop()}` : name;
+}
+
+function SpaceLooks() {
+  const spaces = app.use((s) => s.spaces);
+  const theme = ui.use((u) => u.termTheme);
+  const edit = (id) => ui.set((u) => ({ ...u, overlay: 'spaceEditor', overlayArg: id }));
+  return (
+    <Group title="Per-Space backgrounds">
+      {spaces.map((sp) => (
+        <Row
+          key={sp.id}
+          label={
+            <span className="st-sp">
+              <span style={{ color: sp.color }}>{sp.glyph}</span> {sp.name}
+            </span>
+          }
+          hint={lookLabel(sp.term)}
+        >
+          <span className="row-inline">
+            <LookSwatch space={sp} theme={theme} />
+            <button className="btn" onClick={() => edit(sp.id)}>
+              Edit…
+            </button>
+          </span>
+        </Row>
+      ))}
+    </Group>
+  );
+}
+
+function LookSwatch({ space, theme }) {
+  const look = terminalLook(space, theme);
+  const url = useImageUrl(look.image);
+  return (
+    <span className="st-look" style={{ background: look.bg }}>
+      {look.image && url && <i style={{ backgroundImage: `url("${url}")` }} />}
+      {look.image && <b style={{ background: look.bg, opacity: look.dim }} />}
+    </span>
   );
 }
 
@@ -633,7 +739,7 @@ const GESTURES = [
   { key: 'swipeSpaces', title: 'Switch Space', sub: 'Two-finger swipe on sidebar', art: (<><span>←</span><D /><D /><span>→</span></>) },
   { key: 'pinch', title: 'All Spaces', sub: 'Pinch out · pinch in to return', art: (<><span className="st-diag"><span>↙</span><D /><span>↗</span></span></>) },
   { key: null, title: 'Scrollback', sub: 'Two-finger scroll in terminal', art: (<span className="st-vert"><span>↑</span><span className="row-inline"><D /><D /></span><span>↓</span></span>), always: true },
-  { key: 'edgeReveal', title: 'Reveal sidebar', sub: 'Hover the left edge when hidden', art: (<><b className="st-edge" /><D /><D /><span>→</span></>) },
+  { key: 'edgeReveal', title: 'Reveal sidebar', sub: 'When the sidebar is hidden, hover the left edge', art: (<><b className="st-edge" /><D /><D /><span>→</span></>) },
   { key: 'peek', title: 'Peek session', sub: 'Hover a sidebar row', art: <i className="st-dot big" /> },
   { key: null, title: 'Copy last output', sub: 'Three-finger tap', art: (<span className="st-vert"><span className="row-inline"><D /><D /><D /></span><small>tap</small></span>), accel: 'copyLastOutput' },
 ];

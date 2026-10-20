@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { app, rt, ui } from '../state/model.js';
 import { arrayEq } from '../state/store.js';
 import * as A from '../state/actions.js';
@@ -6,19 +6,22 @@ import { useTabView, StatusMark, Chip, FailTip } from './common.jsx';
 import { formatAccel } from '../lib/keys.js';
 import { shortName, timeAgo, formatDuration } from '../lib/meta.js';
 import { tildify } from '../lib/routing.js';
+import { IconSidebar, IconFolder, IconFolderOpen, IconFolderPlus, IconChevron, IconPlus, IconMore, IconSearch, IconLibrary, IconActivity, IconGear } from './icons.jsx';
+import Rail from './SidebarRail.jsx';
+import { TAB_MIME, PANE_MIME, FOLDER_MIME, renameFolder, dragStart, dragEnd, usePeek, closePeek, rowMenu, folderMenu, spaceMenu, newFolder, promptText } from './sidebar-shared.js';
 
-const api = window.termac;
-const TAB_MIME = 'application/x-termac-tab';
-const PANE_MIME = 'application/x-termac-pane';
+export { promptText };
+
+const RAIL_WIDTH = 68;
+const isTabDrag = (e) => e.dataTransfer.types.includes(TAB_MIME) || e.dataTransfer.types.includes(PANE_MIME);
 
 export default function Sidebar({ floating, onLeave }) {
-  const space = app.use((s) => A.activeSpace(s));
-  const favorites = app.use((s) => s.favorites);
-  const spaces = app.use((s) => s.spaces);
-  const bindings = app.use((s) => s.settings.keybindings);
+  const mode = app.use((s) => s.settings.sidebarMode);
+  const width = app.use((s) => s.settings.sidebarWidth);
   const swipe = app.use((s) => s.settings.gestures.swipeSpaces);
-  const [hint, setHint] = useState(null);
+  const [dragW, setDragW] = useState(null);
   const swipeAcc = useRef({ dx: 0, lock: 0 });
+  const compact = mode === 'compact' && !floating;
 
   const onWheel = (e) => {
     if (!swipe || Math.abs(e.deltaX) <= Math.abs(e.deltaY) * 1.5) return;
@@ -34,13 +37,57 @@ export default function Sidebar({ floating, onLeave }) {
     }
   };
 
+  return (
+    <aside
+      className={`sidebar${compact ? ' compact' : ''}${floating ? ' floating' : ''}${dragW != null ? ' resizing' : ''}`}
+      style={{ width: compact ? RAIL_WIDTH : (dragW ?? width) }}
+      onWheel={onWheel}
+      onMouseLeave={() => {
+        closePeek();
+        onLeave?.();
+      }}
+    >
+      {compact ? <Rail /> : <Expanded />}
+      {!compact && !floating && <ResizeHandle width={width} onDrag={setDragW} />}
+    </aside>
+  );
+}
+
+function ResizeHandle({ width, onDrag }) {
+  const onMouseDown = (e) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    let w = width;
+    const move = (ev) => {
+      w = Math.min(380, Math.max(200, width + ev.clientX - startX));
+      onDrag(w);
+    };
+    const up = () => {
+      window.removeEventListener('mousemove', move);
+      window.removeEventListener('mouseup', up);
+      onDrag(null);
+      A.setSettings({ sidebarWidth: Math.round(w) });
+    };
+    window.addEventListener('mousemove', move);
+    window.addEventListener('mouseup', up);
+  };
+  return <div className="sb-resize" onMouseDown={onMouseDown} onDoubleClick={() => A.setSettings({ sidebarWidth: 256 })} title="Drag to resize · double-click to reset" />;
+}
+
+// ---- Expanded -----------------------------------------------------------------------
+function Expanded() {
+  const space = app.use((s) => A.activeSpace(s));
+  const favorites = app.use((s) => s.favorites);
+  const bindings = app.use((s) => s.settings.keybindings);
+  const [hint, setHint] = useState(null);
+
   const dropOn = (e) => {
     e.preventDefault();
     const pane = e.dataTransfer.getData(PANE_MIME);
     const tid = e.dataTransfer.getData(TAB_MIME);
     const h = hint;
     setHint(null);
-    ui.set((u) => ({ ...u, dragging: null }));
+    dragEnd();
     if (pane) return A.unsplit(pane);
     if (tid && h) A.moveTab(tid, h);
   };
@@ -49,50 +96,69 @@ export default function Sidebar({ floating, onLeave }) {
   const isEmpty = !space.pinned.length && !space.folders.length;
 
   return (
-    <aside className={`sidebar${floating ? ' floating' : ''}`} onWheel={onWheel} onMouseLeave={() => { if (!ui.get().peek?.pinned) ui.set((u) => ({ ...u, peek: null })); onLeave?.(); }} onDragOver={(e) => e.preventDefault()} onDrop={dropOn} onDragLeave={(e) => !e.currentTarget.contains(e.relatedTarget) && setHint(null)}>
+    <div className="sb-expanded" onDragOver={(e) => isTabDrag(e) && e.preventDefault()} onDrop={dropOn} onDragLeave={(e) => !e.currentTarget.contains(e.relatedTarget) && setHint(null)}>
       <div className="sb-head">
-        <button className="icon-btn" title={`Toggle sidebar ${formatAccel(bindings.toggleSidebar)}`} onClick={() => A.setSettings({ sidebarHidden: !app.get().settings.sidebarHidden })}>
-          <span className="sb-toggle" />
+        <button className="icon-btn" title={`Collapse sidebar  ${formatAccel(bindings.toggleSidebar)}`} onClick={A.toggleSidebar}>
+          <IconSidebar />
         </button>
       </div>
       <Location bindings={bindings} />
       <div className="sb-scroll">
         <Favorites ids={favorites} {...dragProps} />
-        <div className="sec-title">
-          <span className="glyph">{space.glyph}</span>
-          <span className="grow ellipsis">{space.name}</span>
-          <button className="more" onClick={() => spaceMenu(space)}>···</button>
-        </div>
-        {isEmpty && <div className="pin-empty">Drag a session here to pin it to this Space</div>}
+        <SpaceHeader space={space} />
         <Section list={space.pinned} dest={{ section: 'pinned', spaceId: space.id, folderId: null }} {...dragProps} />
-        {space.folders.map((f) => (
-          <Folder key={f.id} folder={f} spaceId={space.id} {...dragProps} />
+        {space.folders.map((f, i) => (
+          <Folder key={f.id} folder={f} index={i} spaceId={space.id} {...dragProps} />
         ))}
+        {isEmpty && (
+          <div className="pin-empty" onDragOver={(e) => isTabDrag(e) && setHint({ section: 'pinned', spaceId: space.id, folderId: null, index: 0 })}>
+            Drag a session here to keep it in {space.name}
+          </div>
+        )}
         <TodayHeader space={space} />
         <Section list={space.today} dest={{ section: 'today', spaceId: space.id, folderId: null }} {...dragProps} />
-        <button className="row new" onClick={() => A.openTerminal()} style={{ marginTop: 2, width: 'calc(100% - 16px)' }}>
-          <span className="chip">+</span>
-          <span className="name" style={{ textAlign: 'left' }}>New Terminal</span>
+        <button className="row new" onClick={() => A.openTerminal()}>
+          <span className="chip">
+            <IconPlus size={11} />
+          </span>
+          <span className="name">New Terminal</span>
           <kbd>{formatAccel(bindings.newTerminal)}</kbd>
         </button>
       </div>
       <SidebarCards />
-      <BottomBar spaces={spaces} activeId={space.id} />
-    </aside>
+      <BottomBar />
+    </div>
   );
 }
 
 function Location({ bindings }) {
   const sid = ui.use((s) => s.focusedSid);
   const cwd = rt.use((s) => s[sid]?.cwd);
-  const danger = rt.use((s) => s[sid]?.dangerHost);
+  const host = rt.use((s) => s[sid]?.dangerHost);
   const home = ui.use((s) => s.home);
   return (
-    <button className="location" onClick={() => ui.set((u) => ({ ...u, overlay: 'commandBar' }))}>
-      <span className="host">{danger ? 'ssh' : 'local'}</span>
-      <span className="path">&lrm;{danger || tildify(cwd, home) || '~'}</span>
+    <button className="location" title="Search sessions, folders, hosts and actions" onClick={() => ui.set((u) => ({ ...u, overlay: 'commandBar' }))}>
+      <IconSearch size={14} />
+      <span className="path">&lrm;{host || tildify(cwd, home) || '~'}</span>
       <kbd>{formatAccel(bindings.commandBar)}</kbd>
     </button>
+  );
+}
+
+function SpaceHeader({ space }) {
+  return (
+    <div className="sec-title" onDoubleClick={() => ui.set((u) => ({ ...u, overlay: 'spaceEditor', overlayArg: space.id }))}>
+      <span className="glyph">{space.glyph}</span>
+      <span className="grow ellipsis">{space.name}</span>
+      <span className="sec-actions">
+        <button className="icon-btn sm" title="New folder" onClick={() => newFolder(space.id)}>
+          <IconFolderPlus size={14} />
+        </button>
+        <button className="icon-btn sm" title="Space options" onClick={() => spaceMenu(space)}>
+          <IconMore size={14} />
+        </button>
+      </span>
+    </div>
   );
 }
 
@@ -105,6 +171,7 @@ function Favorites({ ids, hint, setHint }) {
     <div
       className="favs"
       onDragOver={(e) => {
+        if (!isTabDrag(e)) return;
         e.preventDefault();
         e.stopPropagation();
         setHint({ section: 'fav', spaceId: null, folderId: null, index: -1 });
@@ -114,7 +181,7 @@ function Favorites({ ids, hint, setHint }) {
         e.stopPropagation();
         const tid = e.dataTransfer.getData(TAB_MIME);
         setHint(null);
-        ui.set((u) => ({ ...u, dragging: null }));
+        dragEnd();
         if (tid) A.moveTab(tid, { section: 'fav', spaceId: null });
       }}
     >
@@ -129,11 +196,11 @@ function Favorites({ ids, hint, setHint }) {
 function FavTile({ tid }) {
   const v = useTabView(tid);
   const on = app.use((s) => A.activeTabId(s) === tid);
-  const peekHandlers = usePeek(tid, v?.active?.sid, on);
+  const peek = usePeek(tid, v?.active?.sid, on);
   if (!v) return null;
   const color = { run: 'var(--accent)', ok: 'var(--ok)', fail: 'var(--fail)', bell: 'var(--bell)', idle: 'var(--faint)' }[v.status];
   return (
-    <div className={`fav${on ? ' on' : ''}`} title={v.name} draggable onDragStart={(e) => dragStart(e, tid)} onDragEnd={dragEnd} onClick={(e) => (e.shiftKey ? null : A.activateTab(tid))} onContextMenu={(e) => rowMenu(e, tid, v)} {...peekHandlers}>
+    <div className={`fav${on ? ' on' : ''}`} title={v.name} draggable onDragStart={(e) => dragStart(e, tid)} onDragEnd={dragEnd} onClick={(e) => !e.shiftKey && A.activateTab(tid)} onContextMenu={(e) => rowMenu(e, tid, v)} {...peek}>
       {shortName(v.tab.name || v.active?.name)}
       <span className={`corner dot6${v.status === 'run' ? ' st-run' : ''}`} style={{ background: color }} />
       {v.bell > 0 && <span className="badge status st-bell">{v.bell}</span>}
@@ -148,11 +215,11 @@ function Section({ list, dest, hint, setHint, indent }) {
     <div
       className="rows"
       onDragOver={(e) => {
+        if (!isTabDrag(e)) return;
         e.preventDefault();
         e.stopPropagation();
         if (!sameDest(hint)) setHint({ ...dest, index: list.length });
       }}
-      style={{ minHeight: dest.section === 'today' && !list.length ? 8 : undefined }}
     >
       {list.map((tid, i) => (
         <div key={tid}>
@@ -171,7 +238,7 @@ function Row({ tid, indent, onDragOverRow }) {
   const dragging = ui.use((s) => s.dragging?.tabId === tid);
   const [hover, setHover] = useState(false);
   const [renaming, setRenaming] = useState(false);
-  const peekHandlers = usePeek(tid, v?.active?.sid, on);
+  const peek = usePeek(tid, v?.active?.sid, on);
   if (!v) return null;
   const click = (e) => {
     if (e.shiftKey) return;
@@ -185,6 +252,7 @@ function Row({ tid, indent, onDragOverRow }) {
       onDragStart={(e) => dragStart(e, tid)}
       onDragEnd={dragEnd}
       onDragOver={(e) => {
+        if (!isTabDrag(e)) return;
         const r = e.currentTarget.getBoundingClientRect();
         onDragOverRow(e.clientY > r.top + r.height / 2);
       }}
@@ -193,13 +261,13 @@ function Row({ tid, indent, onDragOverRow }) {
       onContextMenu={(e) => rowMenu(e, tid, v, () => setRenaming(true))}
       onMouseEnter={(e) => {
         setHover(true);
-        peekHandlers.onMouseEnter(e);
+        peek.onMouseEnter(e);
       }}
       onMouseLeave={(e) => {
         setHover(false);
-        peekHandlers.onMouseLeave(e);
+        peek.onMouseLeave(e);
       }}
-      onMouseDown={peekHandlers.onMouseDown}
+      onMouseDown={peek.onMouseDown}
     >
       {v.panes.length > 1 ? (
         <span className="panes-chip">
@@ -211,18 +279,11 @@ function Row({ tid, indent, onDragOverRow }) {
         <Chip kind={v.active?.kind} />
       )}
       {renaming ? (
-        <input
-          className="rename"
-          autoFocus
-          defaultValue={v.tab.name || v.name}
-          onClick={(e) => e.stopPropagation()}
-          onBlur={(e) => {
-            A.renameTab(tid, e.target.value === v.name && !v.tab.name ? '' : e.target.value);
+        <InlineName
+          value={v.tab.name || v.name}
+          onDone={(name) => {
+            if (name != null) A.renameTab(tid, name === v.name && !v.tab.name ? '' : name);
             setRenaming(false);
-          }}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') e.target.blur();
-            if (e.key === 'Escape') setRenaming(false);
           }}
         />
       ) : (
@@ -238,39 +299,168 @@ function Row({ tid, indent, onDragOverRow }) {
   );
 }
 
-function Folder({ folder, spaceId, hint, setHint }) {
-  const into = hint && hint.folderId === folder.id;
+function InlineName({ value, onDone }) {
+  const ref = useRef(null);
+  const done = useRef(false);
+  const finish = (v) => {
+    if (done.current) return;
+    done.current = true;
+    onDone(v);
+  };
+  useLayoutEffect(() => {
+    ref.current.focus();
+    ref.current.select();
+  }, []);
   return (
-    <>
-      <div
-        className={`folder${into && !folder.open ? ' drop-into' : ''}`}
-        onClick={() => A.updateFolder(spaceId, folder.id, { open: !folder.open })}
-        onContextMenu={(e) => folderMenu(e, spaceId, folder)}
-        onDragOver={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          setHint({ section: 'pinned', spaceId, folderId: folder.id, index: folder.tabs.length });
-        }}
-      >
-        <span className="chev">{folder.open ? '▼' : '▶'}</span>
-        <span>▭</span>
-        <span className="ellipsis">{folder.name}</span>
-        {!folder.open && <span className="count">{folder.tabs.length}</span>}
-      </div>
-      {folder.open && <Section list={folder.tabs} dest={{ section: 'pinned', spaceId, folderId: folder.id }} hint={hint} setHint={setHint} indent />}
-    </>
+    <input
+      ref={ref}
+      className="rename"
+      defaultValue={value}
+      onClick={(e) => e.stopPropagation()}
+      onBlur={(e) => finish(e.target.value)}
+      onKeyDown={(e) => {
+        e.stopPropagation();
+        if (e.key === 'Enter') finish(e.target.value);
+        if (e.key === 'Escape') finish(null);
+      }}
+    />
   );
 }
 
+// ---- Folders -------------------------------------------------------------------------
+function Folder({ folder, index, spaceId, hint, setHint }) {
+  const [editing, setEditing] = useState(renameFolder.id === folder.id);
+  const [reorder, setReorder] = useState(null); // 'before' | 'after' while a folder is dragged over
+  const spring = useRef(null);
+  const running = rt.use((s) => {
+    const tabs = app.get().tabs;
+    return folder.tabs.some((tid) => tabs[tid] && collectSids(tabs[tid].layout).some((sid) => s[sid]?.status === 'run'));
+  });
+  const into = hint && hint.folderId === folder.id;
+
+  useEffect(() => {
+    if (renameFolder.id === folder.id) renameFolder.id = null;
+  }, [folder.id]);
+
+  const toggle = () => A.updateFolder(spaceId, folder.id, { open: !folder.open });
+  const onDragOver = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.dataTransfer.types.includes(FOLDER_MIME)) {
+      const r = e.currentTarget.getBoundingClientRect();
+      setReorder(e.clientY > r.top + r.height / 2 ? 'after' : 'before');
+      return;
+    }
+    if (!isTabDrag(e)) return;
+    if (!into) setHint({ section: 'pinned', spaceId, folderId: folder.id, index: folder.tabs.length });
+    // Spring-loaded: hovering a closed folder while dragging opens it.
+    if (!folder.open && !spring.current) spring.current = setTimeout(() => A.updateFolder(spaceId, folder.id, { open: true }), 600);
+  };
+  const clearDrag = () => {
+    clearTimeout(spring.current);
+    spring.current = null;
+    setReorder(null);
+  };
+  const onDrop = (e) => {
+    const fid = e.dataTransfer.getData(FOLDER_MIME);
+    clearDrag();
+    if (!fid) return;
+    e.preventDefault();
+    e.stopPropagation();
+    if (fid !== folder.id) {
+      const folders = app.get().spaces.find((x) => x.id === spaceId).folders.filter((f) => f.id !== fid);
+      const at = folders.findIndex((f) => f.id === folder.id);
+      A.moveFolder(spaceId, fid, reorder === 'after' ? at + 1 : at);
+    }
+  };
+
+  return (
+    <div className={`folder-wrap${reorder ? ` reorder-${reorder}` : ''}`}>
+      <div
+        className={`folder${into ? ' drop-into' : ''}`}
+        draggable={!editing}
+        onDragStart={(e) => {
+          e.dataTransfer.setData(FOLDER_MIME, folder.id);
+          e.dataTransfer.effectAllowed = 'move';
+        }}
+        onDragOver={onDragOver}
+        onDragLeave={clearDrag}
+        onDrop={onDrop}
+        onClick={() => !editing && toggle()}
+        onDoubleClick={(e) => {
+          e.stopPropagation();
+          setEditing(true);
+        }}
+        onContextMenu={(e) => folderMenu(e, spaceId, folder, () => setEditing(true))}
+      >
+        <span className={`chev${folder.open ? ' open' : ''}`}>
+          <IconChevron size={11} />
+        </span>
+        <span className="ficon">{folder.open ? <IconFolderOpen size={15} /> : <IconFolder size={15} />}</span>
+        {editing ? (
+          <InlineName
+            value={folder.name}
+            onDone={(name) => {
+              if (name?.trim()) A.updateFolder(spaceId, folder.id, { name: name.trim() });
+              setEditing(false);
+            }}
+          />
+        ) : (
+          <span className="fname">{folder.name}</span>
+        )}
+        {!folder.open && running && <span className="status st-run" />}
+        {!folder.open && <span className="count">{folder.tabs.length}</span>}
+        <span className="folder-actions">
+          <button
+            className="icon-btn sm"
+            title="New terminal in folder"
+            onClick={(e) => {
+              e.stopPropagation();
+              A.openTerminal({ section: 'pinned', spaceId, folderId: folder.id, viaRules: false });
+            }}
+          >
+            <IconPlus size={12} />
+          </button>
+        </span>
+      </div>
+      <div className={`folder-body${folder.open ? ' open' : ''}`}>
+        <div className="folder-inner">
+          {folder.tabs.length ? (
+            <Section list={folder.tabs} dest={{ section: 'pinned', spaceId, folderId: folder.id }} hint={hint} setHint={setHint} indent />
+          ) : (
+            <div
+              className={`folder-empty${into ? ' drop-into' : ''}`}
+              onDragOver={(e) => {
+                if (!isTabDrag(e)) return;
+                e.preventDefault();
+                e.stopPropagation();
+                setHint({ section: 'pinned', spaceId, folderId: folder.id, index: 0 });
+              }}
+            >
+              Drop sessions here
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function collectSids(n) {
+  if (!n) return [];
+  return n.sid ? [n.sid] : [...collectSids(n.a), ...collectSids(n.b)];
+}
+
 function TodayHeader({ space }) {
-  if (!space.today.length) return <div className="today-head">Today<span className="rule" /></div>;
   return (
     <div className="today-head">
       Today
       <span className="rule" />
-      <button title="Move idle sessions to the Library" onClick={() => tidyNow(space)}>
-        Tidy
-      </button>
+      {space.today.length > 0 && (
+        <button title="Move idle sessions to the Library" onClick={() => tidyNow(space)}>
+          Tidy
+        </button>
+      )}
     </div>
   );
 }
@@ -287,146 +477,8 @@ function tidyNow(space) {
   A.tidy(tids, { reason: 'idle' });
 }
 
-function collectSids(n) {
-  return n.sid ? [n.sid] : [...collectSids(n.a), ...collectSids(n.b)];
-}
-
-// ---- Drag helpers --------------------------------------------------------------------
-function dragStart(e, tid) {
-  e.dataTransfer.setData(TAB_MIME, tid);
-  e.dataTransfer.effectAllowed = 'move';
-  ui.set((u) => ({ ...u, dragging: { tabId: tid }, peek: null }));
-}
-function dragEnd() {
-  ui.set((u) => ({ ...u, dragging: null }));
-}
-
-// ---- Peek ----------------------------------------------------------------------------
-let peekTimer = null;
-function usePeek(tid, sid, isActive) {
-  const enabled = app.use((s) => s.settings.gestures.peek);
-  const show = (el, pinned = false) => {
-    const r = el.getBoundingClientRect();
-    ui.set((u) => ({ ...u, peek: { tid, sid, top: r.top, left: r.right + 14, pinned } }));
-  };
-  return {
-    onMouseEnter(e) {
-      if (!enabled || isActive || ui.get().dragging) return;
-      clearTimeout(peekTimer);
-      const el = e.currentTarget;
-      if (ui.get().peek) show(el, ui.get().peek.pinned);
-      else peekTimer = setTimeout(() => show(el), 400);
-    },
-    onMouseLeave() {
-      clearTimeout(peekTimer);
-    },
-    onMouseDown(e) {
-      if (!e.shiftKey || isActive) return;
-      e.preventDefault();
-      const p = ui.get().peek;
-      if (p?.pinned && p.tid === tid) ui.set((u) => ({ ...u, peek: null }));
-      else show(e.currentTarget, true);
-    },
-  };
-}
-
-// ---- Menus ---------------------------------------------------------------------------
-async function rowMenu(e, tid, v, startRename) {
-  e.preventDefault();
-  const s = app.get();
-  const loc = A.locate(tid, s);
-  const sp = A.activeSpace(s);
-  const eff = v.tab.effects || {};
-  const cwd = v.active?.rt.cwd;
-  const items = [
-    startRename && { id: 'rename', label: 'Rename…' },
-    { type: 'separator' },
-    loc?.section === 'today' ? { id: 'pin', label: 'Pin to Space' } : { id: 'unpin', label: 'Move to Today' },
-    loc?.section === 'fav' ? { id: 'unfav', label: 'Remove from Favorites' } : { id: 'fav', label: 'Add to Favorites' },
-    {
-      label: 'Move to Folder',
-      submenu: [...sp.folders.map((f) => ({ id: `folder:${f.id}`, label: f.name })), sp.folders.length && { type: 'separator' }, { id: 'newfolder', label: 'New Folder…' }].filter(Boolean),
-    },
-    { label: 'Move to Space', submenu: s.spaces.map((x) => ({ id: `space:${x.id}`, label: `${x.glyph}  ${x.name}`, enabled: x.id !== loc?.spaceId })) },
-    { type: 'separator' },
-    A.activeTabId(s) !== tid && { id: 'split', label: 'Open in Split Right' },
-    { id: 'dup', label: 'New Terminal Here' },
-    cwd && { id: 'copypath', label: 'Copy Path' },
-    cwd && { id: 'finder', label: 'Open in Finder' },
-    { type: 'separator' },
-    {
-      label: 'Protection',
-      submenu: [
-        { id: 'fx:danger', label: 'Red danger frame', checked: !!eff.danger },
-        { id: 'fx:confirmPaste', label: 'Confirm multi-line paste', checked: !!eff.confirmPaste },
-        { id: 'fx:noArchive', label: 'Never auto-archive', checked: !!eff.noArchive },
-      ],
-    },
-    { type: 'separator' },
-    { id: 'archive', label: 'Move to Library' },
-    { id: 'close', label: 'Close' },
-  ].filter(Boolean);
-  const id = await api.app.popupMenu(items);
-  if (!id) return;
-  if (id === 'rename') startRename();
-  else if (id === 'pin') A.moveTab(tid, { section: 'pinned', spaceId: loc.spaceId });
-  else if (id === 'unpin' || id === 'unfav') A.moveTab(tid, { section: 'today', spaceId: loc?.spaceId || sp.id });
-  else if (id === 'fav') A.moveTab(tid, { section: 'fav', spaceId: null });
-  else if (id === 'newfolder') {
-    const fid = A.createFolder(sp.id);
-    A.moveTab(tid, { section: 'pinned', spaceId: sp.id, folderId: fid });
-  } else if (id.startsWith('folder:')) A.moveTab(tid, { section: 'pinned', spaceId: sp.id, folderId: id.slice(7) });
-  else if (id.startsWith('space:')) A.moveTab(tid, { section: loc?.section === 'pinned' ? 'pinned' : 'today', spaceId: id.slice(6) });
-  else if (id === 'split') A.mergeIntoActive(tid, 'right');
-  else if (id === 'dup') A.openTerminal({ cwd, viaRules: false });
-  else if (id === 'copypath') navigator.clipboard.writeText(cwd);
-  else if (id === 'finder') api.sys.reveal(cwd);
-  else if (id.startsWith('fx:')) A.setTabEffects(tid, { [id.slice(3)]: !eff[id.slice(3)] });
-  else if (id === 'archive') A.archiveTab(tid);
-  else if (id === 'close') A.closeTab(tid);
-}
-
-async function folderMenu(e, spaceId, folder) {
-  e.preventDefault();
-  const id = await api.app.popupMenu([
-    { id: 'rename', label: 'Rename…' },
-    { id: 'delete', label: 'Remove Folder (keep sessions)' },
-  ]);
-  if (id === 'rename') {
-    const name = await promptText('Folder name', folder.name);
-    if (name) A.updateFolder(spaceId, folder.id, { name });
-  } else if (id === 'delete') A.deleteFolder(spaceId, folder.id);
-}
-
-async function spaceMenu(space) {
-  const s = app.get();
-  const id = await api.app.popupMenu([
-    { id: 'edit', label: 'Edit Space…' },
-    { id: 'folder', label: 'New Folder' },
-    { id: 'notes', label: 'Notes' },
-    { type: 'separator' },
-    { id: 'new', label: 'New Space…' },
-    { id: 'overview', label: 'All Spaces' },
-    { type: 'separator' },
-    { id: 'delete', label: 'Delete Space…', enabled: s.spaces.length > 1 },
-  ]);
-  if (id === 'edit') ui.set((u) => ({ ...u, overlay: 'spaceEditor', overlayArg: space.id }));
-  else if (id === 'folder') {
-    const name = await promptText('Folder name', 'New Folder');
-    if (name) A.createFolder(space.id, name);
-  } else if (id === 'notes') ui.set((u) => ({ ...u, notesOpen: true }));
-  else if (id === 'new') ui.set((u) => ({ ...u, overlay: 'spaceEditor', overlayArg: null }));
-  else if (id === 'overview') ui.set((u) => ({ ...u, overlay: 'overview' }));
-  else if (id === 'delete') A.deleteSpace(space.id);
-}
-
-// Tiny inline prompt rendered by App (window.prompt is unavailable in Electron).
-export function promptText(title, value = '') {
-  return new Promise((resolve) => ui.set((u) => ({ ...u, prompt: { title, value, resolve } })));
-}
-
 // ---- Bottom ------------------------------------------------------------------------
-function SidebarCards() {
+export function SidebarCards() {
   const notify = ui.use((s) => s.notify);
   const toast = ui.use((s) => s.toast);
   const spaces = app.use((s) => s.spaces);
@@ -471,39 +523,61 @@ function SidebarCards() {
   );
 }
 
-function BottomBar({ spaces, activeId }) {
+export function SpaceDots({ vertical }) {
+  const spaces = app.use((s) => s.spaces);
+  const activeId = app.use((s) => s.activeSpaceId);
   const unseen = app.use((s) => [...new Set(s.activity.filter((a) => !a.seen).map((a) => a.spaceId))], arrayEq);
-  const hasActivity = app.use((s) => s.activity.some((a) => !a.seen));
-  const view = ui.use((s) => s.view);
+  return (
+    <div className={`space-dots${vertical ? ' vertical' : ''}`}>
+      {spaces.map((sp, i) => (
+        <button
+          key={sp.id}
+          className={`space-dot${sp.id === activeId ? ' on' : ''}`}
+          style={{ '--c': sp.color }}
+          title={`${sp.name}  ⌃${i + 1}`}
+          onClick={() => A.switchSpace(sp.id)}
+          onDoubleClick={() => ui.set((u) => ({ ...u, overlay: 'spaceEditor', overlayArg: sp.id }))}
+        >
+          <i />
+          {unseen.includes(sp.id) && sp.id !== activeId && <span className="badge" />}
+        </button>
+      ))}
+      <button className="icon-btn sm" title="New Space" onClick={() => ui.set((u) => ({ ...u, overlay: 'spaceEditor', overlayArg: null }))}>
+        <IconPlus size={13} />
+      </button>
+    </div>
+  );
+}
+
+export function useActivityButton() {
   const [open, setOpen] = useState(false);
+  const hasActivity = app.use((s) => s.activity.some((a) => !a.seen));
+  const button = (
+    <button className="icon-btn activity-btn" title="Finished jobs" onClick={() => setOpen((o) => !o)}>
+      <IconActivity />
+      {hasActivity && <span className="badge" />}
+    </button>
+  );
+  return { button, popover: open && <ActivityPopover onClose={() => setOpen(false)} /> };
+}
+
+export const openLibrary = () => ui.set((u) => ({ ...u, view: u.view === 'library' ? 'terminal' : 'library' }));
+export const openSettings = () => ui.set((u) => ({ ...u, overlay: 'settings', overlayArg: null }));
+
+function BottomBar() {
+  const view = ui.use((s) => s.view);
+  const activity = useActivityButton();
   return (
     <div className="sb-bottom">
-      <button className="icon-btn" title="Library" style={view === 'library' ? { background: 'var(--sel)', color: 'var(--ink)' } : null} onClick={() => ui.set((u) => ({ ...u, view: u.view === 'library' ? 'terminal' : 'library' }))}>
-        ▤
+      <button className={`icon-btn${view === 'library' ? ' on' : ''}`} title="Library" onClick={openLibrary}>
+        <IconLibrary />
       </button>
-      <div className="space-dots">
-        {spaces.map((sp, i) => (
-          <button
-            key={sp.id}
-            className={`space-dot${sp.id === activeId ? ' on' : ''}`}
-            style={{ '--c': sp.color }}
-            title={`${sp.name}  ⌃${i + 1}`}
-            onClick={() => A.switchSpace(sp.id)}
-            onDoubleClick={() => ui.set((u) => ({ ...u, overlay: 'spaceEditor', overlayArg: sp.id }))}
-          >
-            <i />
-            {unseen.includes(sp.id) && sp.id !== activeId && <span className="badge" />}
-          </button>
-        ))}
-        <button className="icon-btn" title="New Space" onClick={() => ui.set((u) => ({ ...u, overlay: 'spaceEditor', overlayArg: null }))}>
-          +
-        </button>
-      </div>
-      <button className="icon-btn activity-btn" title="Finished jobs" onClick={() => setOpen((o) => !o)}>
-        <span className="ring">↓</span>
-        {hasActivity && <span className="badge" />}
+      <SpaceDots />
+      {activity.button}
+      <button className="icon-btn" title="Settings" onClick={openSettings}>
+        <IconGear />
       </button>
-      {open && <ActivityPopover onClose={() => setOpen(false)} />}
+      {activity.popover}
     </div>
   );
 }
@@ -519,8 +593,10 @@ function ActivityPopover({ onClose }) {
     return () => window.removeEventListener('mousedown', off);
   }, []);
   return (
-    <div ref={ref} className="modal" style={{ left: 12, right: 'auto', top: 'auto', bottom: 52, transform: 'none', width: 300, maxHeight: 360, position: 'absolute' }}>
-      <div className="modal-title" style={{ paddingBottom: 8 }}>Finished jobs</div>
+    <div ref={ref} className="activity-pop">
+      <div className="modal-title" style={{ paddingBottom: 8 }}>
+        Finished jobs
+      </div>
       <div style={{ overflowY: 'auto', padding: '0 8px 8px' }}>
         {!items.length && <div className="dim" style={{ padding: '6px 12px 12px', fontSize: 12 }}>Commands that run longer than the notify threshold show up here.</div>}
         {items.map((a) => (

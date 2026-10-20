@@ -28,3 +28,7 @@ yarn-error.log*
 *.zip
 *.blockmap
 
+
+# Shell state written by the integration scripts during testing
+electron/shell-integration/zsh/.zsh_history
+electron/shell-integration/zsh/.zcompdump*

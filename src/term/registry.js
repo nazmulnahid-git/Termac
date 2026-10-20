@@ -10,57 +10,11 @@ import { WebLinksAddon } from '@xterm/addon-web-links';
 import { SearchAddon } from '@xterm/addon-search';
 import '@xterm/xterm/css/xterm.css';
 import { patchRt, rt } from '../state/model.js';
+import { TERMINAL_THEMES } from '../lib/termtheme.js';
 
 const api = window.termac;
 
-export const THEMES = {
-  dark: {
-    background: '#17181d',
-    foreground: '#d8dae0',
-    cursor: '#d8dae0',
-    cursorAccent: '#17181d',
-    selectionBackground: 'rgba(136,173,255,.28)',
-    black: '#2a2c33',
-    red: '#ff8080',
-    green: '#80d49b',
-    yellow: '#ecc576',
-    blue: '#88adff',
-    magenta: '#c8a0f5',
-    cyan: '#7dd3d3',
-    white: '#d8dae0',
-    brightBlack: '#7f8392',
-    brightRed: '#ff9e9e',
-    brightGreen: '#9de3b3',
-    brightYellow: '#f3d595',
-    brightBlue: '#a6c2ff',
-    brightMagenta: '#d8bbf8',
-    brightCyan: '#9ee2e2',
-    brightWhite: '#ffffff',
-  },
-  light: {
-    background: '#fcfcfa',
-    foreground: '#2b2d33',
-    cursor: '#2b2d33',
-    cursorAccent: '#fcfcfa',
-    selectionBackground: 'rgba(43,91,199,.18)',
-    black: '#2b2d33',
-    red: '#c93535',
-    green: '#1b8048',
-    yellow: '#93650a',
-    blue: '#2b5bc7',
-    magenta: '#7f42c4',
-    cyan: '#10767f',
-    white: '#c9cac4',
-    brightBlack: '#80838c',
-    brightRed: '#de4a4a',
-    brightGreen: '#239a58',
-    brightYellow: '#b07c10',
-    brightBlue: '#3d6fe0',
-    brightMagenta: '#9455d8',
-    brightCyan: '#178c96',
-    brightWhite: '#111216',
-  },
-};
+export const THEMES = TERMINAL_THEMES;
 
 const handles = new Map();
 let parking = null;
@@ -122,7 +76,10 @@ export function configure(settings, dark) {
     theme: THEMES[themeName],
   };
   for (const h of handles.values()) {
-    for (const [k, v] of Object.entries(termOptions)) if (h.term.options[k] !== v) h.term.options[k] = v;
+    for (const [k, v] of Object.entries(termOptions)) {
+      if (k === 'theme' && h.look) continue;
+      if (h.term.options[k] !== v) h.term.options[k] = v;
+    }
     if (h.visible) fit(h.sid);
   }
   return themeName;
@@ -251,20 +208,39 @@ export function mount(sid, container) {
   if (!h) return;
   if (h.el.parentNode !== container) container.appendChild(h.el);
   h.visible = true;
-  if (!h.webgl) {
-    try {
-      const w = new WebglAddon();
-      w.onContextLoss(() => {
-        w.dispose();
-        h.webgl = null;
-      });
-      h.term.loadAddon(w);
-      h.webgl = w;
-    } catch {
-      h.webgl = null; // DOM renderer fallback
+  attachWebgl(h);
+  fit(sid);
+}
+
+function attachWebgl(h) {
+  if (h.webgl) return;
+  try {
+    const w = new WebglAddon();
+    w.onContextLoss(() => {
+      w.dispose();
+      h.webgl = null;
+    });
+    h.term.loadAddon(w);
+    h.webgl = w;
+  } catch {
+    h.webgl = null; // DOM renderer fallback
+  }
+}
+
+// Applies a Space's terminal look (see lib/termtheme.js) to one session.
+export function setLook(sid, look) {
+  const h = handles.get(sid);
+  if (!h || h.look?.key === look.key) return;
+  h.look = look;
+  if (!!h.term.options.allowTransparency !== look.transparent) {
+    h.term.options.allowTransparency = look.transparent;
+    if (h.webgl) {
+      h.webgl.dispose();
+      h.webgl = null;
+      if (h.visible) attachWebgl(h);
     }
   }
-  fit(sid);
+  h.term.options.theme = look.xterm;
 }
 
 export function unmount(sid, container) {
@@ -353,7 +329,7 @@ export function flashRange(sid, entry) {
   const h = handles.get(sid);
   if (!h || !entry?.start || !entry.end) return;
   const height = Math.max(1, entry.end.line - entry.start.line);
-  const deco = h.term.registerDecoration({ marker: entry.start, width: h.term.cols, height, backgroundColor: themeName === 'dark' ? '#88adff' : '#2b5bc7', layer: 'bottom' });
+  const deco = h.term.registerDecoration({ marker: entry.start, width: h.term.cols, height, backgroundColor: (h.look ? h.look.dark : themeName === 'dark') ? '#88adff' : '#2b5bc7', layer: 'bottom' });
   if (deco) {
     deco.onRender((el) => (el.style.opacity = '0.18'));
     setTimeout(() => deco.dispose(), 700);
@@ -405,7 +381,7 @@ export function peekLines(sid, n = 12) {
   let end = b.baseY + b.cursorY;
   while (end > 0 && !(b.getLine(end)?.translateToString(true) ?? '').trim()) end--;
   const start = Math.max(0, end - n + 1);
-  const pal = THEMES[themeName];
+  const pal = h.look?.xterm || THEMES[themeName];
   const ansi = [pal.black, pal.red, pal.green, pal.yellow, pal.blue, pal.magenta, pal.cyan, pal.white, pal.brightBlack, pal.brightRed, pal.brightGreen, pal.brightYellow, pal.brightBlue, pal.brightMagenta, pal.brightCyan, pal.brightWhite];
   const color = (mode, v) => {
     if (mode === 'rgb') return `#${v.toString(16).padStart(6, '0')}`;

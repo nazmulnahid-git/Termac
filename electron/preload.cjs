@@ -43,6 +43,8 @@ contextBridge.exposeInMainWorld('termac', {
     detectImports: () => ipcRenderer.invoke('sys:detectImports'),
     isDir: (p) => ipcRenderer.invoke('sys:isDir', p),
     chooseDir: (p) => ipcRenderer.invoke('sys:chooseDir', p),
+    chooseImage: () => ipcRenderer.invoke('sys:chooseImage'),
+    readImage: (file) => ipcRenderer.invoke('sys:readImage', file),
     reveal: (p) => ipcRenderer.send('sys:reveal', p),
     openExternal: (url) => ipcRenderer.send('sys:openExternal', url),
     notify: (n) => ipcRenderer.send('sys:notify', n),
