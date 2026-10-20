@@ -8,6 +8,7 @@ import { SidebarCards } from './Sidebar.jsx';
 import { usePeek, rowMenu, folderMenu } from './sidebar-shared.js';
 import { PH, pressTab, pressFolder, useDropList, useDropFolders, destAttr } from './sidebar-drag.js';
 import { SpaceTrack } from './space-motion.jsx';
+import { TabIcon } from './tabicons.jsx';
 
 // Compact sidebar: one icon tile per session, folders expand in place. Expanding, search
 // and settings live in the top bar.
@@ -124,7 +125,7 @@ function RailTile({ tid, onTip, onTipEnd }) {
       }}
       onMouseDown={peek.onMouseDown}
     >
-      <span className={`lbl${v.tab.icon ? ' icon' : ''}`}>{v.tab.icon || label}</span>
+      <span className={`lbl${v.tab.icon ? ' icon' : ''}`}>{v.tab.icon ? <TabIcon name={v.tab.icon} size={20} /> : label}</span>
       {color && <span className={`corner${v.status === 'run' ? ' st-run' : ''}`} style={{ background: color }} />}
       {v.bell > 0 && <span className="badge">{v.bell}</span>}
     </button>

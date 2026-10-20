@@ -130,7 +130,9 @@ kbd { font: inherit; color: var(--faint); }
 .fav.tinted:hover { background: color-mix(in oklab, var(--tc) 26%, transparent); }
 .fav.tinted.on { background: color-mix(in oklab, var(--tc) 30%, transparent); box-shadow: inset 0 0 0 1.5px var(--tc); }
 .fav-name { max-width: 100%; overflow: hidden; text-overflow: clip; white-space: nowrap; }
-.fav-icon { font-size: 22px; line-height: 1; }
+.fav-icon { display: inline-flex; color: var(--dim); }
+.fav.on .fav-icon { color: var(--accent); }
+.fav.tinted .fav-icon { color: var(--tc); }
 .fav .corner { position: absolute; top: 7px; right: 7px; }
 .fav .badge { position: absolute; top: -5px; right: -5px; }
 .fav-ph { aspect-ratio: 1; border-radius: var(--r-lg); border: 1px dashed color-mix(in oklab, var(--space) 55%, transparent); background: color-mix(in oklab, var(--space) 8%, transparent); }
@@ -175,8 +177,8 @@ kbd { font: inherit; color: var(--faint); }
 .row.new .chip { color: var(--dim); display: inline-flex; align-items: center; }
 /* The gutter: a session's icon, else what it runs (git, npm, ssh…). Empty for plain shells. */
 .chip { width: 3ch; flex: none; color: var(--faint); font-weight: 600; text-align: left; white-space: nowrap; overflow: hidden; }
-.chip.icon { color: var(--ink); text-align: center; overflow: visible; }
-.row.on .chip:not(.icon) { color: var(--accent); }
+.chip.icon { display: inline-flex; align-items: center; color: var(--dim); overflow: visible; }
+.row.on .chip { color: var(--accent); }
 /* Split session: its panes side by side on one line. */
 .row .segs { flex: 1; min-width: 0; height: 30px; display: flex; gap: 4px; }
 .tab-seg { flex: 1 1 0; min-width: 0; display: flex; align-items: center; gap: 6px; padding: 0 8px; border-radius: var(--r-sm); box-shadow: inset 0 0 0 1px var(--line); transition: background-color 0.12s, box-shadow 0.12s; }
@@ -440,13 +442,10 @@ select.field { padding-right: 6px; }
 .ts .modal-body { display: flex; flex-direction: column; gap: 10px; }
 .ts-preview.row { margin: 0 0 6px; box-shadow: inset 0 0 0 1px var(--panel-line); pointer-events: none; }
 .ts-label { margin-top: 6px; color: var(--dim); }
-.ts-icons { display: grid; grid-template-columns: repeat(auto-fill, minmax(38px, 1fr)); gap: 6px; }
-.ts-icon { height: 38px; display: inline-flex; align-items: center; justify-content: center; border-radius: var(--r-sm); box-shadow: inset 0 0 0 1px var(--panel-line); }
-.ts-icon:hover { background: var(--hover); }
-.ts-icon.on { background: color-mix(in oklab, var(--space) 18%, transparent); box-shadow: inset 0 0 0 1.5px var(--accent); }
-.ts-icon.none { color: var(--dim); }
-.ts-custom { grid-column: span 2; height: 38px; text-align: center; }
-.ts-custom.on { border-color: var(--accent); }
+.ts-icons { display: grid; grid-template-columns: repeat(auto-fill, minmax(40px, 1fr)); gap: 6px; }
+.ts-icon { height: 40px; display: inline-flex; align-items: center; justify-content: center; border-radius: var(--r-sm); color: var(--dim); box-shadow: inset 0 0 0 1px var(--panel-line); }
+.ts-icon:hover { background: var(--hover); color: var(--ink); }
+.ts-icon.on { background: color-mix(in oklab, var(--space) 18%, transparent); color: var(--accent); box-shadow: inset 0 0 0 1.5px var(--accent); }
 .ts-nocolor { background: linear-gradient(135deg, transparent 46%, var(--dim) 46% 54%, transparent 54%); box-shadow: inset 0 0 0 1px var(--panel-line); }
 .ts-nocolor.on { box-shadow: inset 0 0 0 1px var(--panel-line), 0 0 0 2px var(--panel), 0 0 0 4px var(--dim); }
 
@@ -478,7 +477,9 @@ select.field { padding-right: 6px; }
 .rail-tile.tinted.on { background: color-mix(in oklab, var(--tc) 30%, transparent); box-shadow: inset 0 0 0 1.5px var(--tc); }
 .rail-tile.danger { box-shadow: inset 0 0 0 1px var(--fail); }
 .rail-tile .lbl { max-width: 40px; overflow: hidden; text-overflow: clip; white-space: nowrap; }
-.rail-tile .lbl.icon { font-size: 20px; line-height: 1; overflow: visible; }
+.rail-tile .lbl.icon { display: inline-flex; color: var(--dim); overflow: visible; }
+.rail-tile.on .lbl.icon { color: var(--accent); }
+.rail-tile.tinted .lbl.icon { color: var(--tc); }
 .rail-tile .corner { position: absolute; top: 6px; right: 6px; width: 6px; height: 6px; border-radius: 50%; }
 .rail-tile .badge { position: absolute; top: -6px; right: -6px; min-width: 22px; height: 22px; padding: 0 5px; display: inline-flex; align-items: center; justify-content: center; border-radius: var(--r-sm); background: var(--bell); color: #111; }
 .rail-tip { position: fixed; transform: translateY(-50%); z-index: 60; padding: 6px 12px; border-radius: var(--r); background: #0b0c0e; color: #e6e7eb; white-space: nowrap; pointer-events: none; box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12), 0 6px 18px rgba(0, 0, 0, 0.3); }
@@ -569,29 +570,33 @@ html.is-dragging .row:hover .close + .status { display: inline-flex; }
 .panel-resize.left { left: 0; }
 .panel-resize:hover { background: color-mix(in oklab, var(--space) 30%, transparent); }
 
+/* Project explorer, IDE-style (VS Code / Antigravity): tinted file-type icons, indent
+   guides, and git decorations as colored names with a status letter. */
 .tree { flex: 1; min-height: 0; display: flex; flex-direction: column; }
-.tree-scroll { flex: 1; min-height: 0; overflow: auto; padding: 0 6px 12px; }
-.tree-row { height: 32px; display: flex; align-items: center; gap: 8px; padding-right: 10px; border-radius: var(--r-sm); color: var(--ink); white-space: nowrap; }
+.tree-scroll { flex: 1; min-height: 0; overflow: auto; padding: 2px 6px 12px; }
+.tree-row { height: 30px; display: flex; align-items: center; gap: 6px; padding: 0 10px 0 8px; border-radius: var(--r-sm); color: color-mix(in oklab, var(--ink) 88%, var(--dim)); white-space: nowrap; }
 .tree-row:hover { background: var(--hover); }
-.tree-row.sel { background: var(--sel); box-shadow: inset 3px 0 0 var(--accent); }
-.tree-row .chev { width: 14px; flex: none; display: inline-flex; color: var(--dim); transition: transform 0.15s ease; }
+.tree-row.sel { background: color-mix(in oklab, var(--space) 16%, transparent); color: var(--ink); box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--accent) 45%, transparent); }
+/* One guide per depth level; rows touch, so the lines read as continuous. */
+.tree-row .guide { flex: none; align-self: stretch; width: 16px; margin-right: -6px; position: relative; }
+.tree-row .guide::before { content: ''; position: absolute; left: 7px; top: 0; bottom: 0; border-left: 1px solid var(--line); }
+.tree-scroll:hover .tree-row .guide::before { border-color: color-mix(in oklab, var(--ink) 16%, transparent); }
+.tree-row .chev { width: 14px; flex: none; display: inline-flex; justify-content: center; color: var(--dim); transition: transform 0.15s ease; }
 .tree-row .chev.open { transform: rotate(90deg); }
-.tree-row > svg { flex: none; color: var(--dim); }
+.tree-row > svg { flex: none; }
 .tree-row .nm { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .tree-row.faded .nm { color: var(--dim); }
-.tree-row.ignored .nm { color: var(--dim); font-style: italic; }
-.tree-row.st-mod .nm { color: var(--bell); }
-.tree-row.st-add .nm { color: var(--ok); }
-.tree-row.st-del .nm { color: var(--fail); text-decoration: line-through; }
-.tree-row .st-dot { width: 7px; height: 7px; flex: none; margin-left: auto; border-radius: 50%; background: var(--bell); }
-.tree-row.st-add .st-dot { background: var(--ok); }
-.tree-row.st-del .st-dot { background: var(--fail); }
-.tree-row.dirty .st-dot { background: color-mix(in oklab, var(--bell) 60%, transparent); }
-.tree-row.root { margin: 8px 6px 2px; padding: 0 2px 0 8px; font-weight: 700; }
+.tree-row.ignored { opacity: 0.55; }
+.tree-row.st-mod .nm, .tree-row.st-mod .st-letter { color: var(--bell); }
+.tree-row.st-add .nm, .tree-row.st-add .st-letter, .tree-row.st-new .nm, .tree-row.st-new .st-letter { color: var(--ok); }
+.tree-row.st-del .nm, .tree-row.st-del .st-letter { color: var(--fail); }
+.tree-row.st-del .nm { text-decoration: line-through; }
+.tree-row .st-letter { flex: none; margin-left: auto; padding-left: 8px; font-weight: 700; }
+.tree-row .st-dot { width: 6px; height: 6px; flex: none; margin-left: auto; border-radius: 50%; background: color-mix(in oklab, var(--bell) 70%, transparent); }
+.tree-row.st-dirty .nm { color: color-mix(in oklab, var(--bell) 75%, var(--ink)); }
+.tree-row.root { height: 36px; margin: 6px 6px 2px; padding: 0 2px 0 8px; color: var(--ink); font-weight: 700; }
 .tree-refresh { margin-left: auto; opacity: 0; transition: opacity 0.12s; }
 .tree-row.root:hover .tree-refresh { opacity: 1; }
-.fglyph { width: 3ch; flex: none; text-align: center; font-weight: 700; color: var(--dim); white-space: nowrap; overflow: hidden; }
-.fglyph.json { color: #e2a63b; }
 
 .fsearch { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .fs-input { margin: 8px; height: 38px; flex: none; display: flex; align-items: center; gap: 10px; padding: 0 12px; border-radius: var(--r); background: var(--field); box-shadow: inset 0 0 0 1px var(--line); color: var(--dim); }

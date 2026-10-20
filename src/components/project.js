@@ -40,11 +40,12 @@ export const relPath = (root, p) => (root && p.startsWith(root + '/') ? p.slice(
 export const baseName = (p) => p.split('/').pop();
 export const dirName = (p) => (p.includes('/') ? p.slice(0, p.lastIndexOf('/')) : '');
 
-// Changed-file map for decorating the tree: relative path -> 'mod' | 'add' | 'del'.
+// Changed-file map for decorating the tree: relative path -> 'mod' | 'add' | 'new' | 'del'
+// ('new' is untracked, 'add' is staged as added).
 export function statusMap(changes) {
   const m = new Map();
   for (const f of changes?.files || []) {
-    const code = f.untracked || f.x === 'A' ? 'add' : f.x === 'D' || f.y === 'D' ? 'del' : 'mod';
+    const code = f.untracked ? 'new' : f.x === 'A' ? 'add' : f.x === 'D' || f.y === 'D' ? 'del' : 'mod';
     m.set(f.path, code);
   }
   return m;

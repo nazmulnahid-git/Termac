@@ -5,7 +5,7 @@ import { ui } from '../state/model.js';
 import * as A from '../state/actions.js';
 import { highlightLines, langOf } from '../lib/highlight.js';
 import { useProject, relPath, baseName } from './project.js';
-import { FileGlyph } from './ToolsPanel.jsx';
+import { FileIcon } from './fileicons.jsx';
 import { IconClose, IconCopy, IconInsert, IconExternal, IconReview } from './icons.jsx';
 
 const api = window.termac;
@@ -59,7 +59,7 @@ export default function FileViewer() {
       }}
     >
       <div className="vw-head">
-        <FileGlyph name={baseName(v.path)} />
+        <FileIcon name={baseName(v.path)} />
         <span className="vw-path" title={v.path}>
           {parts.map((p, i) => (
             <Fragment key={i}>

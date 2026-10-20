@@ -3,6 +3,7 @@ import { app, rt, ui } from '../state/model.js';
 import { arrayEq } from '../state/store.js';
 import * as L from '../lib/layout.js';
 import { kindOf, sessionName, timeAgo, formatDuration } from '../lib/meta.js';
+import { TabIcon } from './tabicons.jsx';
 
 // Aggregated view of a sidebar row: names, chips and the most urgent status of its panes.
 export function useTabView(tid) {
@@ -50,7 +51,12 @@ export function FailTip({ rt: r }) {
 // The gutter before a session's name: its chosen icon, else what it runs (git, npm,
 // ssh…). Plain shells leave it empty.
 export function Chip({ kind, icon }) {
-  if (icon) return <span className="chip icon">{icon}</span>;
+  if (icon)
+    return (
+      <span className="chip icon">
+        <TabIcon name={icon} />
+      </span>
+    );
   return <span className="chip">{kind === '>_' ? '' : kind}</span>;
 }
 

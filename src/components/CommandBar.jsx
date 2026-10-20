@@ -8,6 +8,7 @@ import { fuzzy, highlight } from '../lib/fuzzy.js';
 import { route, tildify, expandHome } from '../lib/routing.js';
 import { formatAccel } from '../lib/keys.js';
 import { kindOf, sessionName, formatDuration, timeAgo, dayLabel } from '../lib/meta.js';
+import { TabIcon } from './tabicons.jsx';
 import { promptText } from './Sidebar.jsx';
 import { rootOf } from './project.js';
 
@@ -246,7 +247,7 @@ function buildCandidates() {
       label,
       sub: where + status,
       extra: [cwd && tildify(cwd, home), ...names].filter(Boolean).join(' '),
-      chip: tab.icon || kindOf(cur.command || meta.command),
+      chip: tab.icon ? <TabIcon name={tab.icon} /> : kindOf(cur.command || meta.command),
       selHint: 'Switch to session ↵',
       recency,
       spaceId,

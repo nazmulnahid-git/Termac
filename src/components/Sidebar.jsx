@@ -9,6 +9,7 @@ import { highlight } from '../lib/fuzzy.js';
 import { findTabs } from '../lib/tabfind.js';
 import { IconFolder, IconFolderOpen, IconFolderPlus, IconChevron, IconPlus, IconMore, IconSearch, IconClose } from './icons.jsx';
 import Rail from './SidebarRail.jsx';
+import { TabIcon } from './tabicons.jsx';
 import { SpaceTrack, useSpaceMotion } from './space-motion.jsx';
 import { PANE_MIME, renameFolder, usePeek, closePeek, rowMenu, folderMenu, spaceMenu, newFolder, promptText } from './sidebar-shared.js';
 import { PH, pressTab, pressPane, pressFolder, useDropList, useDropFolders, destAttr } from './sidebar-drag.js';
@@ -390,7 +391,11 @@ function FavTile({ tid }) {
   const color = { run: 'var(--accent)', ok: 'var(--ok)', fail: 'var(--fail)', bell: 'var(--bell)', idle: 'var(--faint)' }[v.status];
   return (
     <div className={`fav${on ? ' on' : ''}${v.tab.color ? ' tinted' : ''}`} style={(v.tab.color ? { '--tc': v.tab.color } : undefined)} title={v.name} data-drag-tid={tid} onPointerDown={(e) => pressTab(e, tid)} onClick={(e) => !e.shiftKey && A.activateTab(tid)} onContextMenu={(e) => rowMenu(e, tid, v)} {...peek}>
-      {v.tab.icon ? <span className="fav-icon">{v.tab.icon}</span> : <span className="fav-name">{shortName(v.tab.name || v.active?.name)}</span>}
+      {v.tab.icon ? (
+        <span className="fav-icon">
+          <TabIcon name={v.tab.icon} size={20} />
+        </span>
+      ) : <span className="fav-name">{shortName(v.tab.name || v.active?.name)}</span>}
       <span className={`corner dot6${v.status === 'run' ? ' st-run' : ''}`} style={{ background: color }} />
       {v.bell > 0 && <span className="badge status st-bell">{v.bell}</span>}
     </div>

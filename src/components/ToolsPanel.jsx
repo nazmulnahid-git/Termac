@@ -5,7 +5,11 @@ import { app, rt, ui } from '../state/model.js';
 import * as A from '../state/actions.js';
 import { fuzzy, highlight } from '../lib/fuzzy.js';
 import { useProject, relPath, baseName, dirName, statusMap } from './project.js';
-import { IconFiles, IconSearch, IconReview, IconClose, IconChevron, IconFolder, IconFolderOpen, IconFile, IconRefresh } from './icons.jsx';
+import { IconFiles, IconSearch, IconReview, IconClose, IconChevron, IconRefresh } from './icons.jsx';
+import { FileIcon, FolderIcon } from './fileicons.jsx';
+
+// Git decorations, as an IDE explorer prints them.
+const LETTER = { mod: 'M', add: 'A', new: 'U', del: 'D' };
 
 const api = window.termac;
 const DIM_NAMES = new Set(['.git', 'node_modules', '.turbo', '.next', 'dist', 'build', '.cache', '.DS_Store']);
@@ -171,7 +175,7 @@ function Explorer({ project }) {
         <span className={`chev${open.has(root) ? ' open' : ''}`}>
           <IconChevron size={11} />
         </span>
-        <IconFolder size={15} />
+        <FolderIcon root />
         <span className="nm">{baseName(root) || root}</span>
         <button
           className="icon-btn sm tree-refresh"
@@ -193,7 +197,6 @@ function Explorer({ project }) {
             <div
               key={r.path}
               className={cls}
-              style={{ paddingLeft: 8 + r.depth * 14 }}
               title={rel}
               onClick={() => {
                 setSel(r.path);
@@ -201,6 +204,9 @@ function Explorer({ project }) {
               }}
               onContextMenu={(e) => menu(e, r)}
             >
+              {Array.from({ length: r.depth }, (_, i) => (
+                <span key={i} className="guide" />
+              ))}
               {r.dir ? (
                 <span className={`chev${open.has(r.path) ? ' open' : ''}`}>
                   <IconChevron size={11} />
@@ -208,23 +214,15 @@ function Explorer({ project }) {
               ) : (
                 <span className="chev" />
               )}
-              {r.dir ? open.has(r.path) ? <IconFolderOpen size={15} /> : <IconFolder size={15} /> : <FileGlyph name={r.name} />}
+              {r.dir ? <FolderIcon name={r.name} open={open.has(r.path)} /> : <FileIcon name={r.name} />}
               <span className="nm">{r.name}</span>
-              {st && <span className="st-dot" />}
+              {st === 'dirty' ? <span className="st-dot" /> : st && <span className="st-letter">{LETTER[st]}</span>}
             </div>
           );
         })}
       </div>
     </div>
   );
-}
-
-// Small type badges like Warp's: braces for JSON, M↓ for Markdown, otherwise a page.
-export function FileGlyph({ name }) {
-  const ext = name.includes('.') ? name.split('.').pop().toLowerCase() : '';
-  if (ext === 'json' || ext === 'jsonc') return <span className="fglyph json">{'{ }'}</span>;
-  if (ext === 'md' || ext === 'mdx') return <span className="fglyph md">M↓</span>;
-  return <IconFile size={15} />;
 }
 
 // ---- Find file ----------------------------------------------------------------------
@@ -299,7 +297,7 @@ function FileSearch({ project }) {
           const off = r.f.length - base.length;
           return (
             <div key={r.f} className={`fs-item${i === sel ? ' sel' : ''}`} onMouseMove={() => sel !== i && setSel(i)} onClick={() => open(r)}>
-              <FileGlyph name={base} />
+              <FileIcon name={base} />
               <span className="nm">
                 {highlight(base, r.hits.filter((x) => x >= off).map((x) => x - off)).map((p, k) => (p.hit ? <mark key={k}>{p.text}</mark> : p.text))}
               </span>

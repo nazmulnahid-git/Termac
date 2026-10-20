@@ -26,6 +26,7 @@
     "@xterm/xterm": "^6.0.0",
     "electron": "^33.3.1",
     "electron-builder": "^25.1.8",
+    "lucide-react": "1.52.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "vite": "^6.0.7"

@@ -1,17 +1,14 @@
 // Icon & color for one session (row context menu → Icon & Color…). Picks apply right
 // away, so the sidebar row behind the sheet previews them.
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import * as A from '../state/actions.js';
 import { useTabView, Chip } from './common.jsx';
-import { SPACE_COLORS, SPACE_GLYPHS } from '../lib/meta.js';
-
-const ICONS = [...SPACE_GLYPHS, 'λ', '❯', '#', '$', '⚡', '⚙', '☁', '♥', '∞', '🚀', '🐳', '🔥', '🐍', '📦', '🧪', '🗄️', '🌐', '🔒', '🐛', '🛠️', '📝', '🎯'];
-
-const firstGrapheme = (text) => [...new Intl.Segmenter().segment(text.trim())][0]?.segment || null;
+import { SPACE_COLORS } from '../lib/meta.js';
+import { Ban } from 'lucide-react';
+import { TAB_ICONS } from './tabicons.jsx';
 
 export default function TabStyle({ tid, onClose }) {
   const v = useTabView(tid);
-  const [typed, setTyped] = useState('');
 
   useEffect(() => {
     const onKey = (e) => e.key === 'Escape' && onClose();
@@ -22,7 +19,6 @@ export default function TabStyle({ tid, onClose }) {
   if (!v) return null;
   const { icon = null, color = null } = v.tab;
   const set = (patch) => A.setTabStyle(tid, patch);
-  const custom = icon && !ICONS.includes(icon);
 
   return (
     <div className="modal ts">
@@ -35,25 +31,13 @@ export default function TabStyle({ tid, onClose }) {
         <div className="ts-label">Icon</div>
         <div className="ts-icons">
           <button className={`ts-icon none${!icon ? ' on' : ''}`} title="No icon" onClick={() => set({ icon: null })}>
-            ∅
+            <Ban size={18} strokeWidth={1.75} aria-hidden="true" />
           </button>
-          {ICONS.map((g) => (
-            <button key={g} className={`ts-icon${icon === g ? ' on' : ''}`} onClick={() => set({ icon: g })}>
-              {g}
+          {Object.entries(TAB_ICONS).map(([id, Icon]) => (
+            <button key={id} className={`ts-icon${icon === id ? ' on' : ''}`} title={id} onClick={() => set({ icon: id })}>
+              <Icon size={18} strokeWidth={1.75} aria-hidden="true" />
             </button>
           ))}
-          <input
-            className={`field ts-custom${custom ? ' on' : ''}`}
-            placeholder="any"
-            title="Type or paste any character or emoji"
-            spellCheck={false}
-            value={typed || (custom ? icon : '')}
-            onChange={(e) => {
-              setTyped(e.target.value);
-              const g = firstGrapheme(e.target.value);
-              if (g) set({ icon: g });
-            }}
-          />
         </div>
         <div className="ts-label">Color</div>
         <div className="swatches">
