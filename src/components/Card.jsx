@@ -4,13 +4,13 @@ import { arrayEq } from '../state/store.js';
 import * as A from '../state/actions.js';
 import * as reg from '../term/registry.js';
 import * as L from '../lib/layout.js';
-import { splitCwd, procLabel, clockTime, formatDuration, sessionName } from '../lib/meta.js';
+import { procLabel, clockTime, formatDuration, sessionName } from '../lib/meta.js';
 import { formatAccel } from '../lib/keys.js';
 import { terminalLook } from '../lib/termtheme.js';
 import { useImageUrl } from './common.jsx';
+import PaneChips from './PaneChips.jsx';
 
 const api = window.termac;
-const TAB_MIME = 'application/x-termac-tab';
 const PANE_MIME = 'application/x-termac-pane';
 
 export default function Card() {
@@ -22,29 +22,15 @@ export default function Card() {
   const space = app.use((s) => A.activeSpace(s));
   const look = useMemo(() => terminalLook(space, theme), [space.term, space.color, theme]);
   const image = useImageUrl(look.image);
-  const [edge, setEdge] = useState(null);
 
   if (!tab) return <EmptySpace />;
   const danger = !!tab.effects?.danger || sshDanger;
-  const canDrop = dragging?.tabId && dragging.tabId !== tab.id && sids.length < L.MAX_PANES;
-
-  const onDragOver = (e) => {
-    if (!canDrop) return;
-    e.preventDefault();
-    const r = e.currentTarget.getBoundingClientRect();
-    const d = { left: e.clientX - r.left, right: r.right - e.clientX, top: e.clientY - r.top, bottom: r.bottom - e.clientY };
-    const best = Object.entries(d).sort((a, b) => a[1] - b[1])[0][0];
-    if (best !== edge) setEdge(best);
-  };
-  const onDrop = (e) => {
-    const tid = e.dataTransfer.getData(TAB_MIME);
-    setEdge(null);
-    ui.set((u) => ({ ...u, dragging: null }));
-    if (tid && edge) A.mergeIntoActive(tid, edge);
-  };
+  // The sidebar drag engine hit-tests the card and reports the nearest edge as its target.
+  const canDrop = dragging?.kind === 'tab' && dragging.tabId !== tab.id && sids.length < L.MAX_PANES;
+  const edge = dragging?.target?.kind === 'card' ? dragging.target.edge : null;
 
   return (
-    <div className={`card t-${look.dark ? 'dark' : 'light'}${danger ? ' danger' : ''}`} style={{ ...look.vars, background: look.bg }} onDragOver={onDragOver} onDragLeave={(e) => !e.currentTarget.contains(e.relatedTarget) && setEdge(null)} onDrop={onDrop}>
+    <div className={`card t-${look.dark ? 'dark' : 'light'}${danger ? ' danger' : ''}`} style={{ ...look.vars, background: look.bg }}>
       {look.image && image && (
         <>
           <div className="card-bg" style={{ backgroundImage: `url(${image})`, filter: look.blur ? `blur(${look.blur}px)` : undefined, inset: look.blur ? -look.blur * 2 : 0 }} />
@@ -173,7 +159,6 @@ function Pane({ sid, focused, multi, danger, look }) {
     if (focused && document.activeElement?.tagName !== 'INPUT') reg.focus(sid);
   }, [focused, sid]);
 
-  const { dir, leaf } = splitCwd(r.cwd || meta?.cwd, home);
   const procColor = { run: 'var(--accent)', fail: 'var(--fail)', ok: 'var(--ok)' }[r.status] || 'var(--t-dim)';
 
   return (
@@ -187,27 +172,12 @@ function Pane({ sid, focused, multi, danger, look }) {
         }}
       >
         {danger && <span className="prod-chip">PRODUCTION</span>}
-        <span className="cwd">
-          {r.dangerHost ? (
-            <b>{r.dangerHost}</b>
-          ) : (
-            <>
-              <span>{dir}</span>
-              <b>{leaf}</b>
-            </>
-          )}
-        </span>
-        {r.branch && (
-          <span className="pill">
-            <span className="br">⎇</span>
-            {r.branch}
-          </span>
-        )}
-        <span className="pill" title={r.command || ''}>
+        <PaneChips sid={sid} r={r} cwd={r.cwd || meta?.cwd || home} />
+        <span className="grow" />
+        <span className="pill proc" title={r.command || ''}>
           <span className={`dot6${r.status === 'run' ? ' st-run' : ''}`} style={{ background: procColor }} />
           {procLabel(r, r.shell)}
         </span>
-        <span className="grow" />
         {r.cols && (
           <span className="size">
             {r.shell || 'zsh'} · {r.cols}×{r.rows}

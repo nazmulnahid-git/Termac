@@ -124,6 +124,8 @@ export function terminalLook(space, fallbackTheme = 'dark') {
     '--t-chip': dark ? '#f3f3f1' : '#1d1e24',
     '--t-chip-fg': dark ? '#17181d' : '#f3f3f1',
     '--t-branch': base.magenta,
+    '--t-green': base.green,
+    '--t-yellow': base.yellow,
   };
   return { key: `${bg}|${image || ''}|${look.dim}|${look.blur}`, bg, dark, xterm, vars, image, dim: look.dim, blur: look.blur, transparent: !!image };
 }

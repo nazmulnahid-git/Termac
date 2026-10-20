@@ -1,24 +1,12 @@
-// Behaviour shared by the expanded sidebar and the compact rail: drag, peek, menus.
+// Behaviour shared by the expanded sidebar and the compact rail: peek, menus. Dragging lives in sidebar-drag.js.
 import { app, ui } from '../state/model.js';
 import * as A from '../state/actions.js';
 
 const api = window.termac;
-export const TAB_MIME = 'application/x-termac-tab';
 export const PANE_MIME = 'application/x-termac-pane';
-export const FOLDER_MIME = 'application/x-termac-folder';
 
 // Folder that should start in rename mode (set right after creating it).
 export const renameFolder = { id: null };
-
-export function dragStart(e, tid) {
-  e.dataTransfer.setData(TAB_MIME, tid);
-  e.dataTransfer.effectAllowed = 'move';
-  ui.set((u) => ({ ...u, dragging: { tabId: tid }, peek: null }));
-}
-
-export function dragEnd() {
-  ui.set((u) => ({ ...u, dragging: null }));
-}
 
 // ---- Peek ----------------------------------------------------------------------------
 let peekTimer = null;

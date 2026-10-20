@@ -136,7 +136,7 @@ function startSession(sid, initialCommand = '') {
     initialCommand,
   });
   patchRt(sid, { cwd: meta.cwd, startedAt: Date.now() });
-  if (meta.cwd) api.sys.gitBranch(meta.cwd).then((branch) => patchRt(sid, { branch }));
+  if (meta.cwd) refreshGit(sid, meta.cwd);
 }
 
 // Mounting a pane calls this; restored sessions only get a shell when first shown.
@@ -516,7 +516,7 @@ reg.setHooks({
   cwd(sid, cwd) {
     if (rt.get()[sid]?.cwd === cwd) return;
     patchRt(sid, { cwd });
-    api.sys.gitBranch(cwd).then((branch) => patchRt(sid, { branch }));
+    refreshGit(sid, cwd);
     app.set((s) => {
       if (!s.sessions[sid]) return s;
       const recent = s.recentDirs.filter((d) => d.path !== cwd);
@@ -544,7 +544,8 @@ reg.setHooks({
     if (ssh && entry.exit === 255 && entry.dur > 5000) patch.dropped = { host: ssh.host, cmd: entry.cmd, at: Date.now(), dur: entry.dur };
     patchRt(sid, patch);
     const cwd = rt.get()[sid]?.cwd;
-    if (cwd && /^git\s/.test(entry.cmd)) api.sys.gitBranch(cwd).then((branch) => patchRt(sid, { branch }));
+    // Any command can touch the working tree, so the change count is re-read after each one.
+    if (cwd) refreshGit(sid, cwd);
 
     const threshold = s.settings.notifyAfterS * 1000;
     if (threshold && entry.dur >= threshold && !visible && !interrupted) notifyFinished(sid, entry);
@@ -602,6 +603,55 @@ export function reconnect(sid = focusedSid()) {
   patchRt(sid, { dropped: null });
   api.pty.write(sid, d.cmd + '\r');
   reg.focus(sid);
+}
+
+// ---- Pane header chips ----------------------------------------------------------------
+// Branch, changed-file count and open PR for a session's directory. Results for a cwd the
+// session has since left are dropped.
+export async function refreshGit(sid, cwd) {
+  const still = () => (rt.get()[sid]?.cwd || app.get().sessions[sid]?.cwd) === cwd;
+  const [branch, status] = await Promise.all([api.sys.gitBranch(cwd), api.sys.gitStatus(cwd)]);
+  if (!still()) return;
+  patchRt(sid, { branch, changes: status?.changes ?? null, ...(branch === rt.get()[sid]?.branch ? {} : { pr: null }) });
+  if (!branch) return;
+  const pr = await api.sys.gitPr(cwd, branch);
+  if (still() && rt.get()[sid]?.branch === branch) patchRt(sid, { pr });
+}
+
+export const shellQuote = (s) => `'${String(s).replace(/'/g, `'\\''`)}'`;
+
+// Type a command at the prompt the way a person would, replacing anything half-typed.
+// Refuses while something is running so we never feed keystrokes into another program.
+export function typeCommand(sid, command) {
+  if (!sid) return false;
+  if (rt.get()[sid]?.status === 'run') {
+    toast({ title: 'Finish the running command first', detail: 'Switching runs a command in this shell.' });
+    return false;
+  }
+  const h = reg.getHandle(sid);
+  if (h && !h.alive) startSession(sid);
+  api.pty.write(sid, '\x05\x15' + command + '\r');
+  focusSession(sid);
+  return true;
+}
+
+// Type text at the cursor without running it (e.g. a path from the explorer).
+export function insertText(sid, text) {
+  if (!sid) return;
+  const h = reg.getHandle(sid);
+  if (h && !h.alive) startSession(sid);
+  api.pty.write(sid, text);
+  focusSession(sid);
+}
+
+// ---- Tool panels: explorer / search (left), code review (right), file viewer -------------
+export const togglePanel = (name) => ui.set((u) => ({ ...u, tools: u.tools === name ? null : name }));
+export const toggleReview = () => ui.set((u) => ({ ...u, review: !u.review }));
+export const openFile = (path, line = null) => ui.set((u) => ({ ...u, viewer: { path, line } }));
+export function closeFile() {
+  ui.set((u) => (u.viewer ? { ...u, viewer: null } : u));
+  const sid = focusedSid();
+  if (sid) requestAnimationFrame(() => reg.focus(sid));
 }
 
 export function runInSession(command, sid = focusedSid()) {

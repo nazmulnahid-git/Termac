@@ -50,7 +50,7 @@ function createMainWindow() {
     minHeight: 420,
     show: false,
     titleBarStyle: 'hiddenInset',
-    trafficLightPosition: { x: 16, y: 16 },
+    trafficLightPosition: { x: 16, y: 13 },
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#1b1c21' : '#eeeeec',
     webPreferences,
   });
@@ -187,6 +187,9 @@ function buildMenu(bindings = {}) {
         item('Focus Mode', 'focusMode'),
         item('Library', 'library'),
         item('Notes', 'notes'),
+        item('Project Explorer', 'toggleFiles'),
+        item('Find File…', 'quickOpen'),
+        item('Code Review', 'toggleReview'),
         item('All Spaces', 'overview'),
         { type: 'separator' },
         item('Bigger', 'zoomIn'),
@@ -237,6 +240,18 @@ ipcMain.handle('library:remove', (_e, id) => library.remove(id));
 
 ipcMain.handle('sys:sshHosts', () => sys.sshHosts());
 ipcMain.handle('sys:gitBranch', (_e, cwd) => sys.gitBranch(cwd));
+ipcMain.handle('sys:gitStatus', (_e, cwd) => sys.gitStatus(cwd));
+ipcMain.handle('sys:gitBranches', (_e, cwd) => sys.gitBranches(cwd));
+ipcMain.handle('sys:gitPr', (_e, cwd, branch) => sys.gitPr(cwd, branch));
+ipcMain.handle('sys:listDirs', (_e, dir) => sys.listDirs(dir));
+ipcMain.handle('sys:gitRoot', (_e, cwd) => sys.gitRoot(cwd));
+ipcMain.handle('sys:listDir', (_e, dir) => sys.listDir(dir));
+ipcMain.handle('sys:readFile', (_e, file) => sys.readFile(file).catch((err) => ({ error: err.message })));
+ipcMain.handle('sys:projectFiles', (_e, root) => sys.projectFiles(root));
+ipcMain.handle('sys:gitChanges', (_e, cwd) => sys.gitChanges(cwd));
+ipcMain.handle('sys:gitDiff', (_e, root, file, opts) => sys.gitDiff(root, file, opts));
+ipcMain.handle('sys:gitStage', (_e, root, file, stage) => sys.gitStage(root, file, stage));
+ipcMain.handle('sys:gitDiscard', (_e, root, file, untracked) => sys.gitDiscard(root, file, untracked));
 ipcMain.handle('sys:detectImports', () => sys.detectImports());
 ipcMain.handle('sys:isDir', (_e, p) => sys.isDir(p));
 ipcMain.handle('sys:chooseDir', async (e, defaultPath) => {

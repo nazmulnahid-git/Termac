@@ -90,3 +90,117 @@ export const IconClose = (p) => (
     <path d="M4.5 4.5l7 7M11.5 4.5l-7 7" />
   </Svg>
 );
+
+export const IconBranch = (p) => (
+  <Svg {...p}>
+    <circle cx="4.5" cy="3.5" r="1.5" />
+    <circle cx="4.5" cy="12.5" r="1.5" />
+    <circle cx="11.5" cy="4.5" r="1.5" />
+    <path d="M4.5 5v6M11.5 6c0 3.25-7 2.25-7 5" />
+  </Svg>
+);
+
+export const IconPullRequest = (p) => (
+  <Svg {...p}>
+    <circle cx="4.5" cy="3.5" r="1.5" />
+    <circle cx="4.5" cy="12.5" r="1.5" />
+    <circle cx="11.5" cy="12.5" r="1.5" />
+    <path d="M4.5 5v6M11.5 11V6.5c0-1.1-.9-2-2-2H7.5M9 3L7.5 4.5 9 6" />
+  </Svg>
+);
+
+export const IconDiff = (p) => (
+  <Svg {...p}>
+    <path d="M8 2.75v6.5M4.75 6h6.5M4.75 13.25h6.5" />
+  </Svg>
+);
+
+export const IconCheck = (p) => (
+  <Svg {...p}>
+    <path d="M3.5 8.5l3 3 6-7" />
+  </Svg>
+);
+
+export const IconArrowUp = (p) => (
+  <Svg {...p}>
+    <path d="M8 13V3M4 7l4-4 4 4" />
+  </Svg>
+);
+
+export const IconClock = (p) => (
+  <Svg {...p}>
+    <circle cx="8" cy="8" r="6.25" />
+    <path d="M8 4.75V8l2.25 1.5" />
+  </Svg>
+);
+
+export const IconCopy = (p) => (
+  <Svg {...p}>
+    <rect x="5.25" y="5.25" width="8.5" height="8.5" rx="1.75" />
+    <path d="M10.75 5.25V3.5c0-.97-.78-1.75-1.75-1.75H3.5c-.97 0-1.75.78-1.75 1.75V9c0 .97.78 1.75 1.75 1.75h1.75" />
+  </Svg>
+);
+
+export const IconExternal = (p) => (
+  <Svg {...p}>
+    <path d="M9.5 2.75h3.75V6.5M13.25 2.75L7.5 8.5M12 9.5v2.75c0 .55-.45 1-1 1H3.75c-.55 0-1-.45-1-1V5c0-.55.45-1 1-1H6.5" />
+  </Svg>
+);
+
+export const IconFiles = (p) => (
+  <Svg {...p}>
+    <path d="M5.25 4.25V3.5c0-.97.78-1.75 1.75-1.75h3.4l3.35 3.35v5.4c0 .97-.78 1.75-1.75 1.75h-.75" />
+    <path d="M10.25 1.75v3.5h3.5" />
+    <rect x="2.25" y="4.25" width="8" height="10" rx="1.75" />
+  </Svg>
+);
+
+export const IconFile = (p) => (
+  <Svg {...p}>
+    <path d="M3.25 3.5c0-.97.78-1.75 1.75-1.75h3.9l3.85 3.85v6.9c0 .97-.78 1.75-1.75 1.75H5c-.97 0-1.75-.78-1.75-1.75z" />
+    <path d="M8.75 1.75V5.6h3.85" />
+  </Svg>
+);
+
+export const IconGrid = (p) => (
+  <Svg {...p}>
+    <rect x="2" y="2" width="5" height="5" rx="1.25" />
+    <rect x="9" y="2" width="5" height="5" rx="1.25" />
+    <rect x="2" y="9" width="5" height="5" rx="1.25" />
+    <rect x="9" y="9" width="5" height="5" rx="1.25" />
+  </Svg>
+);
+
+export const IconReview = (p) => (
+  <Svg {...p}>
+    <path d="M3.25 3.5c0-.97.78-1.75 1.75-1.75h3.9l3.85 3.85v6.9c0 .97-.78 1.75-1.75 1.75H5c-.97 0-1.75-.78-1.75-1.75z" />
+    <path d="M8 6v4M6 8h4M6 12h4" />
+  </Svg>
+);
+
+export const IconRefresh = (p) => (
+  <Svg {...p}>
+    <path d="M13.25 8a5.25 5.25 0 1 1-1.54-3.71" />
+    <path d="M13.25 2.75v3h-3" />
+  </Svg>
+);
+
+export const IconUndo = (p) => (
+  <Svg {...p}>
+    <path d="M5.5 3.25L2.75 6 5.5 8.75" />
+    <path d="M2.75 6h6.5a4 4 0 0 1 0 8H7" />
+  </Svg>
+);
+
+export const IconMinus = (p) => (
+  <Svg {...p}>
+    <path d="M3 8h10" />
+  </Svg>
+);
+
+export const IconInsert = (p) => (
+  <Svg {...p}>
+    <path d="M2.75 8h7.5M7.5 5.25L10.25 8 7.5 10.75" />
+    <path d="M10.75 2.75h1.5c.55 0 1 .45 1 1v8.5c0 .55-.45 1-1 1h-1.5" />
+  </Svg>
+);

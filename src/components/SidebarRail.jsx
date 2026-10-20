@@ -5,7 +5,8 @@ import { useTabView } from './common.jsx';
 import { formatAccel } from '../lib/keys.js';
 import { IconSidebar, IconSearch, IconPlus, IconFolder, IconFolderOpen, IconLibrary, IconGear } from './icons.jsx';
 import { SpaceDots, SidebarCards, useActivityButton, openLibrary, openSettings } from './Sidebar.jsx';
-import { dragStart, dragEnd, usePeek, rowMenu, folderMenu } from './sidebar-shared.js';
+import { usePeek, rowMenu, folderMenu } from './sidebar-shared.js';
+import { PH, pressTab, pressFolder, useDropList, useDropFolders, destAttr } from './sidebar-drag.js';
 
 // Compact sidebar: one icon tile per session, folders expand in place.
 export default function Rail() {
@@ -13,6 +14,11 @@ export default function Rail() {
   const favorites = app.use((s) => s.favorites);
   const bindings = app.use((s) => s.settings.keybindings);
   const view = ui.use((s) => s.view);
+  const dragging = ui.use((s) => !!s.dragging);
+  const favs = useDropList(favorites, { section: 'fav' });
+  const pinned = useDropList(space.pinned, { section: 'pinned', spaceId: space.id });
+  const today = useDropList(space.today, { section: 'today', spaceId: space.id });
+  const folders = useDropFolders(space);
   const [tip, setTip] = useState(null);
   const activity = useActivityButton();
   const showTip = (e, text) => {
@@ -23,7 +29,6 @@ export default function Rail() {
 
   return (
     <div className="rail" onMouseLeave={() => setTip(null)}>
-      <div className="rail-head" />
       <button className="rail-btn" onClick={A.toggleSidebar} {...tipProps(`Expand sidebar  ${formatAccel(bindings.toggleSidebar)}`)}>
         <IconSidebar />
       </button>
@@ -31,36 +36,29 @@ export default function Rail() {
         <IconSearch />
       </button>
       <div className="rail-scroll">
-        {favorites.length > 0 && (
+        {favs.length > 0 && (
           <>
-            {favorites.map((tid) => (
-              <RailTile key={tid} tid={tid} onTip={showTip} onTipEnd={() => setTip(null)} />
-            ))}
+            <RailList items={favs} dest={destAttr('fav')} onTip={showTip} onTipEnd={() => setTip(null)} />
             <div className="rail-sep" />
           </>
         )}
-        <div className="rail-space" style={{ color: space.color }} {...tipProps(space.name)} onDoubleClick={() => ui.set((u) => ({ ...u, overlay: 'spaceEditor', overlayArg: space.id }))}>
+        <div className="rail-space" style={{ color: space.color }} data-drop-into={destAttr('pinned', space.id, null, 0)} {...tipProps(space.name)} onDoubleClick={() => ui.set((u) => ({ ...u, overlay: 'spaceEditor', overlayArg: space.id }))}>
           {space.glyph}
         </div>
-        {space.pinned.map((tid) => (
-          <RailTile key={tid} tid={tid} onTip={showTip} onTipEnd={() => setTip(null)} />
-        ))}
-        {space.folders.map((f) => (
-          <div key={f.id} className={`rail-folder${f.open ? ' open' : ''}`}>
-            <button className="rail-btn folder" onClick={() => A.updateFolder(space.id, f.id, { open: !f.open })} onContextMenu={(e) => folderMenu(e, space.id, f, () => A.toggleSidebar())} {...tipProps(`${f.name} · ${f.tabs.length}`)}>
-              {f.open ? <IconFolderOpen /> : <IconFolder />}
-              {!f.open && f.tabs.length > 0 && <span className="rail-count">{f.tabs.length}</span>}
-            </button>
-            {f.open && f.tabs.map((tid) => <RailTile key={tid} tid={tid} onTip={showTip} onTipEnd={() => setTip(null)} />)}
-          </div>
-        ))}
-        {space.today.length > 0 && <div className="rail-sep" />}
-        {space.today.map((tid) => (
-          <RailTile key={tid} tid={tid} onTip={showTip} onTipEnd={() => setTip(null)} />
-        ))}
-        <button className="rail-btn new" onClick={() => A.openTerminal()} {...tipProps(`New terminal  ${formatAccel(bindings.newTerminal)}`)}>
+        <RailList items={pinned} dest={destAttr('pinned', space.id)} onTip={showTip} onTipEnd={() => setTip(null)} />
+        {folders.map((f) =>
+          f === PH ? (
+            <div key="folder-ph" className="rail-ph folder" data-drop-ph />
+          ) : (
+            <RailFolder key={f.id} folder={f} spaceId={space.id} tipProps={tipProps} onTip={showTip} onTipEnd={() => setTip(null)} />
+          )
+        )}
+        {today.length > 0 && <div className="rail-sep" />}
+        <RailList items={today} dest={destAttr('today', space.id)} onTip={showTip} onTipEnd={() => setTip(null)} />
+        <button className="rail-btn new" data-drop-into={destAttr('today', space.id)} onClick={() => A.openTerminal()} {...tipProps(`New terminal  ${formatAccel(bindings.newTerminal)}`)}>
           <IconPlus />
         </button>
+        <div className="sb-fill" data-drop-into={destAttr('today', space.id)} />
       </div>
       <SidebarCardsCompact />
       <div className="rail-bottom">
@@ -74,11 +72,43 @@ export default function Rail() {
         </button>
       </div>
       {activity.popover}
-      {tip && (
+      {tip && !dragging && (
         <div className="rail-tip" style={{ top: tip.top, left: tip.left }}>
           {tip.text}
         </div>
       )}
+    </div>
+  );
+}
+
+function RailList({ items, dest, onTip, onTipEnd }) {
+  if (!items.length) return null;
+  return (
+    <div className="rail-list" data-drop-list={dest}>
+      {items.map((tid) => (tid === PH ? <div key="rail-ph" className="rail-ph" data-drop-ph /> : <RailTile key={tid} tid={tid} onTip={onTip} onTipEnd={onTipEnd} />))}
+    </div>
+  );
+}
+
+function RailFolder({ folder: f, spaceId, tipProps, onTip, onTipEnd }) {
+  const items = useDropList(f.tabs, { section: 'pinned', spaceId, folderId: f.id });
+  const into = ui.use((s) => s.dragging?.target?.kind === 'list' && s.dragging.target.folderId === f.id);
+  return (
+    <div className={`rail-folder${f.open ? ' open' : ''}`}>
+      <button
+        className={`rail-btn folder${into ? ' drop-into' : ''}`}
+        data-folder-head={f.id}
+        data-drop-into={destAttr('pinned', spaceId, f.id)}
+        data-spring={f.open ? undefined : f.id}
+        onPointerDown={(e) => pressFolder(e, spaceId, f.id)}
+        onClick={() => A.updateFolder(spaceId, f.id, { open: !f.open })}
+        onContextMenu={(e) => folderMenu(e, spaceId, f, () => A.toggleSidebar())}
+        {...tipProps(`${f.name} · ${f.tabs.length}`)}
+      >
+        {f.open ? <IconFolderOpen /> : <IconFolder />}
+        {!f.open && f.tabs.length > 0 && <span className="rail-count">{f.tabs.length}</span>}
+      </button>
+      {f.open && <RailList items={items} dest={destAttr('pinned', spaceId, f.id)} onTip={onTip} onTipEnd={onTipEnd} />}
     </div>
   );
 }
@@ -93,9 +123,8 @@ function RailTile({ tid, onTip, onTipEnd }) {
   return (
     <button
       className={`rail-tile${on ? ' on' : ''}${v.danger ? ' danger' : ''}`}
-      draggable
-      onDragStart={(e) => dragStart(e, tid)}
-      onDragEnd={dragEnd}
+      data-drag-tid={tid}
+      onPointerDown={(e) => pressTab(e, tid)}
       onClick={(e) => !e.shiftKey && A.activateTab(tid)}
       onContextMenu={(e) => rowMenu(e, tid, v)}
       onMouseEnter={(e) => {

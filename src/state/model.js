@@ -26,6 +26,9 @@ export const DEFAULT_SETTINGS = {
   gestures: { swipeSpaces: true, pinch: true, edgeReveal: true, peek: true },
   sidebarMode: 'expanded', // expanded | compact | hidden
   sidebarWidth: 256,
+  toolsWidth: 300,
+  reviewWidth: 520,
+  clickToMove: true,
 };
 
 export function defaultProfile() {
@@ -89,7 +92,7 @@ export const ui = createStore({
   peek: null, // { sid, top, pinned }
   toast: null, // { id, kind, title, detail, action, expires }
   confirm: null, // { sid, title, detail, onRun }
-  dragging: null, // { tabId, sid? }
+  dragging: null, // sidebar drag: { kind: 'tab', tabId } | { kind: 'folder', spaceId, folderId }, plus origin and target
   sidebarReveal: false,
   copied: null,
   find: false,
@@ -99,6 +102,10 @@ export const ui = createStore({
   termTheme: 'dark', // resolved terminal theme: dark | light
   notify: null, // finished job in another Space { id, sid, spaceId, command, exit, dur, at }
   prompt: null, // { title, value, resolve }
+  tools: null, // left tool panel: files | search
+  searchFocus: 0, // bumped by ⌘P to refocus the find-file box
+  review: false, // code review panel (right)
+  viewer: null, // { path, line } file shown over the terminal card
 });
 
 export function patchRt(sid, patch) {

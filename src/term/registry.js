@@ -21,6 +21,7 @@ let parking = null;
 let hooks = {};
 let termOptions = {};
 let themeName = 'dark';
+let clickToMove = true;
 
 export const setHooks = (h) => (hooks = h);
 export const getHandle = (sid) => handles.get(sid);
@@ -65,6 +66,7 @@ api.pty.onProc(({ id, proc }) => {
 // ---- Options ------------------------------------------------------------------------
 export function configure(settings, dark) {
   themeName = settings.termTheme === 'system' ? (dark ? 'dark' : 'light') : settings.termTheme;
+  clickToMove = settings.clickToMove !== false;
   termOptions = {
     fontFamily: /monospace\s*$/.test(settings.fontFamily) ? settings.fontFamily : `${settings.fontFamily}, 'SF Mono', Menlo, monospace`,
     fontSize: settings.fontSize,
@@ -137,7 +139,34 @@ export function create(sid) {
     onShellMark(h, data);
     return true;
   });
-  term.onData((d) => hooks.input?.(sid, d));
+  term.onData((d) => {
+    // The first keystroke after a prompt marks where the editable input begins: the cursor
+    // hasn't moved yet, so it's sitting right after the prompt.
+    if (h.awaitInput) {
+      h.awaitInput = false;
+      h.inputStart?.marker.dispose();
+      const b = term.buffer.active;
+      h.inputStart = b.type === 'normal' ? { marker: term.registerMarker(0), x: b.cursorX } : null;
+    }
+    hooks.input?.(sid, d);
+  });
+  let down = null;
+  el.addEventListener(
+    'mousedown',
+    (e) => {
+      down = e.button === 0 && !e.shiftKey && !e.altKey && !e.metaKey && !e.ctrlKey ? { x: e.clientX, y: e.clientY } : null;
+    },
+    true
+  );
+  el.addEventListener(
+    'mouseup',
+    (e) => {
+      const d = down;
+      down = null;
+      if (d && e.detail === 1 && Math.hypot(e.clientX - d.x, e.clientY - d.y) <= 3) moveCursorTo(h, e.clientX, e.clientY);
+    },
+    true
+  );
   term.onBinary((d) => api.pty.write(sid, d));
   term.onResize(({ cols, rows }) => {
     api.pty.resize(sid, cols, rows);
@@ -277,7 +306,15 @@ function onShellMark(h, data) {
     case 'E':
       h.pendingCmd = arg.trim();
       break;
+    case 'A':
+      h.awaitInput = true;
+      h.inputStart?.marker.dispose();
+      h.inputStart = null;
+      break;
     case 'C': {
+      h.awaitInput = false;
+      h.inputStart?.marker.dispose();
+      h.inputStart = null;
       const cmd = h.pendingCmd;
       h.pendingCmd = '';
       const entry = { cmd, at: now, start: h.term.registerMarker(0), end: null, exit: null, dur: null };
@@ -305,6 +342,64 @@ function onShellMark(h, data) {
     default:
       break;
   }
+}
+
+// ---- Click to move the cursor --------------------------------------------------------
+// Like Ghostty: clicking inside the command being typed moves the shell's cursor there by
+// sending left/right arrows. Only at an idle prompt we've seen start (shell integration),
+// never in full-screen apps or while a command runs, and never past the typed text (so a
+// grey autosuggestion isn't accepted by accident).
+function moveCursorTo(h, clientX, clientY) {
+  const t = h.term;
+  const b = t.buffer.active;
+  const start = h.inputStart;
+  if (!clickToMove || !start || start.marker.isDisposed || b.type !== 'normal' || t.modes.mouseTrackingMode !== 'none') return;
+  if (rt.get()[h.sid]?.status === 'run' || t.hasSelection()) return;
+  const screen = h.el.querySelector('.xterm-screen');
+  if (!screen) return;
+  const r = screen.getBoundingClientRect();
+  const col = Math.floor(((clientX - r.left) / r.width) * t.cols);
+  const row = Math.floor(((clientY - r.top) / r.height) * t.rows);
+  if (col < 0 || row < 0 || col >= t.cols || row >= t.rows) return;
+
+  const cy = b.baseY + b.cursorY;
+  const first = start.marker.line;
+  // The input must be one logical line from the prompt to the cursor (soft-wrapped is fine).
+  for (let y = cy; y > first; y--) if (!b.getLine(y)?.isWrapped) return;
+  let last = cy;
+  while (b.getLine(last + 1)?.isWrapped) last++;
+  const y = b.viewportY + row;
+  if (y < first || y > last || (y === first && col < start.x)) return;
+
+  // One pass over the input cells, counting characters (wide glyphs once) to find the
+  // cursor's index, the clicked index, and the end of what was actually typed: the last
+  // non-blank cell, ignoring autosuggestion grey after the cursor.
+  const cell = b.getNullCell();
+  let n = 0;
+  let cur = null;
+  let hit = null;
+  let end = 0;
+  for (let yy = first; yy <= last; yy++) {
+    const line = b.getLine(yy);
+    for (let xx = yy === first ? start.x : 0; xx < t.cols; xx++) {
+      if (yy === cy && xx === b.cursorX) cur = n;
+      if (yy === y && xx === col) hit = n;
+      if (!line?.getCell(xx, cell) || cell.getWidth() === 0) continue;
+      if (cell.getChars().trim()) {
+        const fg = cell.isFgPalette() ? cell.getFgColor() : -1;
+        const grey = fg === 8 || (fg >= 238 && fg <= 246);
+        if (!grey || cur === null) end = n + 1;
+      }
+      n++;
+    }
+  }
+  if (cur === null) cur = n;
+  if (hit === null) hit = n;
+  const delta = Math.min(hit, Math.max(end, cur)) - cur;
+  if (!delta) return;
+  const app = t.modes.applicationCursorKeysMode;
+  const key = delta > 0 ? (app ? '\x1bOC' : '\x1b[C') : app ? '\x1bOD' : '\x1b[D';
+  api.pty.write(h.sid, key.repeat(Math.min(Math.abs(delta), 4000)));
 }
 
 // ---- Reading the buffer -------------------------------------------------------------

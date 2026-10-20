@@ -7,9 +7,9 @@ import { execFile } from 'node:child_process';
 
 const HOME = os.homedir();
 
-function run(cmd, args, timeout = 2000) {
+function run(cmd, args, timeout = 2000, { raw = false, ...opts } = {}) {
   return new Promise((resolve) => {
-    execFile(cmd, args, { timeout }, (err, out) => resolve(err ? null : out.trim()));
+    execFile(cmd, args, { timeout, maxBuffer: 8 << 20, ...opts }, (err, out) => resolve(err ? null : raw ? out : out.trim()));
   });
 }
 
@@ -80,6 +80,174 @@ export function gitBranch(cwd) {
   branchCache.set(cwd, { branch, at: Date.now() });
   if (branchCache.size > 500) branchCache.delete(branchCache.keys().next().value);
   return branch;
+}
+
+// ---- Pane header chips ---------------------------------------------------------------
+// Changed-file count for the working tree (null outside a repo).
+export async function gitStatus(cwd) {
+  if (!cwd) return null;
+  const out = await run('git', ['-C', cwd, 'status', '--porcelain=v1'], 3000);
+  if (out == null) return null;
+  return { changes: out ? out.split('\n').length : 0 };
+}
+
+// Local branches, most recently committed first.
+export async function gitBranches(cwd) {
+  if (!cwd) return [];
+  const out = await run('git', ['-C', cwd, 'for-each-ref', '--sort=-committerdate', '--count=80', '--format=%(refname:short)', 'refs/heads'], 3000);
+  return out ? out.split('\n') : [];
+}
+
+// Open PR for the branch via the GitHub CLI, if it's installed and signed in. GUI apps don't
+// inherit the shell's PATH, so look in the usual Homebrew spots too. Cached: it hits the network.
+const GH = ['/opt/homebrew/bin/gh', '/usr/local/bin/gh', 'gh'].find((p) => !p.includes('/') || fs.existsSync(p));
+const prCache = new Map();
+export async function gitPr(cwd, branch) {
+  if (!cwd || !branch) return null;
+  const key = `${cwd}|${branch}`;
+  const hit = prCache.get(key);
+  if (hit && Date.now() - hit.at < 5 * 60_000) return hit.pr;
+  const out = await run(GH, ['pr', 'view', '--json', 'number,url,state'], 8000, { cwd });
+  let pr = null;
+  try {
+    const j = JSON.parse(out || 'null');
+    if (j?.number) pr = { number: j.number, url: j.url, state: j.state };
+  } catch {
+    pr = null;
+  }
+  prCache.set(key, { pr, at: Date.now() });
+  if (prCache.size > 200) prCache.delete(prCache.keys().next().value);
+  return pr;
+}
+
+// Visible subfolders of a directory, for the directory switcher.
+export async function listDirs(dir) {
+  const entries = await fsp.readdir(dir, { withFileTypes: true }).catch(() => []);
+  return entries
+    .filter((e) => e.isDirectory() && !e.name.startsWith('.'))
+    .map((e) => e.name)
+    .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }))
+    .slice(0, 300);
+}
+
+// ---- Project explorer, file viewer, code review --------------------------------------
+export async function gitRoot(cwd) {
+  if (!cwd) return null;
+  return run('git', ['-C', cwd, 'rev-parse', '--show-toplevel'], 2000);
+}
+
+// One directory level for the explorer tree: folders first, then files.
+export async function listDir(dir) {
+  const entries = await fsp.readdir(dir, { withFileTypes: true }).catch(() => null);
+  if (!entries) return null;
+  const out = [];
+  for (const e of entries) {
+    let isDir = e.isDirectory();
+    if (e.isSymbolicLink()) isDir = isDir || (await fsp.stat(path.join(dir, e.name)).then((st) => st.isDirectory()).catch(() => false));
+    out.push({ name: e.name, dir: isDir });
+  }
+  const cmp = (a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base', numeric: true });
+  return [...out.filter((e) => e.dir).sort(cmp), ...out.filter((e) => !e.dir).sort(cmp)].slice(0, 2000);
+}
+
+const MAX_VIEW = 2 << 20;
+export async function readFile(file) {
+  const st = await fsp.stat(file).catch(() => null);
+  if (!st || !st.isFile()) return { error: 'Not a file' };
+  const fh = await fsp.open(file, 'r');
+  try {
+    const len = Math.min(st.size, MAX_VIEW);
+    const buf = Buffer.alloc(len);
+    await fh.read(buf, 0, len, 0);
+    const binary = buf.subarray(0, 8000).includes(0);
+    return { size: st.size, truncated: st.size > MAX_VIEW, binary, text: binary ? '' : buf.toString('utf8') };
+  } finally {
+    await fh.close();
+  }
+}
+
+// Every file in the project for quick-open: git's view when it's a repo (fast, respects
+// .gitignore), otherwise a bounded walk that skips the usual heavy folders.
+const SKIP = new Set(['node_modules', '.git', 'dist', 'build', '.next', '.turbo', '.cache', 'target', 'vendor', '.venv']);
+export async function projectFiles(root) {
+  const out = await run('git', ['-C', root, 'ls-files', '-co', '--exclude-standard'], 5000);
+  if (out != null) return out ? out.split('\n').slice(0, 50000) : [];
+  const files = [];
+  const walk = async (rel, depth) => {
+    if (depth > 8 || files.length >= 20000) return;
+    const entries = await fsp.readdir(path.join(root, rel), { withFileTypes: true }).catch(() => []);
+    for (const e of entries) {
+      if (files.length >= 20000) return;
+      const r = rel ? `${rel}/${e.name}` : e.name;
+      if (e.isDirectory()) {
+        if (!SKIP.has(e.name)) await walk(r, depth + 1);
+      } else files.push(r);
+    }
+  };
+  await walk('', 0);
+  return files;
+}
+
+// Changed files with line counts, staged and unstaged parts reported separately like git does.
+export async function gitChanges(cwd) {
+  const root = await gitRoot(cwd);
+  if (!root) return null;
+  const [status, unstaged, staged] = await Promise.all([
+    run('git', ['-C', root, 'status', '--porcelain=v1', '-z', '--untracked-files=all'], 5000, { raw: true }),
+    run('git', ['-C', root, 'diff', '--numstat', '-z'], 5000, { raw: true }),
+    run('git', ['-C', root, 'diff', '--cached', '--numstat', '-z'], 5000, { raw: true }),
+  ]);
+  const counts = (out) => {
+    const m = new Map();
+    const parts = (out || '').split('\0');
+    for (let i = 0; i < parts.length; i++) {
+      const p = parts[i];
+      if (!p) continue;
+      const [add, del, file] = p.split('\t');
+      // Renames come as "add\tdel\t" followed by two NUL-separated paths.
+      const name = file || (i += 2, parts[i]);
+      m.set(name, { add: add === '-' ? null : Number(add), del: del === '-' ? null : Number(del) });
+    }
+    return m;
+  };
+  const u = counts(unstaged);
+  const c = counts(staged);
+  const files = [];
+  const parts = (status || '').split('\0');
+  for (let i = 0; i < parts.length; i++) {
+    const p = parts[i];
+    if (p.length < 4) continue;
+    const x = p[0];
+    const y = p[1];
+    const file = p.slice(3);
+    let from = null;
+    if (x === 'R' || x === 'C') from = parts[++i];
+    const untracked = x === '?';
+    files.push({ path: file, from, x, y, untracked, staged: c.get(file) || null, unstaged: u.get(file) || null });
+  }
+  return { root, files };
+}
+
+export async function gitDiff(root, file, { staged = false, untracked = false } = {}) {
+  if (untracked) return untrackedDiff(root, file);
+  return run('git', ['-C', root, 'diff', '--no-color', '-U3', ...(staged ? ['--cached'] : []), '--', file], 5000);
+}
+
+// git diff --no-index exits 1 when files differ, which run() reports as failure.
+function untrackedDiff(root, file) {
+  return new Promise((resolve) => {
+    execFile('git', ['-C', root, 'diff', '--no-index', '--no-color', '--', '/dev/null', file], { timeout: 5000, maxBuffer: 8 << 20 }, (_err, out) => resolve(out || ''));
+  });
+}
+
+export async function gitStage(root, file, stage) {
+  const args = stage ? ['add', '--', file] : ['restore', '--staged', '--', file];
+  return (await run('git', ['-C', root, ...args], 5000)) != null;
+}
+
+export async function gitDiscard(root, file, untracked) {
+  if (untracked) return (await run('git', ['-C', root, 'clean', '-f', '--', file], 5000)) != null;
+  return (await run('git', ['-C', root, 'restore', '--worktree', '--source=HEAD', '--', file], 5000)) != null;
 }
 
 // Folder of the frontmost Finder window, if Finder is frontmost. No other app is probed.

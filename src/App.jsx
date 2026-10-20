@@ -13,6 +13,10 @@ import Settings from './components/Settings.jsx';
 import SpaceEditor from './components/SpaceEditor.jsx';
 import Overview from './components/Overview.jsx';
 import Onboarding from './components/Onboarding.jsx';
+import TopBar from './components/TopBar.jsx';
+import ToolsPanel from './components/ToolsPanel.jsx';
+import ReviewPanel from './components/ReviewPanel.jsx';
+import FileViewer from './components/FileViewer.jsx';
 
 const api = window.termac;
 const setUi = (patch) => ui.set((u) => ({ ...u, ...(typeof patch === 'function' ? patch(u) : patch) }));
@@ -48,6 +52,12 @@ export function runAction(action) {
       return setUi((u) => ({ view: u.view === 'library' ? 'terminal' : 'library', overlay: null }));
     case 'notes':
       return setUi((u) => ({ notesOpen: !u.notesOpen }));
+    case 'toggleFiles':
+      return A.togglePanel('files');
+    case 'quickOpen':
+      return setUi((u) => ({ tools: 'search', searchFocus: (u.searchFocus || 0) + 1 }));
+    case 'toggleReview':
+      return A.toggleReview();
     case 'settings':
       return toggleOverlay('settings');
     case 'newSpace':
@@ -84,7 +94,7 @@ export function runAction(action) {
 }
 
 // Actions that still work while typing in a text field (not the terminal).
-const FROM_INPUTS = new Set(['commandBar', 'newTerminal', 'settings', 'library', 'notes', 'toggleSidebar', 'focusMode', 'prevSpace', 'nextSpace', 'overview', 'newSpace']);
+const FROM_INPUTS = new Set(['commandBar', 'newTerminal', 'settings', 'library', 'notes', 'toggleSidebar', 'focusMode', 'prevSpace', 'nextSpace', 'overview', 'newSpace', 'toggleFiles', 'quickOpen', 'toggleReview']);
 
 function onKeyDown(e) {
   const u = ui.get();
@@ -117,6 +127,13 @@ function onKeyDown(e) {
   }
   if (e.key === 'Escape' && u.peek) {
     setUi({ peek: null });
+    return;
+  }
+  // The file viewer covers the terminal, so Esc closes it unless you're typing in a field.
+  if (e.key === 'Escape' && u.viewer && !inInput) {
+    e.preventDefault();
+    e.stopPropagation();
+    A.closeFile();
     return;
   }
 
@@ -160,9 +177,10 @@ export default function App() {
     document.documentElement.style.setProperty('--space', color || '#3b82f6');
   }, [color]);
 
+  // The top bar always has room for the traffic lights, so they stay visible in every mode.
   useEffect(() => {
-    api.app.trafficLights(!hidden || reveal);
-  }, [hidden, reveal]);
+    api.app.trafficLights(true);
+  }, []);
 
   useEffect(() => {
     const onWheel = (e) => {
@@ -212,13 +230,21 @@ export default function App() {
 
   return (
     <div className={`app${hidden ? ' focus-mode' : ''}`}>
-      {!hidden && <Sidebar />}
-      {hidden && edgeReveal && !reveal && <div className="edge-reveal" onMouseEnter={() => setReveal(true)} />}
-      {hidden && reveal && <Sidebar floating onLeave={() => setReveal(false)} />}
-      <main className="main">
-        {view === 'library' ? <Library /> : <Card />}
-        {notesOpen && <Notes key={spaceId} spaceId={spaceId} onClose={() => setUi({ notesOpen: false })} />}
-      </main>
+      <TopBar />
+      <div className="app-body">
+        {!hidden && <Sidebar />}
+        {hidden && edgeReveal && !reveal && <div className="edge-reveal" onMouseEnter={() => setReveal(true)} />}
+        {hidden && reveal && <Sidebar floating onLeave={() => setReveal(false)} />}
+        <main className="main">
+          <ToolsPanel />
+          <div className="stage">
+            {view === 'library' ? <Library /> : <Card />}
+            {view !== 'library' && <FileViewer />}
+          </div>
+          {notesOpen && <Notes key={spaceId} spaceId={spaceId} onClose={() => setUi({ notesOpen: false })} />}
+          <ReviewPanel />
+        </main>
+      </div>
       <Peek />
       {overlay && <div className={`backdrop${overlay === 'overview' ? ' dark' : ''}`} onMouseDown={close} />}
       {overlay === 'commandBar' && <CommandBar onClose={close} />}

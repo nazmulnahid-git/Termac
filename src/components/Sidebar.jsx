@@ -8,12 +8,15 @@ import { shortName, timeAgo, formatDuration } from '../lib/meta.js';
 import { tildify } from '../lib/routing.js';
 import { IconSidebar, IconFolder, IconFolderOpen, IconFolderPlus, IconChevron, IconPlus, IconMore, IconSearch, IconLibrary, IconActivity, IconGear } from './icons.jsx';
 import Rail from './SidebarRail.jsx';
-import { TAB_MIME, PANE_MIME, FOLDER_MIME, renameFolder, dragStart, dragEnd, usePeek, closePeek, rowMenu, folderMenu, spaceMenu, newFolder, promptText } from './sidebar-shared.js';
+import { PANE_MIME, renameFolder, usePeek, closePeek, rowMenu, folderMenu, spaceMenu, newFolder, promptText } from './sidebar-shared.js';
+import { PH, pressTab, pressFolder, useDropList, useDropFolders, destAttr } from './sidebar-drag.js';
 
 export { promptText };
 
 const RAIL_WIDTH = 68;
-const isTabDrag = (e) => e.dataTransfer.types.includes(TAB_MIME) || e.dataTransfer.types.includes(PANE_MIME);
+const HIDE_SLOP = 8; // px past the right edge before a revealed sidebar starts to hide
+const HIDE_DELAY = 150;
+const isPaneDrag = (e) => e.dataTransfer.types.includes(PANE_MIME);
 
 export default function Sidebar({ floating, onLeave }) {
   const mode = app.use((s) => s.settings.sidebarMode);
@@ -21,7 +24,33 @@ export default function Sidebar({ floating, onLeave }) {
   const swipe = app.use((s) => s.settings.gestures.swipeSpaces);
   const [dragW, setDragW] = useState(null);
   const swipeAcc = useRef({ dx: 0, lock: 0 });
+  const ref = useRef(null);
+  const leave = useRef(onLeave);
+  leave.current = onLeave;
   const compact = mode === 'compact' && !floating;
+
+  // A revealed sidebar hides only once the pointer has really moved off to the right.
+  // mouseleave can't be trusted for this: Electron fires it over drag regions and the
+  // traffic lights, and when a native menu opens, all while the pointer is still on top.
+  useEffect(() => {
+    if (!floating) return;
+    let timer = null;
+    const check = (e) => {
+      const u = ui.get();
+      const r = ref.current?.getBoundingClientRect();
+      const out = !!r && e.clientX > r.right + HIDE_SLOP && !u.dragging && !u.prompt;
+      if (out && !timer) timer = setTimeout(() => leave.current?.(), HIDE_DELAY);
+      else if (!out && timer) {
+        clearTimeout(timer);
+        timer = null;
+      }
+    };
+    window.addEventListener('mousemove', check);
+    return () => {
+      window.removeEventListener('mousemove', check);
+      clearTimeout(timer);
+    };
+  }, [floating]);
 
   const onWheel = (e) => {
     if (!swipe || Math.abs(e.deltaX) <= Math.abs(e.deltaY) * 1.5) return;
@@ -39,15 +68,13 @@ export default function Sidebar({ floating, onLeave }) {
 
   return (
     <aside
+      ref={ref}
       className={`sidebar${compact ? ' compact' : ''}${floating ? ' floating' : ''}${dragW != null ? ' resizing' : ''}`}
       style={{ width: compact ? RAIL_WIDTH : (dragW ?? width) }}
       onWheel={onWheel}
-      onMouseLeave={() => {
-        closePeek();
-        onLeave?.();
-      }}
+      onMouseLeave={closePeek}
     >
-      {compact ? <Rail /> : <Expanded />}
+      {compact ? <Rail /> : <Expanded onDismiss={floating ? () => leave.current?.() : null} />}
       {!compact && !floating && <ResizeHandle width={width} onDrag={setDragW} />}
     </aside>
   );
@@ -75,55 +102,65 @@ function ResizeHandle({ width, onDrag }) {
 }
 
 // ---- Expanded -----------------------------------------------------------------------
-function Expanded() {
+function Expanded({ onDismiss }) {
   const space = app.use((s) => A.activeSpace(s));
   const favorites = app.use((s) => s.favorites);
   const bindings = app.use((s) => s.settings.keybindings);
-  const [hint, setHint] = useState(null);
+  const pinned = useDropList(space.pinned, { section: 'pinned', spaceId: space.id });
+  const today = useDropList(space.today, { section: 'today', spaceId: space.id });
+  const folders = useDropFolders(space);
+  const [paneOver, setPaneOver] = useState(false);
 
-  const dropOn = (e) => {
-    e.preventDefault();
+  // Panes dragged out of a split (HTML5 drag from the card header) land in Today.
+  const dropPane = (e) => {
     const pane = e.dataTransfer.getData(PANE_MIME);
-    const tid = e.dataTransfer.getData(TAB_MIME);
-    const h = hint;
-    setHint(null);
-    dragEnd();
-    if (pane) return A.unsplit(pane);
-    if (tid && h) A.moveTab(tid, h);
+    setPaneOver(false);
+    if (!pane) return;
+    e.preventDefault();
+    A.unsplit(pane);
   };
 
-  const dragProps = { hint, setHint };
-  const isEmpty = !space.pinned.length && !space.folders.length;
+  const isEmpty = !pinned.length && !space.folders.length;
+  const todayEnd = destAttr('today', space.id);
 
   return (
-    <div className="sb-expanded" onDragOver={(e) => isTabDrag(e) && e.preventDefault()} onDrop={dropOn} onDragLeave={(e) => !e.currentTarget.contains(e.relatedTarget) && setHint(null)}>
-      <div className="sb-head">
-        <button className="icon-btn" title={`Collapse sidebar  ${formatAccel(bindings.toggleSidebar)}`} onClick={A.toggleSidebar}>
+    <div
+      className={`sb-expanded${paneOver ? ' pane-over' : ''}`}
+      onDragOver={(e) => {
+        if (!isPaneDrag(e)) return;
+        e.preventDefault();
+        setPaneOver(true);
+      }}
+      onDrop={dropPane}
+      onDragLeave={(e) => !e.currentTarget.contains(e.relatedTarget) && setPaneOver(false)}
+    >
+      <div className="sb-top">
+        <Location bindings={bindings} noFavorites={!favorites.length} />
+        {/* Revealed over a hidden sidebar: just put it away again; don't leave focus mode. */}
+        <button className="icon-btn" title={onDismiss ? 'Hide sidebar' : `Collapse sidebar  ${formatAccel(bindings.toggleSidebar)}`} onClick={onDismiss || A.toggleSidebar}>
           <IconSidebar />
         </button>
       </div>
-      <Location bindings={bindings} />
       <div className="sb-scroll">
-        <Favorites ids={favorites} {...dragProps} />
+        <Favorites ids={favorites} />
         <SpaceHeader space={space} />
-        <Section list={space.pinned} dest={{ section: 'pinned', spaceId: space.id, folderId: null }} {...dragProps} />
-        {space.folders.map((f, i) => (
-          <Folder key={f.id} folder={f} index={i} spaceId={space.id} {...dragProps} />
-        ))}
+        <Section items={pinned} dest={{ section: 'pinned', spaceId: space.id }} />
+        {folders.map((f) => (f === PH ? <div key="folder-ph" className="folder-ph" data-drop-ph /> : <Folder key={f.id} folder={f} spaceId={space.id} />))}
         {isEmpty && (
-          <div className="pin-empty" onDragOver={(e) => isTabDrag(e) && setHint({ section: 'pinned', spaceId: space.id, folderId: null, index: 0 })}>
+          <div className="pin-empty" data-drop-into={destAttr('pinned', space.id, null, 0)}>
             Drag a session here to keep it in {space.name}
           </div>
         )}
         <TodayHeader space={space} />
-        <Section list={space.today} dest={{ section: 'today', spaceId: space.id, folderId: null }} {...dragProps} />
-        <button className="row new" onClick={() => A.openTerminal()}>
+        <Section items={today} dest={{ section: 'today', spaceId: space.id }} />
+        <button className="row new" data-drop-into={todayEnd} onClick={() => A.openTerminal()}>
           <span className="chip">
             <IconPlus size={11} />
           </span>
           <span className="name">New Terminal</span>
           <kbd>{formatAccel(bindings.newTerminal)}</kbd>
         </button>
+        <div className="sb-fill" data-drop-into={todayEnd} />
       </div>
       <SidebarCards />
       <BottomBar />
@@ -131,15 +168,22 @@ function Expanded() {
   );
 }
 
-function Location({ bindings }) {
+function Location({ bindings, noFavorites }) {
   const sid = ui.use((s) => s.focusedSid);
   const cwd = rt.use((s) => s[sid]?.cwd);
   const host = rt.use((s) => s[sid]?.dangerHost);
   const home = ui.use((s) => s.home);
+  const dragTab = ui.use((s) => s.dragging?.kind === 'tab');
+  const hot = ui.use((s) => s.dragging?.target?.section === 'fav');
   return (
-    <button className="location" title="Search sessions, folders, hosts and actions" onClick={() => ui.set((u) => ({ ...u, overlay: 'commandBar' }))}>
+    <button
+      className={`location${dragTab ? ' drop-fav' : ''}${hot ? ' drop-into' : ''}`}
+      title="Search sessions, folders, hosts and actions"
+      data-drop-into={dragTab ? destAttr('fav') : undefined}
+      onClick={() => ui.set((u) => ({ ...u, overlay: 'commandBar' }))}
+    >
       <IconSearch size={14} />
-      <span className="path">&lrm;{host || tildify(cwd, home) || '~'}</span>
+      {dragTab && noFavorites ? <span className="path hint">Drop here to add to Favorites</span> : <span className="path">&lrm;{host || tildify(cwd, home) || '~'}</span>}
       <kbd>{formatAccel(bindings.commandBar)}</kbd>
     </button>
   );
@@ -147,7 +191,7 @@ function Location({ bindings }) {
 
 function SpaceHeader({ space }) {
   return (
-    <div className="sec-title" onDoubleClick={() => ui.set((u) => ({ ...u, overlay: 'spaceEditor', overlayArg: space.id }))}>
+    <div className="sec-title" data-drop-into={destAttr('pinned', space.id, null, 0)} onDoubleClick={() => ui.set((u) => ({ ...u, overlay: 'spaceEditor', overlayArg: space.id }))}>
       <span className="glyph">{space.glyph}</span>
       <span className="grow ellipsis">{space.name}</span>
       <span className="sec-actions">
@@ -163,32 +207,12 @@ function SpaceHeader({ space }) {
 }
 
 // ---- Favorites -----------------------------------------------------------------------
-function Favorites({ ids, hint, setHint }) {
-  const dragging = ui.use((s) => s.dragging);
-  const showDrop = dragging && !ids.includes(dragging.tabId);
-  if (!ids.length && !showDrop) return null;
+function Favorites({ ids }) {
+  const items = useDropList(ids, { section: 'fav' });
+  if (!items.length) return null;
   return (
-    <div
-      className="favs"
-      onDragOver={(e) => {
-        if (!isTabDrag(e)) return;
-        e.preventDefault();
-        e.stopPropagation();
-        setHint({ section: 'fav', spaceId: null, folderId: null, index: -1 });
-      }}
-      onDrop={(e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        const tid = e.dataTransfer.getData(TAB_MIME);
-        setHint(null);
-        dragEnd();
-        if (tid) A.moveTab(tid, { section: 'fav', spaceId: null });
-      }}
-    >
-      {ids.map((tid) => (
-        <FavTile key={tid} tid={tid} />
-      ))}
-      {showDrop && <div className={`fav-drop${hint?.section === 'fav' ? ' drop-into' : ''}`}>Drop to add to Favorites</div>}
+    <div className="favs" data-drop-list={destAttr('fav')} data-axis="x">
+      {items.map((tid) => (tid === PH ? <div key="fav-ph" className="fav-ph" data-drop-ph /> : <FavTile key={tid} tid={tid} />))}
     </div>
   );
 }
@@ -200,7 +224,7 @@ function FavTile({ tid }) {
   if (!v) return null;
   const color = { run: 'var(--accent)', ok: 'var(--ok)', fail: 'var(--fail)', bell: 'var(--bell)', idle: 'var(--faint)' }[v.status];
   return (
-    <div className={`fav${on ? ' on' : ''}`} title={v.name} draggable onDragStart={(e) => dragStart(e, tid)} onDragEnd={dragEnd} onClick={(e) => !e.shiftKey && A.activateTab(tid)} onContextMenu={(e) => rowMenu(e, tid, v)} {...peek}>
+    <div className={`fav${on ? ' on' : ''}`} title={v.name} data-drag-tid={tid} onPointerDown={(e) => pressTab(e, tid)} onClick={(e) => !e.shiftKey && A.activateTab(tid)} onContextMenu={(e) => rowMenu(e, tid, v)} {...peek}>
       {shortName(v.tab.name || v.active?.name)}
       <span className={`corner dot6${v.status === 'run' ? ' st-run' : ''}`} style={{ background: color }} />
       {v.bell > 0 && <span className="badge status st-bell">{v.bell}</span>}
@@ -209,33 +233,17 @@ function FavTile({ tid }) {
 }
 
 // ---- Rows ----------------------------------------------------------------------------
-function Section({ list, dest, hint, setHint, indent }) {
-  const sameDest = (h) => h && h.section === dest.section && h.spaceId === dest.spaceId && (h.folderId || null) === (dest.folderId || null);
+function Section({ items, dest, indent }) {
   return (
-    <div
-      className="rows"
-      onDragOver={(e) => {
-        if (!isTabDrag(e)) return;
-        e.preventDefault();
-        e.stopPropagation();
-        if (!sameDest(hint)) setHint({ ...dest, index: list.length });
-      }}
-    >
-      {list.map((tid, i) => (
-        <div key={tid}>
-          {sameDest(hint) && hint.index === i && <div className="drop-line" />}
-          <Row tid={tid} indent={indent} onDragOverRow={(after) => setHint({ ...dest, index: after ? i + 1 : i })} />
-        </div>
-      ))}
-      {sameDest(hint) && hint.index >= list.length && list.length > 0 && <div className="drop-line" />}
+    <div className="rows" data-drop-list={destAttr(dest.section, dest.spaceId, dest.folderId)}>
+      {items.map((tid) => (tid === PH ? <div key="row-ph" className={`row-ph${indent ? ' indent' : ''}`} data-drop-ph /> : <Row key={tid} tid={tid} indent={indent} />))}
     </div>
   );
 }
 
-function Row({ tid, indent, onDragOverRow }) {
+function Row({ tid, indent }) {
   const v = useTabView(tid);
   const on = app.use((s) => A.activeTabId(s) === tid);
-  const dragging = ui.use((s) => s.dragging?.tabId === tid);
   const [hover, setHover] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const peek = usePeek(tid, v?.active?.sid, on);
@@ -247,15 +255,9 @@ function Row({ tid, indent, onDragOverRow }) {
   };
   return (
     <div
-      className={`row${on ? ' on' : ''}${indent ? ' indent' : ''}${dragging ? ' ghost' : ''}${v.dead ? ' dead' : ''}`}
-      draggable={!renaming}
-      onDragStart={(e) => dragStart(e, tid)}
-      onDragEnd={dragEnd}
-      onDragOver={(e) => {
-        if (!isTabDrag(e)) return;
-        const r = e.currentTarget.getBoundingClientRect();
-        onDragOverRow(e.clientY > r.top + r.height / 2);
-      }}
+      className={`row${on ? ' on' : ''}${indent ? ' indent' : ''}${v.dead ? ' dead' : ''}`}
+      data-drag-tid={tid}
+      onPointerDown={(e) => !renaming && pressTab(e, tid)}
       onClick={click}
       onDoubleClick={() => setRenaming(true)}
       onContextMenu={(e) => rowMenu(e, tid, v, () => setRenaming(true))}
@@ -294,7 +296,7 @@ function Row({ tid, indent, onDragOverRow }) {
         ✕
       </button>
       <StatusMark status={v.status} bell={v.bell} />
-      {hover && v.status === 'fail' && !ui.get().peek && <FailTip rt={v.fail.rt} />}
+      {hover && v.status === 'fail' && !ui.get().peek && !ui.get().dragging && <FailTip rt={v.fail.rt} />}
     </div>
   );
 }
@@ -328,64 +330,29 @@ function InlineName({ value, onDone }) {
 }
 
 // ---- Folders -------------------------------------------------------------------------
-function Folder({ folder, index, spaceId, hint, setHint }) {
+function Folder({ folder, spaceId }) {
   const [editing, setEditing] = useState(renameFolder.id === folder.id);
-  const [reorder, setReorder] = useState(null); // 'before' | 'after' while a folder is dragged over
-  const spring = useRef(null);
+  const items = useDropList(folder.tabs, { section: 'pinned', spaceId, folderId: folder.id });
+  const into = ui.use((s) => s.dragging?.target?.kind === 'list' && s.dragging.target.folderId === folder.id);
   const running = rt.use((s) => {
     const tabs = app.get().tabs;
     return folder.tabs.some((tid) => tabs[tid] && collectSids(tabs[tid].layout).some((sid) => s[sid]?.status === 'run'));
   });
-  const into = hint && hint.folderId === folder.id;
 
   useEffect(() => {
     if (renameFolder.id === folder.id) renameFolder.id = null;
   }, [folder.id]);
 
   const toggle = () => A.updateFolder(spaceId, folder.id, { open: !folder.open });
-  const onDragOver = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (e.dataTransfer.types.includes(FOLDER_MIME)) {
-      const r = e.currentTarget.getBoundingClientRect();
-      setReorder(e.clientY > r.top + r.height / 2 ? 'after' : 'before');
-      return;
-    }
-    if (!isTabDrag(e)) return;
-    if (!into) setHint({ section: 'pinned', spaceId, folderId: folder.id, index: folder.tabs.length });
-    // Spring-loaded: hovering a closed folder while dragging opens it.
-    if (!folder.open && !spring.current) spring.current = setTimeout(() => A.updateFolder(spaceId, folder.id, { open: true }), 600);
-  };
-  const clearDrag = () => {
-    clearTimeout(spring.current);
-    spring.current = null;
-    setReorder(null);
-  };
-  const onDrop = (e) => {
-    const fid = e.dataTransfer.getData(FOLDER_MIME);
-    clearDrag();
-    if (!fid) return;
-    e.preventDefault();
-    e.stopPropagation();
-    if (fid !== folder.id) {
-      const folders = app.get().spaces.find((x) => x.id === spaceId).folders.filter((f) => f.id !== fid);
-      const at = folders.findIndex((f) => f.id === folder.id);
-      A.moveFolder(spaceId, fid, reorder === 'after' ? at + 1 : at);
-    }
-  };
 
   return (
-    <div className={`folder-wrap${reorder ? ` reorder-${reorder}` : ''}`}>
+    <div className="folder-wrap">
       <div
         className={`folder${into ? ' drop-into' : ''}`}
-        draggable={!editing}
-        onDragStart={(e) => {
-          e.dataTransfer.setData(FOLDER_MIME, folder.id);
-          e.dataTransfer.effectAllowed = 'move';
-        }}
-        onDragOver={onDragOver}
-        onDragLeave={clearDrag}
-        onDrop={onDrop}
+        data-folder-head={folder.id}
+        data-drop-into={destAttr('pinned', spaceId, folder.id)}
+        data-spring={folder.open ? undefined : folder.id}
+        onPointerDown={(e) => !editing && pressFolder(e, spaceId, folder.id)}
         onClick={() => !editing && toggle()}
         onDoubleClick={(e) => {
           e.stopPropagation();
@@ -425,18 +392,10 @@ function Folder({ folder, index, spaceId, hint, setHint }) {
       </div>
       <div className={`folder-body${folder.open ? ' open' : ''}`}>
         <div className="folder-inner">
-          {folder.tabs.length ? (
-            <Section list={folder.tabs} dest={{ section: 'pinned', spaceId, folderId: folder.id }} hint={hint} setHint={setHint} indent />
+          {items.length ? (
+            <Section items={items} dest={{ section: 'pinned', spaceId, folderId: folder.id }} indent />
           ) : (
-            <div
-              className={`folder-empty${into ? ' drop-into' : ''}`}
-              onDragOver={(e) => {
-                if (!isTabDrag(e)) return;
-                e.preventDefault();
-                e.stopPropagation();
-                setHint({ section: 'pinned', spaceId, folderId: folder.id, index: 0 });
-              }}
-            >
+            <div className="folder-empty" data-drop-into={destAttr('pinned', spaceId, folder.id, 0)}>
               Drop sessions here
             </div>
           )}
@@ -527,12 +486,15 @@ export function SpaceDots({ vertical }) {
   const spaces = app.use((s) => s.spaces);
   const activeId = app.use((s) => s.activeSpaceId);
   const unseen = app.use((s) => [...new Set(s.activity.filter((a) => !a.seen).map((a) => a.spaceId))], arrayEq);
+  const dragTab = ui.use((s) => s.dragging?.kind === 'tab');
+  const hot = ui.use((s) => (s.dragging?.target?.kind === 'space' ? s.dragging.target.spaceId : null));
   return (
     <div className={`space-dots${vertical ? ' vertical' : ''}`}>
       {spaces.map((sp, i) => (
         <button
           key={sp.id}
-          className={`space-dot${sp.id === activeId ? ' on' : ''}`}
+          className={`space-dot${sp.id === activeId ? ' on' : ''}${hot === sp.id ? ' drop-into' : ''}`}
+          data-drop-space={dragTab ? sp.id : undefined}
           style={{ '--c': sp.color }}
           title={`${sp.name}  ⌃${i + 1}`}
           onClick={() => A.switchSpace(sp.id)}

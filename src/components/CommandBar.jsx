@@ -9,6 +9,7 @@ import { route, tildify, expandHome } from '../lib/routing.js';
 import { formatAccel } from '../lib/keys.js';
 import { kindOf, sessionName, formatDuration, timeAgo, dayLabel } from '../lib/meta.js';
 import { promptText } from './Sidebar.jsx';
+import { rootOf } from './project.js';
 
 const api = window.termac;
 
@@ -16,6 +17,7 @@ const GROUPS = [
   ['path', 'Directory'],
   ['run', 'Run'],
   ['session', 'Open sessions'],
+  ['file', 'Files'],
   ['dir', 'Recent directories'],
   ['host', 'SSH hosts'],
   ['snippet', 'Snippets'],
@@ -24,6 +26,7 @@ const GROUPS = [
 const FILTERS = [
   ['all', 'All'],
   ['session', 'Sessions'],
+  ['file', 'Files'],
   ['dir', 'Directories'],
   ['host', 'Hosts'],
   ['snippet', 'Snippets'],
@@ -44,7 +47,9 @@ export default function CommandBar({ onClose }) {
   const listRef = useRef(null);
 
   // Snapshot of everything searchable, taken once per open.
-  const cands = useMemo(buildCandidates, []);
+  const base = useMemo(buildCandidates, []);
+  const files = useProjectFiles();
+  const cands = useMemo(() => ({ ...base, files }), [base, files]);
 
   const { prefix, term } = parseQuery(query);
   const scope = prefix === '>' ? 'run' : PREFIX[prefix] || filter;
@@ -103,7 +108,7 @@ export default function CommandBar({ onClose }) {
     <div className="palette cb" onMouseDown={(e) => e.target.tagName !== 'INPUT' && e.preventDefault()}>
       <div className="input-row">
         <span className="prompt">❯</span>
-        <input autoFocus spellCheck={false} value={query} placeholder="Search sessions, directories, hosts, snippets, actions…" onChange={(e) => setQuery(e.target.value)} onKeyDown={onKeyDown} />
+        <input autoFocus spellCheck={false} value={query} placeholder="Search sessions, files, directories, hosts, snippets, actions…" onChange={(e) => setQuery(e.target.value)} onKeyDown={onKeyDown} />
         <button className="filter" onClick={() => cycle(1)}>
           {chipText}
         </button>
@@ -361,6 +366,31 @@ function openDir(path, mode) {
 }
 
 // ---- Ranking -------------------------------------------------------------------------
+// Files of the focused session's project, as command bar rows (matched by name, then path).
+function useProjectFiles() {
+  const [files, setFiles] = useState([]);
+  useEffect(() => {
+    const sid = ui.get().focusedSid;
+    const cwd = rt.get()[sid]?.cwd || app.get().sessions[sid]?.cwd;
+    let on = true;
+    rootOf(cwd).then(async (p) => {
+      if (!p || !on) return;
+      const list = await api.sys.projectFiles(p.root);
+      if (!on) return;
+      setFiles(
+        list.map((rel) => {
+          const cut = rel.lastIndexOf('/');
+          return { key: `f:${rel}`, group: 'file', label: rel.slice(cut + 1), sub: cut > 0 ? rel.slice(0, cut) : '', subMono: true, extra: rel, chip: '≡', selHint: 'Open file ↵', run: () => A.openFile(`${p.root}/${rel}`) };
+        })
+      );
+    });
+    return () => {
+      on = false;
+    };
+  }, []);
+  return files;
+}
+
 function match(item, term) {
   const m = fuzzy(term, item.label);
   if (m) return { ...item, hl: m.indices, subHl: null, score: m.score + (item.bonus || 0) };
@@ -424,6 +454,7 @@ function rank(c, { prefix, term, scope, path }) {
   const cap = solo ? SOLO_CAP : GROUP_CAP;
   const sessions = want('session') ? top(c.sessions, term, cap) : [];
   if (want('session')) out.push(...sessions);
+  if (want('file')) out.push(...top(c.files, term, cap));
   if (want('dir')) out.push(...top(c.dirs, term, cap));
   if (want('host')) out.push(...top(c.hosts, term, cap));
   if (want('snippet')) {
