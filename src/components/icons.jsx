@@ -204,3 +204,18 @@ export const IconInsert = (p) => (
     <path d="M10.75 2.75h1.5c.55 0 1 .45 1 1v8.5c0 .55-.45 1-1 1h-1.5" />
   </Svg>
 );
+
+// App mark: a terminal window branching out to three sessions. Same drawing as build/icon.svg.
+export const LogoMark = ({ size = 28, ...rest }) => (
+  <svg width={size} height={(size * 290) / 400} viewBox="33 25 400 290" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...rest}>
+    <path strokeWidth="22" d="M278 150V114a40 40 0 0 0-40-40H92a40 40 0 0 0-40 40v96a40 40 0 0 0 40 40h146a40 40 0 0 0 40-40v-10" />
+    <path strokeWidth="18" d="M278 150c22-10 22-90 97-95M278 200c22 10 22 90 97 95M272 175h123" />
+    <path strokeWidth="18" d="M102 132l30 30-30 30" />
+    <path strokeWidth="16" strokeOpacity="0.6" d="M165 208h55" />
+    <g fill="currentColor" stroke="none">
+      <circle cx="380" cy="55" r="26" />
+      <circle cx="400" cy="175" r="26" />
+      <circle cx="380" cy="285" r="26" />
+    </g>
+  </svg>
+);

@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#16191a"/>
+      <stop offset="1" stop-color="#070808"/>
+    </linearGradient>
+    <radialGradient id="halo" cx="0.42" cy="0.5" r="0.55">
+      <stop offset="0" stop-color="#a8f5cf" stop-opacity="0.22"/>
+      <stop offset="1" stop-color="#a8f5cf" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="14" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <!-- macOS icon grid: 824px squircle-ish tile centred on a 1024 canvas -->
+  <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#bg)"/>
+  <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#halo)"/>
+  <rect x="101.5" y="101.5" width="821" height="821" rx="183.5" fill="none" stroke="#ffffff" stroke-opacity="0.08" stroke-width="3"/>
+  <g transform="translate(512 512) scale(1.32) translate(-233 -170)" filter="url(#glow)" fill="none" stroke="#a8f5cf" stroke-linecap="round" stroke-linejoin="round">
+    <path stroke-width="22" d="M278 150V114a40 40 0 0 0-40-40H92a40 40 0 0 0-40 40v96a40 40 0 0 0 40 40h146a40 40 0 0 0 40-40v-10"/>
+    <path stroke-width="18" d="M278 150c22-10 22-90 97-95M278 200c22 10 22 90 97 95M272 175h123"/>
+    <path stroke-width="18" d="M102 132l30 30-30 30"/>
+    <path stroke-width="16" stroke-opacity="0.6" d="M165 208h55"/>
+    <g fill="#a8f5cf" stroke="none">
+      <circle cx="380" cy="55" r="26"/><circle cx="400" cy="175" r="26"/><circle cx="380" cy="285" r="26"/>
+    </g>
+  </g>
+</svg>

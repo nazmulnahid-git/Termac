@@ -5,7 +5,7 @@ import * as A from '../state/actions.js';
 import { SPACE_COLORS, uid } from '../lib/meta.js';
 import { tildify } from '../lib/routing.js';
 import { formatAccel } from '../lib/keys.js';
-import { IconSearch } from './icons.jsx';
+import { IconSearch, LogoMark } from './icons.jsx';
 
 const api = window.termac;
 const STEPS = ['welcome', 'import', 'spaces', 'tips'];
@@ -122,7 +122,9 @@ function Welcome({ onNext, onSkip }) {
     <>
       <div className="ob-body ob-welcome">
         <div className="ob-hero">
-          <div className="ob-logo">❯_</div>
+          <div className="ob-logo">
+            <LogoMark size={32} />
+          </div>
           <h1>Welcome to Termac</h1>
           <p>Terminals that live in a sidebar, sorted into Spaces, and tidy themselves up.</p>
           <div className="row-inline">

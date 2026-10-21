@@ -34,9 +34,14 @@
   "build": {
     "appId": "com.termac.app",
     "productName": "Termac",
+    "directories": {
+      "output": "release"
+    },
+    "npmRebuild": false,
     "mac": {
       "category": "public.app-category.developer-tools",
-      "target": "dmg"
+      "target": "dmg",
+      "icon": "build/icon.icns"
     },
     "files": [
       "electron/**/*",

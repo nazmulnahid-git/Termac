@@ -390,6 +390,8 @@ app.on('window-all-closed', () => {});
 
 app.whenReady().then(() => {
   app.setName('Termac');
+  // Packaged builds take the icon from the bundle; in dev the dock would show Electron's.
+  if (!app.isPackaged) app.dock?.setIcon(path.join(__dirname, '../build/icon.png'));
   buildMenu();
   createMainWindow();
   setHotkey(state?.settings?.keybindings?.quickTerminal ?? 'Alt+Space');
