@@ -1,5 +1,6 @@
 import { app, BrowserWindow, ipcMain, Menu, dialog, shell, screen, globalShortcut, Notification, nativeTheme } from 'electron';
 import path from 'node:path';
+import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { PtyHost } from './pty-host.js';
@@ -11,6 +12,12 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DEV_URL = process.env.VITE_DEV_SERVER_URL;
 const USER = app.getPath('userData');
 const STATE_FILE = path.join(USER, 'state.json');
+// The app was called Termac before; carry its data over on first launch under the new name.
+// Electron creates the userData folder itself before this runs, so test for our state file.
+const LEGACY_USER = path.join(app.getPath('appData'), 'Termac');
+if (!fs.existsSync(STATE_FILE) && fs.existsSync(path.join(LEGACY_USER, 'state.json'))) {
+  fs.cpSync(LEGACY_USER, USER, { recursive: true, filter: (src) => !path.basename(src).startsWith('Singleton') });
+}
 const SCROLLBACK_DIR = path.join(USER, 'scrollback');
 const integrationDir = path.join(__dirname, 'shell-integration').replace('app.asar', 'app.asar.unpacked');
 
@@ -389,7 +396,7 @@ app.on('will-quit', () => {
 app.on('window-all-closed', () => {});
 
 app.whenReady().then(() => {
-  app.setName('Termac');
+  app.setName('Termorc');
   // Packaged builds take the icon from the bundle; in dev the dock would show Electron's.
   if (!app.isPackaged) app.dock?.setIcon(path.join(__dirname, '../build/icon.png'));
   buildMenu();

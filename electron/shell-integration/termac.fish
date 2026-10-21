@@ -1,4 +1,4 @@
-# Termac shell integration for fish (loaded with --init-command).
+# Termorc shell integration for fish (loaded with --init-command).
 function __termac_preexec --on-event fish_preexec
     printf '\e]633;E;%s\a' (string replace -ra '[[:cntrl:]]' ' ' -- $argv[1])
     printf '\e]633;C\a'

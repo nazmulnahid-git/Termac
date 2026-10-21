@@ -923,7 +923,7 @@ function checkpointScrollback() {
 export async function prepareQuit({ running }) {
   const s = app.get();
   if (s.settings.confirmQuit && running > 0) {
-    const ok = await api.sys.confirm({ message: `Quit Termac with ${running} running process${running > 1 ? 'es' : ''}?`, detail: 'Running commands will be stopped. Sessions and scrollback are restored next launch.', ok: 'Quit' });
+    const ok = await api.sys.confirm({ message: `Quit Termorc with ${running} running process${running > 1 ? 'es' : ''}?`, detail: 'Running commands will be stopped. Sessions and scrollback are restored next launch.', ok: 'Quit' });
     if (!ok) return api.app.quitCancel();
   }
   quitting = true;

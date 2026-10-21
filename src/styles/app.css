@@ -1,4 +1,4 @@
-/* Termac — a terminal first. The chrome is a shade of the terminal (App.jsx sets --chrome
+/* Termorc — a terminal first. The chrome is a shade of the terminal (App.jsx sets --chrome
    from the active Space's background), surfaces are flat and split by hairlines, and each
    Space contributes one accent color. Type is one monospace size, 15px at 1.5, everywhere:
    hierarchy comes from weight and color, never from size. Light/dark follow the system. */

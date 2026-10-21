@@ -256,7 +256,7 @@ function GeneralTab() {
           <Select value={s.notifyAfterS} onChange={setSetting('notifyAfterS')} options={[[10, '10 seconds'], [30, '30 seconds'], [60, '1 minute'], [300, '5 minutes'], [0, 'Never']]} />
         </Row>
         <Row label="Also send a macOS notification">
-          <Select value={s.osNotify} onChange={setSetting('osNotify')} options={[['always', 'Always'], ['background', 'Only when Termac is in background'], ['never', 'Never']]} />
+          <Select value={s.osNotify} onChange={setSetting('osNotify')} options={[['always', 'Always'], ['background', 'Only when Termorc is in background'], ['never', 'Never']]} />
         </Row>
         <Row label="Confirm quit with running processes">
           <Switch on={s.confirmQuit} onChange={setSetting('confirmQuit')} />

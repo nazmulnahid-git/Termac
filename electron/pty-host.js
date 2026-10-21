@@ -46,7 +46,7 @@ export class PtyHost {
     Object.assign(env, {
       TERM: 'xterm-256color',
       COLORTERM: 'truecolor',
-      TERM_PROGRAM: 'Termac',
+      TERM_PROGRAM: 'Termorc',
       LANG: env.LANG || 'en_US.UTF-8',
       SHELL_SPACE: spaceName,
     });

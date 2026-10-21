@@ -1,4 +1,4 @@
-# Termac
+# Termorc
 
 A macOS terminal where every session lives in a vertical sidebar, grouped into colored **Spaces**.
 
@@ -36,7 +36,7 @@ A macOS terminal where every session lives in a vertical sidebar, grouped into c
 | `src/term/registry.js` | One xterm.js instance per session. Off-screen terminals are parked, so xterm pauses their rendering. Only visible panes hold a WebGL context. Restored sessions get a shell only when first shown. |
 | `src/state/` | Three small stores (persisted app model, runtime status, UI) with selector subscriptions. All mutations live in `actions.js`. |
 
-State lives in `~/Library/Application Support/Termac/`:
+State lives in `~/Library/Application Support/Termorc/`:
 - `state.json`
 - `scrollback/` for live sessions across restarts
 - `library/` for archived sessions

@@ -125,7 +125,7 @@ function Welcome({ onNext, onSkip }) {
           <div className="ob-logo">
             <LogoMark size={32} />
           </div>
-          <h1>Welcome to Termac</h1>
+          <h1>Welcome to Termorc</h1>
           <p>Terminals that live in a sidebar, sorted into Spaces, and tidy themselves up.</p>
           <div className="row-inline">
             <button className="btn primary ob-big" onClick={onNext} autoFocus>
@@ -196,7 +196,7 @@ function Import({ found, pick, setPick, onBack, onSkip, onNext }) {
   const sources = [];
   if (found?.iterm.length) {
     const n = found.iterm.length;
-    sources.push({ id: 'iterm', icon: '$_', title: 'iTerm2', sub: `${n} profile${n > 1 ? 's' : ''} · ${found.iterm.slice(0, 3).map((p) => p.name).join(', ')}${n > 3 ? '…' : ''}`, meta: '→ Termac profiles' });
+    sources.push({ id: 'iterm', icon: '$_', title: 'iTerm2', sub: `${n} profile${n > 1 ? 's' : ''} · ${found.iterm.slice(0, 3).map((p) => p.name).join(', ')}${n > 3 ? '…' : ''}`, meta: '→ Termorc profiles' });
   }
   if (found?.ssh.length) {
     const n = found.ssh.length;
@@ -207,7 +207,7 @@ function Import({ found, pick, setPick, onBack, onSkip, onNext }) {
     <>
       <div className="ob-body">
         <h2>Bring your setup with you</h2>
-        <p className="ob-lead">We looked for these on your Mac. Profiles become Termac profiles; SSH hosts show up in the command bar.</p>
+        <p className="ob-lead">We looked for these on your Mac. Profiles become Termorc profiles; SSH hosts show up in the command bar.</p>
         {!found ? (
           <div className="ob-empty dim">Looking around…</div>
         ) : sources.length ? (
@@ -312,7 +312,7 @@ function Tips({ onBack, onDone }) {
       </div>
       <Foot onBack={onBack}>
         <button className="btn primary" onClick={onDone} autoFocus>
-          Start using Termac
+          Start using Termorc
         </button>
       </Foot>
     </>

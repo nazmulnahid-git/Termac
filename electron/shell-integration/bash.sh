@@ -1,4 +1,4 @@
-# Termac shell integration for bash (loaded with --rcfile).
+# Termorc shell integration for bash (loaded with --rcfile).
 if [[ -n "$TERMAC_LOGIN" ]]; then
   [[ -f /etc/profile ]] && . /etc/profile
   for __f in ~/.bash_profile ~/.bash_login ~/.profile; do [[ -f "$__f" ]] && { . "$__f"; break; }; done

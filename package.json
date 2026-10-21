@@ -1,5 +1,5 @@
 {
-  "name": "termac",
+  "name": "termorc",
   "version": "2.0.0",
   "description": "A terminal for macOS where sessions live in a sidebar, grouped into Spaces",
   "type": "module",
@@ -32,8 +32,8 @@
     "vite": "^6.0.7"
   },
   "build": {
-    "appId": "com.termac.app",
-    "productName": "Termac",
+    "appId": "com.termorc.app",
+    "productName": "Termorc",
     "directories": {
       "output": "release"
     },
