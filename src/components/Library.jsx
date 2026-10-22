@@ -8,6 +8,7 @@ import * as A from '../state/actions.js';
 import { THEMES, focus as focusTerm } from '../term/registry.js';
 import { clockTime, dayLabel } from '../lib/meta.js';
 import { tildify } from '../lib/routing.js';
+import { monoStack } from '../lib/fonts.js';
 
 const api = window.termac;
 
@@ -68,7 +69,7 @@ function distinct(list) {
 
 export default function Library() {
   const spacesKey = app.use((s) => s.spaces.map((sp) => [sp.id, sp.name, sp.glyph, sp.color].join(SEP)).join('\n'));
-  const settings = app.use((s) => ({ archiveAfterH: s.settings.archiveAfterH, fontSize: s.settings.fontSize, fontFamily: s.settings.fontFamily, lineHeight: s.settings.lineHeight }), shallow);
+  const settings = app.use((s) => ({ archiveAfterH: s.settings.archiveAfterH, fontSize: s.settings.fontSize, fontFamily: s.settings.fontFamily, lineHeight: s.settings.lineHeight, letterSpacing: s.settings.letterSpacing, fontWeight: s.settings.fontWeight, fontWeightBold: s.settings.fontWeightBold }), shallow);
   const theme = ui.use((s) => s.termTheme);
   const home = ui.use((s) => s.home);
 
@@ -464,9 +465,12 @@ function usePreview(id, theme, settings) {
   opts.current = { theme, ...settings };
 
   const termOptions = () => ({
-    fontFamily: opts.current.fontFamily,
+    fontFamily: monoStack(opts.current.fontFamily),
     fontSize: opts.current.fontSize,
     lineHeight: opts.current.lineHeight,
+    letterSpacing: opts.current.letterSpacing,
+    fontWeight: opts.current.fontWeight,
+    fontWeightBold: opts.current.fontWeightBold,
     theme: THEMES[opts.current.theme] || THEMES.dark,
   });
 
@@ -507,7 +511,7 @@ function usePreview(id, theme, settings) {
     const o = termOptions();
     for (const [k, v] of Object.entries(o)) if (p.term.options[k] !== v) p.term.options[k] = v;
     refit();
-  }, [theme, settings.fontSize, settings.fontFamily, settings.lineHeight]);
+  }, [theme, settings.fontSize, settings.fontFamily, settings.lineHeight, settings.letterSpacing, settings.fontWeight, settings.fontWeightBold]);
 
   useEffect(() => {
     if (!id) return;

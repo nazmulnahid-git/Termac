@@ -1,7 +1,7 @@
 // Read-only file viewer shown over the terminal card: line numbers, light syntax colors,
 // and only the visible rows rendered so large files stay quick. Esc closes.
 import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { ui } from '../state/model.js';
+import { app, ui } from '../state/model.js';
 import * as A from '../state/actions.js';
 import { highlightLines, langOf } from '../lib/highlight.js';
 import { useProject, relPath, baseName } from './project.js';
@@ -9,7 +9,6 @@ import { FileIcon } from './fileicons.jsx';
 import { IconClose, IconCopy, IconInsert, IconExternal, IconReview } from './icons.jsx';
 
 const api = window.termac;
-const ROW = 22.5; // 15px text at 1.5 line height (.vw-scroll)
 const IMAGE = /\.(png|jpe?g|gif|webp|bmp|ico)$/i;
 
 export default function FileViewer() {
@@ -106,22 +105,24 @@ function Code({ lines, lang, line, truncated }) {
   // Highlighting is cheap but not free; do it once per file, not per scroll.
   const tokens = useMemo(() => highlightLines(lines, lang), [lines, lang]);
   const gutter = String(lines.length).length;
+  // Rows are absolutely placed, so their height is fixed: the UI size at a code-friendly 1.6.
+  const rowH = app.use((s) => Math.round(s.settings.uiFontSize * 1.6));
 
   useLayoutEffect(() => {
     const el = scroller.current;
     setHeight(el.clientHeight);
     const ro = new ResizeObserver(() => setHeight(el.clientHeight));
     ro.observe(el);
-    if (line) el.scrollTop = Math.max(0, (line - 6) * ROW);
+    if (line) el.scrollTop = Math.max(0, (line - 6) * rowH);
     return () => ro.disconnect();
-  }, [lines, line]);
+  }, [lines, line, rowH]);
 
-  const first = Math.max(0, Math.floor(top / ROW) - 20);
-  const last = Math.min(lines.length, Math.ceil((top + height) / ROW) + 20);
+  const first = Math.max(0, Math.floor(top / rowH) - 20);
+  const last = Math.min(lines.length, Math.ceil((top + height) / rowH) + 20);
   const rows = [];
   for (let i = first; i < last; i++) {
     rows.push(
-      <div key={i} className={`vw-ln${line === i + 1 ? ' hit' : ''}`} style={{ top: i * ROW }}>
+      <div key={i} className={`vw-ln${line === i + 1 ? ' hit' : ''}`} style={{ top: i * rowH, height: rowH }}>
         <span className="no" style={{ width: `${gutter + 2}ch` }}>
           {i + 1}
         </span>
@@ -130,11 +131,11 @@ function Code({ lines, lang, line, truncated }) {
     );
   }
   return (
-    <div className="vw-scroll" ref={scroller} onScroll={(e) => setTop(e.currentTarget.scrollTop)}>
-      <div className="vw-lines" style={{ height: lines.length * ROW + (truncated ? 40 : 12) }}>
+    <div className="vw-scroll" ref={scroller} style={{ lineHeight: `${rowH}px` }} onScroll={(e) => setTop(e.currentTarget.scrollTop)}>
+      <div className="vw-lines" style={{ height: lines.length * rowH + (truncated ? 40 : 12) }}>
         {rows}
         {truncated && (
-          <div className="vw-trunc" style={{ top: lines.length * ROW + 8 }}>
+          <div className="vw-trunc" style={{ top: lines.length * rowH + 8 }}>
             File is larger than 2 MB; showing the beginning.
           </div>
         )}

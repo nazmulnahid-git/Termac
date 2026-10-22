@@ -5,7 +5,7 @@ import fsp from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { PtyHost } from './pty-host.js';
 import { Library } from './library.js';
-import { readJSON, debouncedWriter } from './store.js';
+import { readJSON, debouncedWriter, writeAtomicSync } from './store.js';
 import * as sys from './system.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -19,6 +19,10 @@ if (!fs.existsSync(STATE_FILE) && fs.existsSync(path.join(LEGACY_USER, 'state.js
   fs.cpSync(LEGACY_USER, USER, { recursive: true, filter: (src) => !path.basename(src).startsWith('Singleton') });
 }
 const SCROLLBACK_DIR = path.join(USER, 'scrollback');
+// Hand-editable settings live in a dotfolder so they're easy to find, version and share.
+const SETTINGS_DIR = path.join(app.getPath('home'), '.termorc');
+const SETTINGS_FILE = path.join(SETTINGS_DIR, 'settings.json');
+const SCHEMA_FILE = path.join(SETTINGS_DIR, 'settings.schema.json');
 const integrationDir = path.join(__dirname, 'shell-integration').replace('app.asar', 'app.asar.unpacked');
 
 const ptys = new PtyHost({ integrationDir });
@@ -238,6 +242,58 @@ ipcMain.on('state:save', (_e, next) => {
   quickWin?.webContents.send('state:changed', { spaces: next.spaces, settings: next.settings, profiles: next.profiles, activeSpaceId: next.activeSpaceId, defaultProfileId: next.defaultProfileId });
 });
 
+// settings.json: the renderer parses and validates; here we only move text and watch for
+// edits. `settingsText` is what's on disk, so our own writes don't echo back as changes.
+let settingsText = null;
+let settingsWatcher = null;
+function readSettingsText() {
+  try {
+    return fs.readFileSync(SETTINGS_FILE, 'utf8');
+  } catch {
+    return null;
+  }
+}
+function watchSettings() {
+  if (settingsWatcher) return;
+  fs.mkdirSync(SETTINGS_DIR, { recursive: true });
+  let timer = null;
+  // Editors often save by replacing the file, so watch the folder rather than the file.
+  settingsWatcher = fs.watch(SETTINGS_DIR, (_event, name) => {
+    if (name && name !== 'settings.json') return;
+    clearTimeout(timer);
+    timer = setTimeout(() => {
+      const text = readSettingsText();
+      if (text == null || text === settingsText) return;
+      settingsText = text;
+      mainWin?.webContents.send('settings:changed', text);
+    }, 120);
+  });
+  settingsWatcher.on('error', (err) => console.error('settings watch failed', err));
+}
+ipcMain.handle('settings:load', () => {
+  settingsText = readSettingsText();
+  watchSettings();
+  return { text: settingsText, path: SETTINGS_FILE, schemaUrl: `file://${SCHEMA_FILE}` };
+});
+ipcMain.on('settings:save', (_e, text) => {
+  if (stateSealed || text === settingsText) return;
+  settingsText = text;
+  writeAtomicSync(SETTINGS_FILE, text);
+});
+ipcMain.on('settings:saveSchema', (_e, text) => {
+  let cur = null;
+  try {
+    cur = fs.readFileSync(SCHEMA_FILE, 'utf8');
+  } catch {
+    /* not written yet */
+  }
+  if (cur !== text) writeAtomicSync(SCHEMA_FILE, text);
+});
+ipcMain.handle('settings:open', async () => {
+  // No app registered for .json opens nothing; fall back to showing it in Finder.
+  if (await shell.openPath(SETTINGS_FILE)) shell.showItemInFolder(SETTINGS_FILE);
+});
+
 ipcMain.handle('scrollback:save', async (_e, id, data) => {
   await fsp.mkdir(SCROLLBACK_DIR, { recursive: true });
   await fsp.writeFile(path.join(SCROLLBACK_DIR, `${id.replace(/[^\w-]/g, '')}.ans`), data);
@@ -387,6 +443,7 @@ app.on('before-quit', (e) => {
 
 app.on('will-quit', () => {
   globalShortcut.unregisterAll();
+  settingsWatcher?.close();
   stateWriter.flushSync();
   stateSealed = true;
   library.flushSync();

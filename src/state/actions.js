@@ -1,10 +1,12 @@
 // Everything that changes sessions, tabs and Spaces goes through here.
-import { app, rt, ui, patchRt, migrate, newSpace } from './model.js';
+import { app, rt, ui, patchRt, migrate, newSpace, DEFAULT_SETTINGS } from './model.js';
 import * as reg from '../term/registry.js';
 import * as L from '../lib/layout.js';
 import { route, ruleMatches, sshTarget, expandHome, isRiskyCommand } from '../lib/routing.js';
 import { uid, formatDuration, leafOf, SPACE_COLORS, SPACE_GLYPHS } from '../lib/meta.js';
-import { buildKeymap } from '../lib/keys.js';
+import { buildKeymap, ACTIONS } from '../lib/keys.js';
+import { parseSettingsFile, settingsToFile, settingsSchema } from '../lib/settingsfile.js';
+import { applyFontVars } from '../lib/fonts.js';
 
 const api = window.termac;
 const home = () => ui.get().home;
@@ -18,11 +20,61 @@ app.subscribe(() => {
   if (!loaded || quitting) return;
   clearTimeout(saveTimer);
   saveTimer = setTimeout(() => api.state.save(app.get()), 300);
+  if (app.get().settings !== fileSettings && !ui.get().settingsFile.error) {
+    clearTimeout(fileTimer);
+    fileTimer = setTimeout(writeSettingsFile, 400);
+  }
 });
 function saveNow() {
   clearTimeout(saveTimer);
   api.state.save(app.get());
+  if (fileTimer) writeSettingsFile();
 }
+
+// ---- settings.json ------------------------------------------------------------------
+// `fileSettings` is the settings object last read from or written to the file: changes
+// made in the app write it back, edits made in an editor are applied live. While the file
+// has a syntax error it isn't overwritten, so a half-finished edit is never lost.
+let fileSettings = null;
+let fileTimer = null;
+let schemaUrl = '';
+
+function writeSettingsFile() {
+  clearTimeout(fileTimer);
+  fileTimer = null;
+  fileSettings = app.get().settings;
+  api.settings.save(settingsToFile(fileSettings, schemaUrl));
+}
+
+function setFileStatus(patch) {
+  ui.set((u) => ({ ...u, settingsFile: { ...u.settingsFile, ...patch } }));
+}
+
+// Parses the file over the current settings. Returns the merged settings, or null on a syntax error.
+function readSettingsFile(text, current) {
+  const r = parseSettingsFile(text, DEFAULT_SETTINGS);
+  if (r.error) {
+    setFileStatus({ error: r.error, warnings: [] });
+    return null;
+  }
+  setFileStatus({ error: null, warnings: r.warnings });
+  return { ...current, ...r.settings };
+}
+
+function onSettingsFileChanged(text) {
+  const prev = app.get().settings;
+  const next = readSettingsFile(text, prev);
+  const { error, warnings } = ui.get().settingsFile;
+  if (error) return toast({ title: 'settings.json has an error', detail: `${error}. Keeping the last good settings.`, action: { label: 'Open', run: openSettingsFile } }, 8000);
+  fileSettings = next;
+  app.set((s) => ({ ...s, settings: next }));
+  applySettings();
+  if (next.keybindings.quickTerminal !== prev.keybindings.quickTerminal) api.app.setHotkey(next.keybindings.quickTerminal || '');
+  if (warnings.length) toast({ title: `settings.json: ${warnings.length} problem${warnings.length > 1 ? 's' : ''}`, detail: warnings.slice(0, 2).join(' · '), action: { label: 'Open', run: openSettingsFile } }, 8000);
+  else toast({ title: 'Settings reloaded', detail: 'Applied changes from settings.json.' });
+}
+
+export const openSettingsFile = () => api.settings.open();
 
 // ---- Lookups ------------------------------------------------------------------------
 export const activeSpace = (s = app.get()) => s.spaces.find((x) => x.id === s.activeSpaceId) || s.spaces[0];
@@ -858,6 +910,8 @@ export const getKeymap = () => keymap;
 
 export function applySettings() {
   const s = app.get();
+  applyFontVars(s.settings);
+  api.app.setZoom(s.settings.zoomLevel);
   const termTheme = reg.configure(s.settings, ui.get().dark);
   ui.set((u) => (u.termTheme === termTheme ? u : { ...u, termTheme }));
   keymap = buildKeymap(s.settings.keybindings);
@@ -866,14 +920,25 @@ export function applySettings() {
 
 export function zoom(delta) {
   const size = app.get().settings.fontSize;
-  setSettings({ fontSize: delta === 0 ? 13 : Math.min(28, Math.max(9, size + delta)) });
+  setSettings({ fontSize: delta === 0 ? DEFAULT_SETTINGS.fontSize : Math.min(28, Math.max(9, size + delta)) });
 }
 
 // ---- Boot, quit ---------------------------------------------------------------------
 export async function boot() {
-  const { state, home: homeDir, dark } = await api.state.load();
-  ui.set((u) => ({ ...u, home: homeDir, dark }));
+  const [{ state, home: homeDir, dark }, file] = await Promise.all([api.state.load(), api.settings.load()]);
+  ui.set((u) => ({ ...u, home: homeDir, dark, settingsFile: { ...u.settingsFile, path: file.path } }));
   let s = migrate(state);
+
+  // settings.json wins over state.json. With no file yet, write one from the current settings.
+  schemaUrl = file.schemaUrl;
+  api.settings.saveSchema(settingsSchema(DEFAULT_SETTINGS, ACTIONS));
+  const fromFile = file.text == null ? null : readSettingsFile(file.text, s.settings);
+  if (fromFile) {
+    if (fromFile.keybindings.quickTerminal !== s.settings.keybindings.quickTerminal) api.app.setHotkey(fromFile.keybindings.quickTerminal || '');
+    s = { ...s, settings: fromFile };
+    fileSettings = fromFile;
+  }
+  api.settings.onChanged(onSettingsFileChanged);
 
   // Drop dangling references left by a crash.
   const referenced = new Set([...s.favorites, ...s.spaces.flatMap(tabsOfSpace)]);
@@ -888,6 +953,9 @@ export async function boot() {
   app.set(s);
   loaded = true;
   applySettings();
+  if (file.text == null) writeSettingsFile();
+  const { error, warnings } = ui.get().settingsFile;
+  if (error || warnings.length) toast({ title: error ? 'settings.json has an error' : 'settings.json has problems', detail: error || warnings.slice(0, 2).join(' · '), action: { label: 'Open', run: openSettingsFile } }, 8000);
 
   const stamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   const favSids = new Set(s.favorites.flatMap((tid) => L.leaves(tabs[tid]?.layout)));

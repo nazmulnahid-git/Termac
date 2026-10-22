@@ -10,6 +10,7 @@ import * as reg from './term/registry.js';
 import { StatusMark } from './components/common.jsx';
 import { uid, splitCwd, sessionName, leafOf } from './lib/meta.js';
 import { sshTarget } from './lib/routing.js';
+import { applyFontVars } from './lib/fonts.js';
 import { formatAccel } from './lib/keys.js';
 
 const api = window.termac;
@@ -47,6 +48,7 @@ function defaultProfile() {
 }
 
 function applyTheme() {
+  applyFontVars(app.get().settings);
   const termTheme = reg.configure(app.get().settings, ui.get().dark);
   ui.set((u) => (u.termTheme === termTheme ? u : { ...u, termTheme }));
 }

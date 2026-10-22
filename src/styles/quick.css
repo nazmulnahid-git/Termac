@@ -6,7 +6,7 @@ html, body.quick-body, body.quick-body #root { background: transparent; }
 .qt-head .st-idle { border-color: var(--t-dim); }
 .qt-cwd { min-width: 0; }
 .qt-cwd span { color: var(--t-dim); }
-.qt-cwd b { font-weight: 700; }
+.qt-cwd b { font-weight: var(--bold); }
 .qt-move { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 8px; border-radius: var(--r-sm); background: var(--t-pill); font-weight: 500; white-space: nowrap; }
 .qt-move:hover, .qt-move.on { background: color-mix(in oklab, var(--t-fg) 16%, transparent); }
 .qt-move:disabled { opacity: 0.5; }

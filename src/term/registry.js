@@ -11,6 +11,7 @@ import { SearchAddon } from '@xterm/addon-search';
 import '@xterm/xterm/css/xterm.css';
 import { patchRt, rt } from '../state/model.js';
 import { TERMINAL_THEMES } from '../lib/termtheme.js';
+import { monoStack } from '../lib/fonts.js';
 
 const api = window.termac;
 
@@ -68,9 +69,12 @@ export function configure(settings, dark) {
   themeName = settings.termTheme === 'system' ? (dark ? 'dark' : 'light') : settings.termTheme;
   clickToMove = settings.clickToMove !== false;
   termOptions = {
-    fontFamily: /monospace\s*$/.test(settings.fontFamily) ? settings.fontFamily : `${settings.fontFamily}, 'SF Mono', Menlo, monospace`,
+    fontFamily: monoStack(settings.fontFamily),
     fontSize: settings.fontSize,
     lineHeight: settings.lineHeight,
+    letterSpacing: settings.letterSpacing,
+    fontWeight: settings.fontWeight,
+    fontWeightBold: settings.fontWeightBold,
     cursorStyle: settings.cursorStyle,
     cursorBlink: settings.cursorBlink,
     scrollback: settings.scrollback,

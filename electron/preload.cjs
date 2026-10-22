@@ -1,5 +1,5 @@
 // Narrow, typed bridge between the renderer and the main process.
-const { contextBridge, ipcRenderer } = require('electron');
+const { contextBridge, ipcRenderer, webFrame } = require('electron');
 
 const on = (channel) => (fn) => {
   const h = (_e, ...args) => fn(...args);
@@ -25,6 +25,13 @@ contextBridge.exposeInMainWorld('termac', {
     load: () => ipcRenderer.invoke('state:load'),
     save: (s) => ipcRenderer.send('state:save', s),
     onChanged: on('state:changed'),
+  },
+  settings: {
+    load: () => ipcRenderer.invoke('settings:load'),
+    save: (text) => ipcRenderer.send('settings:save', text),
+    saveSchema: (text) => ipcRenderer.send('settings:saveSchema', text),
+    open: () => ipcRenderer.invoke('settings:open'),
+    onChanged: on('settings:changed'),
   },
   scrollback: {
     save: (id, data) => ipcRenderer.invoke('scrollback:save', id, data),
@@ -68,6 +75,7 @@ contextBridge.exposeInMainWorld('termac', {
     setHotkey: (accel) => ipcRenderer.invoke('app:setHotkey', accel),
     focusMain: () => ipcRenderer.send('app:focusMain'),
     trafficLights: (visible) => ipcRenderer.send('app:trafficLights', visible),
+    setZoom: (percent) => webFrame.setZoomFactor(percent / 100),
     quitReady: () => ipcRenderer.send('app:quitReady'),
     quitCancel: () => ipcRenderer.send('app:quitCancel'),
     onMenu: on('menu:action'),

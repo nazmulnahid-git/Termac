@@ -3,7 +3,7 @@
 
 .lib-head { flex: none; display: flex; flex-direction: column; gap: 12px; padding: 18px 22px 12px; border-bottom: 1px solid var(--panel-line); }
 .lib-titlebar { display: flex; align-items: center; gap: 14px; min-width: 0; }
-.lib-title { font-weight: 700; }
+.lib-title { font-weight: var(--bold); }
 .lib-select { padding: 4px 10px; border-radius: var(--r-sm); box-shadow: inset 0 0 0 1px var(--panel-line); white-space: nowrap; }
 .lib-select:hover { background: var(--panel-2); }
 
@@ -17,7 +17,7 @@
 .lib-chip:hover { background: var(--panel-2); }
 .lib-chip.on { box-shadow: inset 0 0 0 1px var(--accent); color: var(--accent); }
 .lib-chip .mono { }
-.lib-chip.space { background: var(--c); color: #fff; box-shadow: none; font-weight: 700; }
+.lib-chip.space { background: var(--c); color: #fff; box-shadow: none; font-weight: var(--bold); }
 .lib-chip.space:hover { filter: brightness(1.05); }
 .lib-chip .x { margin-left: 2px; opacity: 0.85; border-radius: var(--r-sm); padding: 0 2px; }
 .lib-chip .x:hover { opacity: 1; background: rgba(255, 255, 255, 0.2); }
@@ -26,7 +26,7 @@
 
 /* List */
 .lib-list { width: 38%; min-width: 320px; max-width: 460px; flex: none; overflow-y: auto; padding: 8px; border-right: 1px solid var(--panel-line); outline: 0; display: flex; flex-direction: column; gap: 2px; }
-.lib-day { padding: 10px 10px 4px; font-weight: 700; color: var(--dim); }
+.lib-day { padding: 10px 10px 4px; font-weight: var(--bold); color: var(--dim); }
 .lib-group:first-child .lib-day { padding-top: 6px; }
 .lib-item { display: flex; flex-direction: column; gap: 3px; padding: 9px 10px; border-radius: var(--r); }
 .lib-item:hover { background: var(--hover); }
@@ -34,12 +34,12 @@
 .lib-item.sel { background: color-mix(in oklab, var(--space) 14%, var(--panel)); }
 .lib-list:focus-visible .lib-item.sel { box-shadow: inset 0 0 0 1.5px color-mix(in oklab, var(--space) 45%, transparent); }
 .lib-l1 { display: flex; align-items: center; gap: 8px; min-width: 0; }
-.lib-name { font-weight: 700; min-width: 0; flex: 0 1 auto; }
+.lib-name { font-weight: var(--bold); min-width: 0; flex: 0 1 auto; }
 .lib-arrow { color: var(--dim); min-width: 0; flex: 0 1 auto; }
 .lib-hit { flex: none; color: var(--dim); padding: 0 5px; border-radius: var(--r-sm); background: var(--panel-2); }
-.lib-ok { color: var(--ok); font-weight: 700; flex: none; }
-.lib-exit { font-weight: 700;color: var(--fail); flex: none; white-space: nowrap; }
-.lib-x { color: var(--fail); font-weight: 700; flex: none; }
+.lib-ok { color: var(--ok); font-weight: var(--bold); flex: none; }
+.lib-exit { font-weight: var(--bold);color: var(--fail); flex: none; white-space: nowrap; }
+.lib-x { color: var(--fail); font-weight: var(--bold); flex: none; }
 .lib-l2 { display: flex; gap: 8px; min-width: 0; color: var(--dim); }
 .lib-l2 .mono { min-width: 0; }
 .lib-when { flex: none; white-space: nowrap; }
@@ -48,8 +48,8 @@
 /* Detail */
 .lib-detail { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 14px; padding: 18px 22px; }
 .lib-dhead { display: flex; align-items: center; gap: 10px; min-width: 0; }
-.lib-dtitle { font-weight: 700; min-width: 0; flex: 0 1 auto; }
-.lib-pill { flex: none; padding: 3px 8px; border-radius: var(--r-sm); font-weight: 700; background: var(--panel-2); color: var(--dim); }
+.lib-dtitle { font-weight: var(--bold); min-width: 0; flex: 0 1 auto; }
+.lib-pill { flex: none; padding: 3px 8px; border-radius: var(--r-sm); font-weight: var(--bold); background: var(--panel-2); color: var(--dim); }
 .lib-pill.ok { background: color-mix(in oklab, var(--ok) 16%, var(--panel)); color: var(--ok); }
 .lib-pill.fail { background: color-mix(in oklab, var(--fail) 14%, var(--panel)); color: var(--fail); }
 .lib-btn { height: 34px; padding: 0 14px; border-radius: var(--r); }
@@ -62,7 +62,7 @@
 .lib-glyph { }
 
 .lib-cmds { display: flex; flex-direction: column; gap: 4px; min-height: 0; }
-.lib-sub { font-weight: 700; color: var(--dim); margin-bottom: 2px; }
+.lib-sub { font-weight: var(--bold); color: var(--dim); margin-bottom: 2px; }
 .lib-cmdlist { max-height: 132px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
 .lib-cmd { display: flex; gap: 10px; align-items: center; min-width: 0; }
 .lib-cmd > span:first-child { width: 10px; text-align: center; }

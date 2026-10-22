@@ -8,6 +8,7 @@ import { route, expandHome } from '../lib/routing.js';
 import { uid } from '../lib/meta.js';
 import { BG_PRESETS, terminalLook } from '../lib/termtheme.js';
 import { Switch, Seg, useImageUrl } from './common.jsx';
+import { monoStack } from '../lib/fonts.js';
 
 const api = window.termac;
 const RULE_MIME = 'application/x-termac-rule';
@@ -28,6 +29,7 @@ const tabId = (t) => {
 
 export default function Settings({ onClose, initialTab }) {
   const [tab, setTab] = useState(() => tabId(initialTab) || 'general');
+  const file = ui.use((u) => u.settingsFile);
   const sheet = useRef(null);
 
   useEffect(() => {
@@ -55,6 +57,9 @@ export default function Settings({ onClose, initialTab }) {
     <div className="modal st-sheet" role="dialog" aria-label="Settings" tabIndex={-1} ref={sheet}>
       <div className="st-head">
         <div className="st-titlebar">
+          <button className="st-file" onClick={A.openSettingsFile} title={file.path}>
+            {'{ }'} Open settings.json
+          </button>
           <span className="st-title">{label}</span>
           <button className="btn st-done" onClick={onClose}>
             Done
@@ -69,6 +74,17 @@ export default function Settings({ onClose, initialTab }) {
           ))}
         </div>
       </div>
+      {(file.error || file.warnings.length > 0) && (
+        <div className="st-filebar">
+          <span className="grow">
+            <b>{file.error ? 'settings.json has an error' : 'settings.json has problems'}</b> — {file.error || file.warnings.join(' · ')}
+            {file.error && '. Changes made here are not saved to the file until it is fixed.'}
+          </span>
+          <button className="st-link" onClick={A.openSettingsFile}>
+            Open file
+          </button>
+        </div>
+      )}
       <div className={`st-body st-body-${tab}`}>
         {tab === 'general' && <GeneralTab />}
         {tab === 'appearance' && <AppearanceTab />}
@@ -300,6 +316,7 @@ function HotkeyRecorder({ accel }) {
 // ---- Appearance -----------------------------------------------------------------------
 
 const FONTS = ['SF Mono', 'Menlo', 'Monaco', 'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'Hack', 'Source Code Pro'];
+const UI_FONTS = ['system-ui', 'Inter', 'Helvetica Neue', 'Avenir Next', 'Roboto', 'SF Mono'];
 
 function AppearanceTab() {
   const s = app.use((st) => st.settings);
@@ -313,7 +330,31 @@ function AppearanceTab() {
 
   return (
     <div className="st-stack">
-      <div className="st-preview" style={{ background: t.background, color: t.foreground, fontFamily: `${font ?? s.fontFamily}, monospace`, fontSize: s.fontSize, lineHeight: s.lineHeight }}>
+      <Group title="Interface">
+        <Row label="Font" hint="Sidebar, bars and menus. system-ui is SF Pro.">
+          <span className="row-inline">
+            <DraftInput className="field st-font" list="st-ui-fonts" value={s.uiFontFamily} spellCheck={false} onCommit={(v) => A.setSettings({ uiFontFamily: v.trim() || 'system-ui' })} delay={600} />
+            <datalist id="st-ui-fonts">
+              {UI_FONTS.map((f) => (
+                <option key={f} value={f} />
+              ))}
+            </datalist>
+            <label className="st-unit">
+              <DraftInput className="field st-num" type="number" min={10} max={20} step={0.5} value={s.uiFontSize} onCommit={(v) => A.setSettings({ uiFontSize: clamp(10, 20, 13.5)(v) })} />
+              px
+            </label>
+            <label className="st-unit">
+              Line
+              <DraftInput className="field st-num" type="number" min={1} max={2} step={0.05} value={s.uiLineHeight} onCommit={(v) => A.setSettings({ uiLineHeight: clamp(1, 2, 1.45)(v) })} />
+            </label>
+          </span>
+        </Row>
+        <Row label="Zoom" hint="Scales the whole window.">
+          <Select value={s.zoomLevel} onChange={setSetting('zoomLevel')} options={[[80, '80%'], [90, '90%'], [100, '100%'], [110, '110%'], [125, '125%'], [150, '150%']]} />
+        </Row>
+      </Group>
+      <div className="st-group-title">Terminal</div>
+      <div className="st-preview" style={{ background: t.background, color: t.foreground, fontFamily: monoStack(font ?? s.fontFamily), fontSize: s.fontSize, lineHeight: s.lineHeight, letterSpacing: s.letterSpacing, fontWeight: s.fontWeight }}>
         <div>
           <span style={{ color: t.green }}>❯</span> kubectl get pods -n staging
         </div>
@@ -347,6 +388,17 @@ function AppearanceTab() {
             <label className="st-unit">
               Line
               <DraftInput className="field st-num" type="number" min={1} max={2} step={0.05} value={s.lineHeight} onCommit={(v) => A.setSettings({ lineHeight: clamp(1, 2, 1.35)(v) })} />
+            </label>
+          </span>
+        </Row>
+        <Row label="Weight">
+          <span className="row-inline">
+            <Select value={s.fontWeight} onChange={setSetting('fontWeight')} options={[['300', 'Light'], ['normal', 'Regular'], ['500', 'Medium'], ['600', 'Semibold']]} />
+            <span className="dim">Bold</span>
+            <Select value={s.fontWeightBold} onChange={setSetting('fontWeightBold')} options={[['500', 'Medium'], ['600', 'Semibold'], ['bold', 'Bold'], ['800', 'Heavy']]} />
+            <label className="st-unit">
+              Spacing
+              <DraftInput className="field st-num" type="number" min={-2} max={4} step={0.5} value={s.letterSpacing} onCommit={(v) => A.setSettings({ letterSpacing: clamp(-2, 4, 0)(v) })} />
             </label>
           </span>
         </Row>

@@ -13,9 +13,16 @@ export const DEFAULT_SETTINGS = {
   notifyAfterS: 30, // 0 = never
   osNotify: 'background', // always | background | never
   confirmQuit: true,
+  zoomLevel: 100,
+  uiFontFamily: 'system-ui',
+  uiFontSize: 13.5,
+  uiLineHeight: 1.45,
   fontFamily: 'SF Mono, Menlo, monospace',
   fontSize: 13,
-  lineHeight: 1.35,
+  lineHeight: 1.4,
+  letterSpacing: 0,
+  fontWeight: 'normal',
+  fontWeightBold: '600',
   cursorStyle: 'block',
   cursorBlink: true,
   termTheme: 'system', // system | dark | light
@@ -107,6 +114,7 @@ export const ui = createStore({
   tabFind: 0, // bumped by ⌘J to focus the sidebar's session filter
   review: false, // code review panel (right)
   viewer: null, // { path, line } file shown over the terminal card
+  settingsFile: { path: '', error: null, warnings: [] }, // ~/.termorc/settings.json and its last parse result
 });
 
 export function patchRt(sid, patch) {
