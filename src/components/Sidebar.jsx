@@ -252,11 +252,11 @@ function TabFind({ query, onQuery, hits, sel, onSel, onOpen, onEverywhere, accel
 
   return (
     <label className={`tab-find${query ? ' has-query' : ''}${dragTab ? ' drop-fav' : ''}${hot ? ' drop-into' : ''}`} data-drop-into={dragTab ? destAttr('fav') : undefined}>
-      <span className="slash">/</span>
+      <IconSearch size={14} className="lead" />
       {dragTab && noFavorites ? (
         <span className="hint">Drop here to add to Favorites</span>
       ) : (
-        <input ref={ref} value={query} placeholder="filter sessions" spellCheck={false} onChange={(e) => onQuery(e.target.value)} onKeyDown={onKeyDown} />
+        <input ref={ref} value={query} placeholder="Search sessions" spellCheck={false} onChange={(e) => onQuery(e.target.value)} onKeyDown={onKeyDown} />
       )}
       {query ? (
         <button

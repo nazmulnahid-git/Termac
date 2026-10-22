@@ -6,7 +6,7 @@ import * as A from '../state/actions.js';
 import { formatAccel } from '../lib/keys.js';
 import { tildify } from '../lib/routing.js';
 import { procLabel } from '../lib/meta.js';
-import { IconSidebar, IconFiles, IconGrid, IconReview, IconGear } from './icons.jsx';
+import { IconSidebar, IconFiles, IconGrid, IconReview, IconGear, IconSearch } from './icons.jsx';
 import { openSettings } from './Sidebar.jsx';
 
 export default function TopBar() {
@@ -37,11 +37,11 @@ export default function TopBar() {
         </button>
       </div>
       <button className="tb-title" title={`Command bar${k('commandBar')}`} onClick={() => ui.set((u) => ({ ...u, overlay: 'commandBar', overlayArg: null }))}>
-        <span className="tb-prompt">❯</span>
+        <IconSearch size={14} className="tb-ic" />
         {sid && cwd ? (
           <>
             <span className="tb-path">{tildify(cwd, home) || '~'}</span>
-            <span className="tb-sep">—</span>
+            <span className="tb-sep">·</span>
             <span className="tb-proc">{procLabel(r, r?.shell)}</span>
           </>
         ) : (
