@@ -1,6 +1,6 @@
 {
   "name": "termorc",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "A terminal for macOS where sessions live in a sidebar, grouped into Spaces",
   "type": "module",
   "main": "electron/main.js",
