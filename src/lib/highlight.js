@@ -6,6 +6,7 @@ const C_LIKE = 'break case catch class const continue default do else enum expor
 const LANGS = {
   js: { kw: C_LIKE, line: '//', block: ['/*', '*/'], quotes: '"\'`' },
   json: { kw: 'true false null', quotes: '"' },
+  jsonc: { kw: 'true false null', line: '//', block: ['/*', '*/'], quotes: '"' },
   css: { kw: 'important media import supports keyframes from to', block: ['/*', '*/'], quotes: '"\'' },
   py: { kw: 'and as assert async await break class continue def del elif else except False finally for from global if import in is lambda None nonlocal not or pass raise return self True try while with yield match case', line: '#', quotes: '"\'' },
   sh: { kw: 'if then else elif fi for in do done while until case esac function return local export readonly echo exit set unset source', line: '#', quotes: '"\'' },
@@ -19,7 +20,7 @@ const LANGS = {
 };
 const EXT = {
   js: 'js', jsx: 'js', mjs: 'js', cjs: 'js', ts: 'js', tsx: 'js', mts: 'js', cts: 'js', vue: 'js', svelte: 'js',
-  json: 'json', jsonc: 'js',
+  json: 'json', jsonc: 'jsonc',
   css: 'css', scss: 'css', less: 'css',
   py: 'py',
   sh: 'sh', bash: 'sh', zsh: 'sh', fish: 'sh', env: 'sh',

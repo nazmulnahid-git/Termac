@@ -43,7 +43,9 @@ function writeSettingsFile() {
   clearTimeout(fileTimer);
   fileTimer = null;
   fileSettings = app.get().settings;
-  api.settings.save(settingsToFile(fileSettings, schemaUrl));
+  const text = settingsToFile(fileSettings, schemaUrl);
+  setFileStatus({ text });
+  api.settings.save(text);
 }
 
 function setFileStatus(patch) {
@@ -62,19 +64,40 @@ function readSettingsFile(text, current) {
 }
 
 function onSettingsFileChanged(text) {
+  setFileStatus({ text });
   const prev = app.get().settings;
   const next = readSettingsFile(text, prev);
   const { error, warnings } = ui.get().settingsFile;
-  if (error) return toast({ title: 'settings.json has an error', detail: `${error}. Keeping the last good settings.`, action: { label: 'Open', run: openSettingsFile } }, 8000);
+  if (error) return toast({ title: 'settings.json has an error', detail: `${error}. Keeping the last good settings.`, action: { label: 'Open', run: () => openSettings('file') } }, 8000);
   fileSettings = next;
   app.set((s) => ({ ...s, settings: next }));
   applySettings();
   if (next.keybindings.quickTerminal !== prev.keybindings.quickTerminal) api.app.setHotkey(next.keybindings.quickTerminal || '');
-  if (warnings.length) toast({ title: `settings.json: ${warnings.length} problem${warnings.length > 1 ? 's' : ''}`, detail: warnings.slice(0, 2).join(' · '), action: { label: 'Open', run: openSettingsFile } }, 8000);
+  if (warnings.length) toast({ title: `settings.json: ${warnings.length} problem${warnings.length > 1 ? 's' : ''}`, detail: warnings.slice(0, 2).join(' · '), action: { label: 'Open', run: () => openSettings('file') } }, 8000);
   else toast({ title: 'Settings reloaded', detail: 'Applied changes from settings.json.' });
 }
 
 export const openSettingsFile = () => api.settings.open();
+
+// Saves text typed in the in-app editor and applies it, as if it had been edited on disk.
+export function saveSettingsText(text) {
+  api.settings.save(text);
+  onSettingsFileChanged(text);
+}
+
+// ---- Settings tab -------------------------------------------------------------------
+// Settings opens in place of the terminal and keeps a tab in the sidebar until closed.
+export function openSettings(tab) {
+  ui.set((u) => ({ ...u, view: 'settings', settingsOpen: true, settingsTab: tab || u.settingsTab, overlay: null, viewer: null }));
+}
+
+export function closeSettings() {
+  const wasShown = ui.get().view === 'settings';
+  ui.set((u) => ({ ...u, settingsOpen: false, capturingKeys: false, view: u.view === 'settings' ? 'terminal' : u.view }));
+  if (wasShown) requestAnimationFrame(() => focusedSid() && reg.focus(focusedSid()));
+}
+
+export const toggleSettings = () => (ui.get().view === 'settings' ? closeSettings() : openSettings());
 
 // ---- Lookups ------------------------------------------------------------------------
 export const activeSpace = (s = app.get()) => s.spaces.find((x) => x.id === s.activeSpaceId) || s.spaces[0];
@@ -905,6 +928,9 @@ export function setSettings(patch) {
   applySettings();
 }
 
+// Matches --bar-h in app.css. The traffic lights don't zoom, so main recenters them.
+const TITLE_BAR_H = 36;
+
 let keymap = new Map();
 export const getKeymap = () => keymap;
 
@@ -912,6 +938,7 @@ export function applySettings() {
   const s = app.get();
   applyFontVars(s.settings);
   api.app.setZoom(s.settings.zoomLevel);
+  api.app.titleBarHeight(TITLE_BAR_H * (s.settings.zoomLevel / 100));
   const termTheme = reg.configure(s.settings, ui.get().dark);
   ui.set((u) => (u.termTheme === termTheme ? u : { ...u, termTheme }));
   keymap = buildKeymap(s.settings.keybindings);
@@ -926,7 +953,7 @@ export function zoom(delta) {
 // ---- Boot, quit ---------------------------------------------------------------------
 export async function boot() {
   const [{ state, home: homeDir, dark }, file] = await Promise.all([api.state.load(), api.settings.load()]);
-  ui.set((u) => ({ ...u, home: homeDir, dark, settingsFile: { ...u.settingsFile, path: file.path } }));
+  ui.set((u) => ({ ...u, home: homeDir, dark, settingsFile: { ...u.settingsFile, path: file.path, text: file.text } }));
   let s = migrate(state);
 
   // settings.json wins over state.json. With no file yet, write one from the current settings.
@@ -955,7 +982,7 @@ export async function boot() {
   applySettings();
   if (file.text == null) writeSettingsFile();
   const { error, warnings } = ui.get().settingsFile;
-  if (error || warnings.length) toast({ title: error ? 'settings.json has an error' : 'settings.json has problems', detail: error || warnings.slice(0, 2).join(' · '), action: { label: 'Open', run: openSettingsFile } }, 8000);
+  if (error || warnings.length) toast({ title: error ? 'settings.json has an error' : 'settings.json has problems', detail: error || warnings.slice(0, 2).join(' · '), action: { label: 'Open', run: () => openSettings('file') } }, 8000);
 
   const stamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   const favSids = new Set(s.favorites.flatMap((tid) => L.leaves(tabs[tid]?.layout)));

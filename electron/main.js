@@ -61,7 +61,7 @@ function createMainWindow() {
     minHeight: 420,
     show: false,
     titleBarStyle: 'hiddenInset',
-    trafficLightPosition: { x: 18, y: 16 },
+    trafficLightPosition: { x: 18, y: 16 }, // recentered once the renderer knows its zoom
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#0f1013' : '#f2f2f0',
     webPreferences,
   });
@@ -386,6 +386,8 @@ ipcMain.handle('menu:popup', (e, items) => {
 ipcMain.on('app:setMenu', (_e, bindings) => buildMenu(bindings));
 ipcMain.handle('app:setHotkey', (_e, accel) => setHotkey(accel));
 ipcMain.on('app:trafficLights', (e, visible) => BrowserWindow.fromWebContents(e.sender)?.setWindowButtonVisibility(!!visible));
+// Keeps the traffic lights centered in the title bar, whose height follows the page zoom.
+ipcMain.on('app:titleBarHeight', (e, px) => BrowserWindow.fromWebContents(e.sender)?.setWindowButtonPosition({ x: 18, y: Math.round((px - 14) / 2) }));
 ipcMain.on('app:focusMain', () => {
   mainWin?.show();
   mainWin?.focus();

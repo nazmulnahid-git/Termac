@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { app, rt, ui } from '../state/model.js';
+import { app, rt, ui, DEFAULT_SETTINGS } from '../state/model.js';
 import * as A from '../state/actions.js';
 import { useTabView, StatusMark, Chip, FailTip } from './common.jsx';
 import { formatAccel } from '../lib/keys.js';
@@ -8,6 +8,7 @@ import { tildify } from '../lib/routing.js';
 import { highlight } from '../lib/fuzzy.js';
 import { findTabs } from '../lib/tabfind.js';
 import { IconFolder, IconFolderOpen, IconFolderPlus, IconChevron, IconPlus, IconMore, IconSearch, IconClose } from './icons.jsx';
+import { Settings as SettingsIcon } from 'lucide-react';
 import Rail from './SidebarRail.jsx';
 import { TabIcon } from './tabicons.jsx';
 import { SpaceTrack, useSpaceMotion } from './space-motion.jsx';
@@ -16,7 +17,7 @@ import { PH, pressTab, pressPane, pressFolder, useDropList, useDropFolders, dest
 
 export { promptText };
 
-const RAIL_WIDTH = 72;
+const RAIL_WIDTH = 56;
 const HIDE_SLOP = 8; // px past the right edge before a revealed sidebar starts to hide
 const HIDE_DELAY = 150;
 const isPaneDrag = (e) => e.dataTransfer.types.includes(PANE_MIME);
@@ -85,7 +86,7 @@ function ResizeHandle({ width, onDrag }) {
     const startX = e.clientX;
     let w = width;
     const move = (ev) => {
-      w = Math.min(460, Math.max(240, width + ev.clientX - startX));
+      w = Math.min(380, Math.max(200, width + ev.clientX - startX));
       onDrag(w);
     };
     const up = () => {
@@ -97,7 +98,7 @@ function ResizeHandle({ width, onDrag }) {
     window.addEventListener('mousemove', move);
     window.addEventListener('mouseup', up);
   };
-  return <div className="sb-resize" onMouseDown={onMouseDown} onDoubleClick={() => A.setSettings({ sidebarWidth: 300 })} title="Drag to resize · double-click to reset" />;
+  return <div className="sb-resize" onMouseDown={onMouseDown} onDoubleClick={() => A.setSettings({ sidebarWidth: DEFAULT_SETTINGS.sidebarWidth })} title="Drag to resize · double-click to reset" />;
 }
 
 // ---- Expanded -----------------------------------------------------------------------
@@ -150,11 +151,33 @@ function Expanded() {
         ) : (
           <>
             <Favorites ids={favorites} />
+            <SettingsRow />
             <SpaceTrack render={(space) => <SpaceBody space={space} bindings={bindings} />} />
           </>
         )}
       </div>
       <SidebarCards />
+    </div>
+  );
+}
+
+// While Settings is open it gets a row of its own above the Spaces, like Warp's Settings tab.
+// Visiting a session leaves it here; the ✕ closes it.
+function SettingsRow() {
+  const open = ui.use((u) => u.settingsOpen);
+  const on = ui.use((u) => u.view === 'settings');
+  if (!open) return null;
+  return (
+    <div className="rows sb-app-tabs">
+      <div className={`row${on ? ' on' : ''}`} onClick={() => A.openSettings()}>
+        <span className="chip icon">
+          <SettingsIcon size={14} strokeWidth={1.75} />
+        </span>
+        <span className="name">Settings</span>
+        <button className="close" title="Close Settings" onClick={(e) => (e.stopPropagation(), A.closeSettings())}>
+          ✕
+        </button>
+      </div>
     </div>
   );
 }
@@ -700,4 +723,4 @@ export function SidebarCards() {
 }
 
 export const openLibrary = () => ui.set((u) => ({ ...u, view: u.view === 'library' ? 'terminal' : 'library' }));
-export const openSettings = () => ui.set((u) => ({ ...u, overlay: 'settings', overlayArg: null }));
+export const openSettings = () => A.toggleSettings();

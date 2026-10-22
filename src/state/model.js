@@ -13,10 +13,10 @@ export const DEFAULT_SETTINGS = {
   notifyAfterS: 30, // 0 = never
   osNotify: 'background', // always | background | never
   confirmQuit: true,
-  zoomLevel: 100,
+  zoomLevel: 125,
   uiFontFamily: 'system-ui',
-  uiFontSize: 13.5,
-  uiLineHeight: 1.45,
+  uiFontSize: 12.5,
+  uiLineHeight: 1.4,
   fontFamily: 'SF Mono, Menlo, monospace',
   fontSize: 13,
   lineHeight: 1.4,
@@ -32,7 +32,7 @@ export const DEFAULT_SETTINGS = {
   shellPriority: false,
   gestures: { swipeSpaces: true, pinch: true, edgeReveal: true, peek: true },
   sidebarMode: 'expanded', // expanded | compact | hidden
-  sidebarWidth: 300,
+  sidebarWidth: 248,
   toolsWidth: 300,
   reviewWidth: 520,
   clickToMove: true,
@@ -91,7 +91,10 @@ export const rt = createStore({});
 
 // Transient UI state.
 export const ui = createStore({
-  view: 'terminal', // terminal | library
+  view: 'terminal', // terminal | library | settings
+  settingsOpen: false, // Settings has a tab in the sidebar (it stays there while you visit sessions)
+  settingsTab: 'general', // section shown in Settings
+  capturingKeys: false, // a shortcut recorder in Settings owns the keyboard
   overlay: null, // commandBar | settings | spaceEditor | overview | onboarding
   overlayArg: null,
   notesOpen: false,
@@ -114,7 +117,7 @@ export const ui = createStore({
   tabFind: 0, // bumped by ⌘J to focus the sidebar's session filter
   review: false, // code review panel (right)
   viewer: null, // { path, line } file shown over the terminal card
-  settingsFile: { path: '', error: null, warnings: [] }, // ~/.termorc/settings.json and its last parse result
+  settingsFile: { path: '', text: null, error: null, warnings: [] }, // ~/.termorc/settings.json: its text on disk and last parse result
 });
 
 export function patchRt(sid, patch) {

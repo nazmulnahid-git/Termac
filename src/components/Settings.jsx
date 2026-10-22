@@ -1,97 +1,107 @@
-import { useEffect, useRef, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import '../styles/settings.css';
-import { app, ui, defaultProfile } from '../state/model.js';
+import { app, ui, defaultProfile, DEFAULT_SETTINGS } from '../state/model.js';
 import * as A from '../state/actions.js';
 import { THEMES } from '../term/registry.js';
 import { ACTIONS, defaultBindings, eventToAccel, normalizeAccel, formatAccel } from '../lib/keys.js';
-import { route, expandHome } from '../lib/routing.js';
+import { route, expandHome, tildify } from '../lib/routing.js';
 import { uid } from '../lib/meta.js';
 import { BG_PRESETS, terminalLook } from '../lib/termtheme.js';
+import { highlightLines } from '../lib/highlight.js';
+import { parseSettingsFile } from '../lib/settingsfile.js';
 import { Switch, Seg, useImageUrl } from './common.jsx';
 import { monoStack } from '../lib/fonts.js';
+import { SlidersHorizontal, Palette, SquareTerminal, Keyboard, Hand, Route, FileJson, ExternalLink, X } from 'lucide-react';
 
 const api = window.termac;
 const RULE_MIME = 'application/x-termac-rule';
 
 const TABS = [
-  ['general', '⚙', 'General'],
-  ['appearance', '◐', 'Appearance'],
-  ['profiles', '>_', 'Profiles'],
-  ['keybindings', '⌘', 'Keybindings'],
-  ['gestures', '◎', 'Gestures'],
-  ['rules', '⇢', 'Rules'],
+  ['general', SlidersHorizontal, 'General'],
+  ['appearance', Palette, 'Appearance'],
+  ['profiles', SquareTerminal, 'Profiles'],
+  ['keybindings', Keyboard, 'Keybindings'],
+  ['gestures', Hand, 'Gestures'],
+  ['rules', Route, 'Rules'],
+  ['file', FileJson, 'settings.json'],
 ];
-const ALIASES = { keys: 'keybindings', shortcuts: 'keybindings', routing: 'rules' };
+const ALIASES = { keys: 'keybindings', shortcuts: 'keybindings', routing: 'rules', json: 'file' };
 const tabId = (t) => {
   const id = ALIASES[t] || t;
   return TABS.some(([k]) => k === id) ? id : null;
 };
+const setTab = (settingsTab) => ui.set((u) => ({ ...u, settingsTab }));
 
-export default function Settings({ onClose, initialTab }) {
-  const [tab, setTab] = useState(() => tabId(initialTab) || 'general');
+// Settings as a page in place of the terminal (see A.openSettings); its sidebar row is in Sidebar.jsx.
+export default function Settings() {
+  const tab = ui.use((u) => tabId(u.settingsTab)) || 'general';
   const file = ui.use((u) => u.settingsFile);
-  const sheet = useRef(null);
-
-  useEffect(() => {
-    const t = tabId(initialTab);
-    if (t) setTab(t);
-  }, [initialTab]);
+  const page = useRef(null);
 
   // Take focus away from the terminal so keys don't reach the shell.
-  useEffect(() => sheet.current?.focus(), []);
+  useEffect(() => page.current?.focus(), []);
 
   // Bubble phase: shortcut recorders listen in capture phase and preventDefault, so Esc
-  // while recording cancels the recording instead of closing the sheet.
+  // while recording cancels the recording instead of closing Settings. The JSON editor
+  // keeps Esc for itself.
   useEffect(() => {
     const onKey = (e) => {
-      if (e.key !== 'Escape' || e.defaultPrevented) return;
+      if (e.key !== 'Escape' || e.defaultPrevented || e.target.closest?.('.sf')) return;
       e.preventDefault();
-      onClose();
+      A.closeSettings();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
+  }, []);
 
   const label = TABS.find(([k]) => k === tab)[2];
   return (
-    <div className="modal st-sheet" role="dialog" aria-label="Settings" tabIndex={-1} ref={sheet}>
-      <div className="st-head">
-        <div className="st-titlebar">
-          <button className="st-file" onClick={A.openSettingsFile} title={file.path}>
-            {'{ }'} Open settings.json
-          </button>
-          <span className="st-title">{label}</span>
-          <button className="btn st-done" onClick={onClose}>
-            Done
-          </button>
-        </div>
-        <div className="st-tabs">
-          {TABS.map(([k, icon, name]) => (
-            <button key={k} className={`st-tab${tab === k ? ' on' : ''}`} onClick={() => setTab(k)}>
-              <span className={`st-tab-ic${k === 'profiles' ? ' mono' : ''}`}>{icon}</span>
+    <div className="st-page" aria-label="Settings" tabIndex={-1} ref={page}>
+      <nav className="st-nav">
+        <div className="st-nav-title">Settings</div>
+        {TABS.map(([k, Icon, name]) => (
+          <Fragment key={k}>
+            {k === 'file' && <div className="st-nav-sep" />}
+            <button className={`st-tab${tab === k ? ' on' : ''}${k === 'file' ? ' mono' : ''}`} onClick={() => setTab(k)}>
+              <Icon size={15} strokeWidth={1.75} />
               {name}
+              {k === 'file' && file.error && <span className="st-tab-err" title={file.error} />}
             </button>
-          ))}
-        </div>
-      </div>
-      {(file.error || file.warnings.length > 0) && (
-        <div className="st-filebar">
-          <span className="grow">
-            <b>{file.error ? 'settings.json has an error' : 'settings.json has problems'}</b> — {file.error || file.warnings.join(' · ')}
-            {file.error && '. Changes made here are not saved to the file until it is fixed.'}
-          </span>
-          <button className="st-link" onClick={A.openSettingsFile}>
-            Open file
+          </Fragment>
+        ))}
+        <div className="grow" />
+        <button className="st-file" onClick={A.openSettingsFile} title={file.path}>
+          <ExternalLink size={13} strokeWidth={1.75} />
+          Open in external editor
+        </button>
+      </nav>
+      <div className="st-main">
+        <div className="st-head">
+          <span className="st-title">{label}</span>
+          <button className="icon-btn" title="Close Settings (Esc)" onClick={A.closeSettings}>
+            <X size={16} strokeWidth={1.75} />
           </button>
         </div>
-      )}
-      <div className={`st-body st-body-${tab}`}>
-        {tab === 'general' && <GeneralTab />}
-        {tab === 'appearance' && <AppearanceTab />}
-        {tab === 'profiles' && <ProfilesTab />}
-        {tab === 'keybindings' && <KeysTab />}
-        {tab === 'gestures' && <GesturesTab />}
-        {tab === 'rules' && <RulesTab />}
+        {tab !== 'file' && (file.error || file.warnings.length > 0) && (
+          <div className="st-filebar">
+            <span className="grow">
+              <b>{file.error ? 'settings.json has an error' : 'settings.json has problems'}</b> — {file.error || file.warnings.join(' · ')}
+              {file.error && '. Changes made here are not saved to the file until it is fixed.'}
+            </span>
+            <button className="st-link" onClick={() => setTab('file')}>
+              Fix it
+            </button>
+          </div>
+        )}
+        <div className={`st-body st-body-${tab}`}>
+          {tab === 'general' && <GeneralTab />}
+          {tab === 'appearance' && <AppearanceTab />}
+          {tab === 'profiles' && <ProfilesTab />}
+          {tab === 'keybindings' && <KeysTab />}
+          {tab === 'gestures' && <GesturesTab />}
+          {tab === 'rules' && <RulesTab />}
+          {tab === 'file' && <FileTab />}
+        </div>
       </div>
     </div>
   );
@@ -195,6 +205,7 @@ function useKeyCapture(active, onKey) {
   cb.current = onKey;
   useEffect(() => {
     if (!active) return;
+    ui.set((u) => ({ ...u, capturingKeys: true }));
     const fn = (e) => {
       e.preventDefault();
       e.stopPropagation();
@@ -207,7 +218,10 @@ function useKeyCapture(active, onKey) {
       cb.current('set', normalizeAccel(a));
     };
     window.addEventListener('keydown', fn, true);
-    return () => window.removeEventListener('keydown', fn, true);
+    return () => {
+      window.removeEventListener('keydown', fn, true);
+      ui.set((u) => ({ ...u, capturingKeys: false }));
+    };
   }, [active]);
 }
 
@@ -340,12 +354,12 @@ function AppearanceTab() {
               ))}
             </datalist>
             <label className="st-unit">
-              <DraftInput className="field st-num" type="number" min={10} max={20} step={0.5} value={s.uiFontSize} onCommit={(v) => A.setSettings({ uiFontSize: clamp(10, 20, 13.5)(v) })} />
+              <DraftInput className="field st-num" type="number" min={10} max={20} step={0.5} value={s.uiFontSize} onCommit={(v) => A.setSettings({ uiFontSize: clamp(10, 20, 12.5)(v) })} />
               px
             </label>
             <label className="st-unit">
               Line
-              <DraftInput className="field st-num" type="number" min={1} max={2} step={0.05} value={s.uiLineHeight} onCommit={(v) => A.setSettings({ uiLineHeight: clamp(1, 2, 1.45)(v) })} />
+              <DraftInput className="field st-num" type="number" min={1} max={2} step={0.05} value={s.uiLineHeight} onCommit={(v) => A.setSettings({ uiLineHeight: clamp(1, 2, 1.4)(v) })} />
             </label>
           </span>
         </Row>
@@ -1071,6 +1085,102 @@ function RuleCard({ rule: r, index, count, hits, spaces, profiles, matched, auto
             + effect
           </button>
         )}
+      </div>
+    </div>
+  );
+}
+
+// ---- settings.json --------------------------------------------------------------------
+
+// JSON keys get their own color: a string followed by a colon.
+const markKeys = (lines) => lines.map((toks) => toks.map((t, i) => (t[0] === 'str' && /^\s*:/.test(toks[i + 1]?.[1] || '') ? ['fn', t[1]] : t)));
+
+// The file itself, edited in place: highlighted text under a transparent textarea, checked
+// as you type. ⌘S saves and applies it; edits made in another editor load in unless you
+// have unsaved changes here.
+function FileTab() {
+  const file = ui.use((u) => u.settingsFile);
+  const home = ui.use((u) => u.home);
+  const [text, setText] = useState(file.text ?? '');
+  const [base, setBase] = useState(file.text ?? ''); // the file on disk as of the last load or save
+  const area = useRef(null);
+  const dirty = text !== base;
+
+  useEffect(() => {
+    if (file.text == null || file.text === base) return;
+    if (!dirty) setText(file.text);
+    setBase(file.text);
+  }, [file.text]);
+
+  const lines = useMemo(() => text.split('\n'), [text]);
+  const tokens = useMemo(() => markKeys(highlightLines(lines, 'jsonc')), [lines]);
+  const check = useMemo(() => parseSettingsFile(text, DEFAULT_SETTINGS), [text]);
+  const errLine = Number(/line (\d+)/.exec(check.error || '')?.[1]) || null;
+
+  const save = () => {
+    if (!dirty) return;
+    A.saveSettingsText(text);
+    setBase(text);
+  };
+
+  // insertText keeps the textarea's own undo stack intact.
+  const insert = (s) => document.execCommand('insertText', false, s);
+  const onKeyDown = (e) => {
+    if (e.metaKey && e.key === 's') {
+      e.preventDefault();
+      save();
+    } else if (e.key === 'Tab' && !e.metaKey && !e.ctrlKey && !e.altKey) {
+      e.preventDefault();
+      insert('  ');
+    } else if (e.key === 'Enter' && !e.metaKey && !e.shiftKey) {
+      // Keep the indentation, one level deeper after an opening brace or bracket.
+      const el = e.currentTarget;
+      const before = el.value.slice(0, el.selectionStart);
+      const line = before.slice(before.lastIndexOf('\n') + 1);
+      const indent = /^\s*/.exec(line)[0] + (/[{[]\s*$/.test(line) ? '  ' : '');
+      e.preventDefault();
+      insert('\n' + indent);
+    } else if (e.key === 'Escape') {
+      e.currentTarget.blur();
+    }
+  };
+
+  if (file.text == null && !text) return <div className="st-empty">settings.json hasn't been written yet. Change any setting to create it.</div>;
+  return (
+    <div className="sf">
+      <div className="sf-bar">
+        <span className="sf-path">{tildify(file.path, home)}</span>
+        {dirty && <span className="sf-dirty">Unsaved</span>}
+        <span className="grow" />
+        <button className="btn" disabled={!dirty} onClick={() => setText(base)}>
+          Revert
+        </button>
+        <button className="btn primary" disabled={!dirty} onClick={save}>
+          Save <kbd>⌘S</kbd>
+        </button>
+      </div>
+      <div className="sf-scroll" onMouseDown={(e) => e.target === e.currentTarget && area.current?.focus()}>
+        <div className="sf-gutter" aria-hidden="true">
+          {lines.map((_, i) => (
+            <div key={i} className={errLine === i + 1 ? 'err' : undefined}>
+              {i + 1}
+            </div>
+          ))}
+        </div>
+        <div className="sf-code">
+          <pre aria-hidden="true">
+            {tokens.map((line, i) => (
+              <div key={i} className={errLine === i + 1 ? 'err' : undefined}>
+                {line.map(([cls, t], k) => (cls ? <span key={k} className={`hl-${cls}`}>{t}</span> : <Fragment key={k}>{t}</Fragment>))}
+              </div>
+            ))}
+          </pre>
+          <textarea ref={area} value={text} spellCheck={false} wrap="off" autoCapitalize="off" autoComplete="off" autoCorrect="off" data-keys="Cmd+S" onChange={(e) => setText(e.target.value)} onKeyDown={onKeyDown} />
+        </div>
+      </div>
+      <div className={`sf-status${check.error ? ' err' : check.warnings.length ? ' warn' : ''}`}>
+        <span className="sf-msg">{check.error ? `✕ ${check.error.replace(/ in JSON at position \d+/, '')}` : check.warnings.length ? `⚠ ${check.warnings.join(' · ')}` : '✓ Valid'}</span>
+        <span className="dim">Comments and trailing commas are fine</span>
       </div>
     </div>
   );

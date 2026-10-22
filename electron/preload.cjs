@@ -76,6 +76,7 @@ contextBridge.exposeInMainWorld('termac', {
     focusMain: () => ipcRenderer.send('app:focusMain'),
     trafficLights: (visible) => ipcRenderer.send('app:trafficLights', visible),
     setZoom: (percent) => webFrame.setZoomFactor(percent / 100),
+    titleBarHeight: (px) => ipcRenderer.send('app:titleBarHeight', px),
     quitReady: () => ipcRenderer.send('app:quitReady'),
     quitCancel: () => ipcRenderer.send('app:quitCancel'),
     onMenu: on('menu:action'),

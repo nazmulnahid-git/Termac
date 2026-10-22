@@ -66,7 +66,7 @@ export function runAction(action) {
     case 'toggleReview':
       return A.toggleReview();
     case 'settings':
-      return toggleOverlay('settings');
+      return A.toggleSettings();
     case 'newSpace':
       return setUi({ overlay: 'spaceEditor', overlayArg: null });
     case 'prevTab':
@@ -121,11 +121,11 @@ function onKeyDown(e) {
   const inTerminal = !!e.target.closest?.('.xterm');
   const inInput = !inTerminal && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName);
 
-  if (e.defaultPrevented || u.overlay === 'settings') return;
+  if (e.defaultPrevented || u.capturingKeys) return;
   if (u.overlay) {
     // Overlays own their keys; only the toggles that opened them close them again.
     const action = A.getKeymap().get(accel);
-    if (action && ['commandBar', 'settings', 'overview'].includes(action) && u.overlay === action) {
+    if (action && ['commandBar', 'overview'].includes(action) && u.overlay === action) {
       e.preventDefault();
       e.stopPropagation();
       setUi({ overlay: null });
@@ -143,6 +143,9 @@ function onKeyDown(e) {
     A.closeFile();
     return;
   }
+
+  // A field can claim shortcuts for itself (data-keys="Cmd+S"), like the settings.json editor's save.
+  if (inInput && e.target.dataset.keys?.split(' ').includes(accel)) return;
 
   const digit = /^(Cmd|Ctrl)\+([1-9])$/.exec(accel);
   if (digit && !inInput) {
@@ -253,7 +256,7 @@ export default function App() {
   };
 
   return (
-    <div className={`app${hidden ? ' focus-mode' : ''}`}>
+    <div className={`app${hidden ? ' focus-mode' : ''}${view === 'settings' ? ' on-settings' : ''}`}>
       <TopBar />
       <div className="app-body">
         {!hidden && <Sidebar />}
@@ -262,8 +265,8 @@ export default function App() {
         <main className="main">
           <ToolsPanel />
           <div className="stage">
-            {view === 'library' ? <Library /> : <Card />}
-            {view !== 'library' && <FileViewer />}
+            {view === 'library' ? <Library /> : view === 'settings' ? <Settings /> : <Card />}
+            {view === 'terminal' && <FileViewer />}
           </div>
           {notesOpen && <Notes key={spaceId} spaceId={spaceId} onClose={() => setUi({ notesOpen: false })} />}
           <ReviewPanel />
@@ -273,7 +276,6 @@ export default function App() {
       <Peek />
       {overlay && <div className={`backdrop${overlay === 'overview' ? ' dark' : ''}`} onMouseDown={close} />}
       {overlay === 'commandBar' && <CommandBar onClose={close} initial={typeof overlayArg === 'string' ? overlayArg : ''} />}
-      {overlay === 'settings' && <Settings onClose={close} initialTab={overlayArg} />}
       {overlay === 'spaceEditor' && <SpaceEditor key={overlayArg ?? 'new'} spaceId={overlayArg} onClose={close} />}
       {overlay === 'overview' && <Overview onClose={close} />}
       {overlay === 'tabStyle' && <TabStyle tid={overlayArg} onClose={close} />}

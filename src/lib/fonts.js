@@ -26,4 +26,5 @@ export function applyFontVars(settings, root = document.documentElement) {
   st.setProperty('--ui-size', `${settings.uiFontSize}px`);
   st.setProperty('--ui-lh', String(settings.uiLineHeight));
   st.setProperty('--mono', monoStack(settings.fontFamily));
+  st.setProperty('--zoom', String(settings.zoomLevel / 100));
 }
