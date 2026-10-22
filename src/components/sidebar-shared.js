@@ -22,12 +22,14 @@ export function usePeek(tid, sid, isActive) {
       clearTimeout(peekTimer);
       const el = e.currentTarget;
       if (ui.get().peek) show(el, ui.get().peek.pinned);
-      else peekTimer = setTimeout(() => !ui.get().dragging && el.isConnected && show(el), 400);
+      // Re-check at fire time: a click during the delay makes this row active.
+      else peekTimer = setTimeout(() => !ui.get().dragging && el.isConnected && A.activeTabId(app.get()) !== tid && show(el), 400);
     },
     onMouseLeave() {
       clearTimeout(peekTimer);
     },
     onMouseDown(e) {
+      clearTimeout(peekTimer);
       if (!e.shiftKey || isActive) return;
       e.preventDefault();
       const p = ui.get().peek;

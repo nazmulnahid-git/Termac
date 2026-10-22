@@ -251,9 +251,29 @@ function attachWebgl(h) {
     });
     h.term.loadAddon(w);
     h.webgl = w;
+    patchRectangles(w);
   } catch {
     h.webgl = null; // DOM renderer fallback
   }
+}
+
+// The WebGL addon draws a "default background" rectangle under dim/italic cells (those
+// flags live in the bg word) and forces it opaque, so with a transparent theme (image
+// looks) faint text sits on black boxes. Collapse those rectangles to zero width; the
+// cleared canvas already is the background. Patched once on the shared prototype.
+let rectanglesPatched = false;
+function patchRectangles(w) {
+  if (rectanglesPatched) return;
+  const proto = w._renderer?._rectangleRenderer?.value && Object.getPrototypeOf(w._renderer._rectangleRenderer.value);
+  if (typeof proto?._updateRectangle !== 'function') return;
+  rectanglesPatched = true;
+  const update = proto._updateRectangle;
+  proto._updateRectangle = function (vertices, offset, fg, bg, startX, endX, y) {
+    update.call(this, vertices, offset, fg, bg, startX, endX, y);
+    const inverse = fg & 0x4000000;
+    const defaultBg = (bg & 0x3000000) === 0;
+    if (!inverse && defaultBg && (this._themeService.colors.background.rgba & 0xff) < 0xff) vertices.attributes[offset + 2] = 0;
+  };
 }
 
 // Applies a Space's terminal look (see lib/termtheme.js) to one session.
