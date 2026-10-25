@@ -2,6 +2,7 @@
 // family. Callers keep using the Icon* names; size defaults to 16.
 import {
   PanelLeft,
+  ImagePlus,
   Folder,
   FolderOpen,
   FolderPlus,
@@ -100,6 +101,7 @@ export const IconExpandAll = icon(ChevronsUpDown);
 export const IconCheckCircle = icon(CircleCheck);
 export const IconXCircle = icon(CircleX);
 export const IconDot = icon(CircleDot);
+export const IconImagePlus = icon(ImagePlus);
 // Spins while a git or gh action runs (.spin in app.css).
 export const IconSpinner = ({ size = 16, ...rest }) => <LoaderCircle size={size} strokeWidth={2} className="spin" aria-hidden="true" {...rest} />;
 

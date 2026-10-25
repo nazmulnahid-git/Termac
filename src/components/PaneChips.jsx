@@ -12,6 +12,7 @@ import { IconFolder, IconFolderOpen, IconBranch, IconPullRequest, IconCheck, Ico
 
 const api = window.termac;
 const MENU_W = 420;
+const MENU_MAX_H = 480;
 
 export default function PaneChips({ sid, r, cwd }) {
   const home = ui.use((s) => s.home);
@@ -213,10 +214,18 @@ function ChipMenu({ rect, placeholder, sections, extra, onClose }) {
     e.preventDefault();
   };
 
+  // Open downward unless the chip sits too low for a usable list; then flip above it,
+  // with the search field next to the chip. Either way, cap the height to the room left.
   const left = Math.max(8, Math.min(rect.left, window.innerWidth - MENU_W - 8));
+  const below = window.innerHeight - rect.bottom - 14;
+  const above = rect.top - 14;
+  const up = below < Math.min(MENU_MAX_H, 260) && above > below;
+  const pos = up
+    ? { bottom: window.innerHeight - rect.top + 6, maxHeight: Math.min(MENU_MAX_H, above) }
+    : { top: rect.bottom + 6, maxHeight: Math.min(MENU_MAX_H, below) };
   let n = -1;
   return (
-    <div ref={ref} className="chip-menu" style={{ left, top: rect.bottom + 6, width: MENU_W }} onKeyDown={onKeyDown}>
+    <div ref={ref} className={`chip-menu${up ? ' up' : ''}`} style={{ left, width: MENU_W, ...pos }} onKeyDown={onKeyDown}>
       {placeholder ? (
         <label className="cm-search">
           <IconSearch size={13} />

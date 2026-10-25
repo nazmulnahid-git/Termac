@@ -6,7 +6,7 @@ import { app, rt, ui } from '../state/model.js';
 import { arrayEq } from '../state/store.js';
 import * as A from '../state/actions.js';
 import { procLabel, timeAgo, formatDuration } from '../lib/meta.js';
-import { StatusMark } from './common.jsx';
+import { StatusMark, SpaceGlyph } from './common.jsx';
 import { openLibrary } from './Sidebar.jsx';
 
 export default function StatusBar() {
@@ -80,7 +80,7 @@ function SpaceTabs() {
             onDoubleClick={() => ui.set((u) => ({ ...u, overlay: 'spaceEditor', overlayArg: sp.id }))}
           >
             <span className="n">{i + 1}:</span>
-            <span className="g">{sp.glyph}</span>
+            <SpaceGlyph space={sp} className="g" />
             {sp.name.toLowerCase()}
             <span className={`flag${flag === '#' ? ' bell' : ''}`}>{flag}</span>
           </button>

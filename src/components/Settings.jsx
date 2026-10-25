@@ -9,7 +9,7 @@ import { uid } from '../lib/meta.js';
 import { BG_PRESETS, terminalLook } from '../lib/termtheme.js';
 import { highlightLines } from '../lib/highlight.js';
 import { parseSettingsFile } from '../lib/settingsfile.js';
-import { Switch, Seg, useImageUrl } from './common.jsx';
+import { Switch, Seg, useImageUrl, SpaceGlyph } from './common.jsx';
 import { monoStack } from '../lib/fonts.js';
 import { SlidersHorizontal, Palette, SquareTerminal, Keyboard, Hand, Route, FileJson, ExternalLink, X } from 'lucide-react';
 
@@ -517,7 +517,7 @@ function SpaceLooks() {
           key={sp.id}
           label={
             <span className="st-sp">
-              <span style={{ color: sp.color }}>{sp.glyph}</span> {sp.name}
+              <SpaceGlyph space={sp} style={{ color: sp.color }} /> {sp.name}
             </span>
           }
           hint={lookLabel(sp.term)}
@@ -666,7 +666,7 @@ function ProfileEditor({ profile: p, isDefault, canDelete, onDeleted }) {
           {usedBy.length ? (
             usedBy.map((sp) => (
               <span key={sp.id} className="st-space-chip" style={{ '--c': sp.color }}>
-                <i>{sp.glyph}</i>
+                <SpaceGlyph space={sp} />
                 {sp.name}
               </span>
             ))
@@ -993,7 +993,7 @@ function TestResult({ result, spaces }) {
       <span className="dim">→</span>
       {rule.action.type === 'space' ? (
         <b className="st-space-name" style={{ '--c': sp?.color }}>
-          <i>{sp?.glyph || '◆'}</i>
+          <SpaceGlyph space={sp} />
           {sp?.name || 'Missing Space'}
         </b>
       ) : (
@@ -1071,7 +1071,14 @@ function RuleCard({ rule: r, index, count, hits, spaces, profiles, matched, auto
         <span className="grow" />
         <span className="st-hits">{r.enabled ? `${hits} ${hits === 1 ? 'match' : 'matches'}` : 'Off'}</span>
         <Switch on={r.enabled} onChange={(enabled) => mutRule(r.id, () => ({ enabled }))} />
-        <button className="st-x st-rule-del" title="Delete rule" onClick={() => A.setRules(app.get().rules.filter((x) => x.id !== r.id))}>
+        <button
+          className="st-x st-rule-del"
+          title="Delete rule"
+          onClick={async () => {
+            if (r.trigger?.pattern && api?.sys?.confirm && !(await api.sys.confirm({ message: `Delete the rule for “${r.trigger.pattern}”?`, detail: 'New sessions that match it will open with the defaults.', ok: 'Delete' }))) return;
+            A.setRules(app.get().rules.filter((x) => x.id !== r.id));
+          }}
+        >
           ✕
         </button>
       </div>

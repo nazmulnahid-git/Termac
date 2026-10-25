@@ -9,6 +9,7 @@ import { THEMES, focus as focusTerm } from '../term/registry.js';
 import { clockTime, dayLabel } from '../lib/meta.js';
 import { tildify } from '../lib/routing.js';
 import { monoStack } from '../lib/fonts.js';
+import { SpaceGlyph } from './common.jsx';
 
 const api = window.termac;
 
@@ -68,7 +69,7 @@ function distinct(list) {
 }
 
 export default function Library() {
-  const spacesKey = app.use((s) => s.spaces.map((sp) => [sp.id, sp.name, sp.glyph, sp.color].join(SEP)).join('\n'));
+  const spacesKey = app.use((s) => s.spaces.map((sp) => [sp.id, sp.name, sp.glyph, sp.color, sp.iconImage || ''].join(SEP)).join('\n'));
   const settings = app.use((s) => ({ archiveAfterH: s.settings.archiveAfterH, fontSize: s.settings.fontSize, fontFamily: s.settings.fontFamily, lineHeight: s.settings.lineHeight, letterSpacing: s.settings.letterSpacing, fontWeight: s.settings.fontWeight, fontWeightBold: s.settings.fontWeightBold }), shallow);
   const theme = ui.use((s) => s.termTheme);
   const home = ui.use((s) => s.home);
@@ -77,8 +78,8 @@ export default function Library() {
     () =>
       spacesKey
         ? spacesKey.split('\n').map((line) => {
-            const [id, name, glyph, color] = line.split(SEP);
-            return { id, name, glyph, color };
+            const [id, name, glyph, color, iconImage] = line.split(SEP);
+            return { id, name, glyph, color, iconImage };
           })
         : [],
     [spacesKey],
@@ -325,7 +326,7 @@ export default function Library() {
         <div className="lib-chips">
           {fSpace ? (
             <button className="lib-chip space" style={{ '--c': fSpace.color }} onClick={pickSpace}>
-              {fSpace.glyph} {fSpace.name}
+              <SpaceGlyph space={fSpace} /> {fSpace.name}
               <span
                 className="x"
                 onClick={(ev) => {
@@ -411,9 +412,7 @@ function Detail({ e, space, home, theme, slotRef, onRestore, onRestoreTo, onDele
       </div>
       <div className="lib-meta">
         <Meta k="Space">
-          <span className="lib-glyph" style={{ color: space?.color }}>
-            {space?.glyph || '◇'}
-          </span>{' '}
+          {space ? <SpaceGlyph space={space} className="lib-glyph" style={{ color: space.color }} /> : <span className="lib-glyph">◇</span>}{' '}
           {space?.name || e.spaceName || '—'}
         </Meta>
         <Meta k="Directory" mono>

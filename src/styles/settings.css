@@ -87,7 +87,7 @@
 .st-startup { min-height: 84px; }
 .st-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .st-space-chip { display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px; border-radius: var(--r-sm); background: color-mix(in oklab, var(--c) 16%, transparent); font-weight: 500; }
-.st-space-chip i { font-style: normal; color: var(--c); }
+.st-space-chip .sp-glyph { color: var(--c); }
 
 /* Keybindings */
 .st-search { display: flex; align-items: center; gap: 8px; height: 28px; padding: 0 10px; border-radius: var(--r); background: var(--input); border: 1px solid var(--panel-line); }
@@ -148,7 +148,7 @@ select.field.st-tok { height: 28px; padding: 0 4px 0 6px; border-radius: var(--r
 .st-test .field { background: var(--input); }
 .st-test-res { display: inline-flex; align-items: center; gap: 8px; flex: none; max-width: 55%; white-space: nowrap; overflow: hidden; }
 .st-space-name { display: inline-flex; align-items: center; gap: 4px; }
-.st-space-name i { font-style: normal; color: var(--c, var(--accent)); }
+.st-space-name .sp-glyph { color: var(--c, var(--accent)); }
 .st-eff-tag { padding: 2px 6px; border-radius: var(--r-sm); background: var(--line); font-weight: var(--bold); }
 .st-eff-tag.danger { background: var(--fail); color: #fff; }
 

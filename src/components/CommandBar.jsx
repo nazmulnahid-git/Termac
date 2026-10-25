@@ -9,6 +9,7 @@ import { route, tildify, expandHome } from '../lib/routing.js';
 import { formatAccel } from '../lib/keys.js';
 import { kindOf, sessionName, formatDuration, timeAgo, dayLabel } from '../lib/meta.js';
 import { TabIcon } from './tabicons.jsx';
+import { SpaceGlyph } from './common.jsx';
 import { promptText } from './Sidebar.jsx';
 import { rootOf } from './project.js';
 
@@ -151,9 +152,7 @@ function Row({ item, head, selected, first, onHover, onPick }) {
       {head && <div className="group">{head}</div>}
       <div className={`item${selected ? ' sel' : ''}`} onMouseMove={onHover} onClick={onPick}>
         {item.glyph ? (
-          <span className="chip cb-glyph" style={{ '--c': item.color }}>
-            {item.glyph}
-          </span>
+          <SpaceGlyph space={item} className="chip cb-glyph" style={{ '--c': item.color }} />
         ) : (
           <span className="chip">{item.chip}</span>
         )}
@@ -328,7 +327,7 @@ function buildCandidates() {
       if (dir) A.openTerminal({ cwd: dir });
     }, { hint: '', words: 'folder choose' }),
     ...s.spaces.map((sp, i) =>
-      act(`space:${sp.id}`, `Switch to Space · ${sp.name}`, () => A.switchSpace(sp.id), { glyph: sp.glyph, color: sp.color, hint: i < 9 ? `⌃${i + 1}` : '', current: sp.id === activeSpaceId }),
+      act(`space:${sp.id}`, `Switch to Space · ${sp.name}`, () => A.switchSpace(sp.id), { glyph: sp.glyph, iconImage: sp.iconImage, color: sp.color, hint: i < 9 ? `⌃${i + 1}` : '', current: sp.id === activeSpaceId }),
     ),
     act('newSpace', 'New Space', () => setUi({ overlay: 'spaceEditor', overlayArg: null })),
     act('overview', 'All Spaces', () => setUi({ overlay: 'overview' }), { words: 'overview' }),

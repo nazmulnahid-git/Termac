@@ -8,7 +8,7 @@ import './styles/quick.css';
 import { app, rt, ui, migrate, patchRt } from './state/model.js';
 import { createStore } from './state/store.js';
 import * as reg from './term/registry.js';
-import { StatusMark } from './components/common.jsx';
+import { StatusMark, SpaceGlyph } from './components/common.jsx';
 import { uid, splitCwd, sessionName, leafOf } from './lib/meta.js';
 import { sshTarget } from './lib/routing.js';
 import { applyFontVars } from './lib/fonts.js';
@@ -289,7 +289,7 @@ function MoveMenu() {
     <div className="qt-menu" onMouseLeave={() => setSel(-1)}>
       {spaces.map((sp, i) => (
         <button key={sp.id} className={`qt-item${sel === i ? ' sel' : ''}`} style={{ '--c': sp.color }} onMouseEnter={() => setSel(i)} onClick={() => pick(i)}>
-          <span className="qt-glyph">{sp.glyph}</span>
+          <SpaceGlyph space={sp} className="qt-glyph" />
           <span className="grow ellipsis">{sp.name}</span>
           {i < 9 && <kbd>⌃{i + 1}</kbd>}
         </button>

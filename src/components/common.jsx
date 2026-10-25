@@ -76,6 +76,15 @@ export function Seg({ value, options, onChange }) {
   );
 }
 
+// A Space's icon: its picked image when it has one, else its text glyph.
+export function SpaceGlyph({ space, className = '', style }) {
+  return (
+    <span className={`sp-glyph ${className}`} style={style}>
+      {space?.iconImage ? <img src={space.iconImage} alt="" draggable={false} /> : space?.glyph || '◆'}
+    </span>
+  );
+}
+
 // Background images are read through the main process once and cached as data URLs.
 const imageCache = new Map();
 export function useImageUrl(file) {

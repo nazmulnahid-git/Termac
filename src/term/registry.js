@@ -140,6 +140,7 @@ export function create(sid) {
     lastActivity: Date.now(),
     pendingCmd: '',
     cmds: [],
+    dividers: [], // where each earlier launch's restored history ends
     newLines: 0,
     ownPrompt: false, // this session's shell runs with its prompt blanked (TERMORC_PROMPT)
     atPrompt: false, // the shell is waiting at a prompt (between marks A and C)
@@ -447,12 +448,7 @@ function onShellMark(h, data) {
       h.atPrompt = false;
       if (h.ownPrompt) decorateHead(h, entry);
       h.cmds.push(entry);
-      if (h.cmds.length > 200) {
-        const old = h.cmds.shift();
-        old?.start?.dispose();
-        old?.head?.dispose();
-        old?.decos?.forEach((d) => d.dispose());
-      }
+      trimCmds(h);
       patchRt(h.sid, { status: 'run', atPrompt: false, command: cmd, cmdStart: now, exitCode: null, dropped: null });
       hooks.commandStart?.(h.sid, cmd);
       break;
@@ -476,6 +472,119 @@ function onShellMark(h, data) {
     default:
       break;
   }
+}
+
+function trimCmds(h) {
+  while (h.cmds.length > 200) {
+    const old = h.cmds.shift();
+    for (const m of [old.start, old.head, old.end]) m?.dispose();
+    old.decos?.forEach((d) => d.dispose());
+  }
+}
+
+// ---- Saved history --------------------------------------------------------------------
+// Saved scrollback starts with a private OSC listing the blocks (and restore dividers) by
+// row, so a restored session draws the same block headers as a live one instead of bare
+// terminal text. Other readers of the file (the Library preview, its search) skip the OSC.
+const HISTORY_RE = /^\x1b\]7701;([^\x07]*)\x07/;
+// The text banner older builds wrote between launches; dividers are decorations now.
+const LEGACY_BANNER = /(?:\r\n)?(?:\x1b\[[0-9;]*m)*─{4} restored · [^\r\n]*?─{4}(?:\x1b\[[0-9;]*m)*/g;
+
+// Unlike serializeBuffer, this drops the blank rows under the last output (the idle
+// prompt line) and doesn't keep the cursor: it's for a fresh terminal, not a live shell.
+export function saveHistory(sid, scrollback = 3000) {
+  const h = handles.get(sid);
+  if (!h) return '';
+  const b = h.term.buffer.normal;
+  let last = b.length - 1;
+  while (last >= 0 && !b.getLine(last)?.translateToString(true).trim()) last--;
+  if (last < 0) return '';
+  const first = Math.max(0, last + 1 - scrollback - h.term.rows);
+  const rows = last - first;
+  const row = (m) => (m && !m.isDisposed && m.line >= first ? Math.min(m.line, last + 1) - first : null);
+  const blocks = [];
+  for (const e of h.cmds) {
+    const head = row(e.head);
+    if (head == null || !(e.decos.length || e.restored)) continue;
+    blocks.push({ cmd: e.cmd, at: e.at, exit: e.exit, dur: e.dur, head, start: row(e.start), end: row(e.end) });
+  }
+  // A divider with nothing after it is dropped, so relaunches without new output don't stack up.
+  const dividers = h.dividers.map((d) => ({ at: d.at, row: row(d.marker) })).filter((d) => d.row != null && d.row < rows);
+  try {
+    const body = h.serialize.serialize({ range: { start: first, end: last }, excludeAltBuffer: true, excludeModes: true });
+    return `\x1b]7701;${JSON.stringify({ cols: h.term.cols, rows, blocks, dividers })}\x07${body}`;
+  } catch {
+    return '';
+  }
+}
+
+// Writes saved history into a fresh session, then a divider where this launch picks up.
+export function restore(sid, content, at = Date.now()) {
+  const h = handles.get(sid);
+  if (!h || !content) return;
+  let meta = null;
+  const m = HISTORY_RE.exec(content);
+  if (m) {
+    try {
+      meta = JSON.parse(m[1]);
+    } catch {
+      /* written by a newer build; show the text alone */
+    }
+    content = content.slice(m[0].length);
+  } else content = content.replace(LEGACY_BANNER, '');
+  // Rows only line up at the width they were saved at; the next fit reflows them, markers too.
+  if (meta?.cols > 1 && meta.cols !== h.term.cols) h.term.resize(meta.cols, h.term.rows);
+  // One row for the divider, the next for the shell's first prompt. The callback runs
+  // before any shell output is parsed, so the cursor is still two rows under the history.
+  h.term.write(content + '\x1b[0m\r\n\r\n', () => {
+    const b = h.term.buffer.active;
+    const cur = b.baseY + b.cursorY;
+    const rows = meta?.rows ?? cur - 2;
+    const mark = (r) => {
+      if (r == null) return null;
+      const offset = Math.min(r, rows + 1) - rows - 2;
+      return cur + offset < 0 ? null : h.term.registerMarker(offset); // scrolled out of a smaller scrollback
+    };
+    const restored = [];
+    for (const bl of meta?.blocks || []) {
+      const head = mark(bl.head);
+      if (!head) continue;
+      const e = { cmd: bl.cmd || '', at: bl.at || 0, exit: bl.exit ?? null, dur: bl.dur ?? null, head, start: mark(bl.start), end: mark(bl.end), decos: [], restored: true };
+      if (ownPrompt) {
+        decorateHead(h, e);
+        if (e.end) decorateEnd(h, e);
+      }
+      restored.push(e);
+    }
+    h.cmds = [...restored, ...h.cmds];
+    trimCmds(h);
+    for (const d of meta?.dividers || []) addDivider(h, d.at, mark(d.row));
+    addDivider(h, at, h.term.registerMarker(-1));
+  });
+}
+
+function addDivider(h, at, marker) {
+  if (!marker) return;
+  const d = { at, marker };
+  h.dividers.push(d);
+  const deco = h.term.registerDecoration({ marker, width: h.term.cols, layer: 'top' });
+  deco?.onRender((el) => {
+    el.classList.add('hist-div');
+    el.style.width = '100%';
+    if (!el.firstChild) {
+      // xterm sets display on the decoration itself; the rule-label-rule row lives inside.
+      const row = document.createElement('div');
+      row.textContent = `Restored · ${stamp(at)}`;
+      el.appendChild(row);
+    }
+  });
+  marker.onDispose(() => (h.dividers = h.dividers.filter((x) => x !== d)));
+}
+
+function stamp(ts) {
+  const d = new Date(ts);
+  const today = new Date().toDateString() === d.toDateString();
+  return today ? clock(ts) : `${d.toLocaleDateString([], { month: 'short', day: 'numeric' })}, ${clock(ts)}`;
 }
 
 // ---- Click to move the cursor --------------------------------------------------------

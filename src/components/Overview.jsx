@@ -4,7 +4,7 @@ import { app, rt, ui } from '../state/model.js';
 import { arrayEq } from '../state/store.js';
 import * as A from '../state/actions.js';
 import * as L from '../lib/layout.js';
-import { useTabView, StatusMark } from './common.jsx';
+import { useTabView, StatusMark, SpaceGlyph } from './common.jsx';
 
 const OV_MIME = 'application/x-termac-ov-tab';
 
@@ -107,7 +107,7 @@ function SpaceCard({ space, current, highlighted, dropping, dragTid, onPick, onH
     <div className={cls} style={{ '--c': space.color }} onClick={onPick} onMouseEnter={onHover} onDragOver={onDragOver} onDragLeave={onDragLeave} onDrop={onDrop}>
       <div className="ov-head">
         <div className="top">
-          <span className="g">{space.glyph}</span>
+          <SpaceGlyph space={space} className="g" />
           <span className="grow ellipsis">{space.name}</span>
           {current && <span className="badge">Current</span>}
         </div>

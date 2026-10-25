@@ -3,14 +3,13 @@ import { app, rt, ui, patchRt, migrate, newSpace, DEFAULT_SETTINGS } from './mod
 import * as reg from '../term/registry.js';
 import * as L from '../lib/layout.js';
 import { route, ruleMatches, sshTarget, expandHome, isRiskyCommand } from '../lib/routing.js';
-import { uid, formatDuration, leafOf, SPACE_COLORS, SPACE_GLYPHS } from '../lib/meta.js';
+import { uid, formatDuration, leafOf, sessionName, SPACE_COLORS, SPACE_GLYPHS } from '../lib/meta.js';
 import { buildKeymap, ACTIONS } from '../lib/keys.js';
 import { parseSettingsFile, settingsToFile, settingsSchema } from '../lib/settingsfile.js';
 import { applyFontVars } from '../lib/fonts.js';
 
 const api = window.termac;
 const home = () => ui.get().home;
-const RESTORED = (t) => `\r\n\x1b[2m──── restored · ${t} ────\x1b[0m\r\n`;
 
 // ---- Persistence --------------------------------------------------------------------
 let saveTimer = null;
@@ -269,7 +268,7 @@ export function openTerminal(opts = {}) {
   });
 
   const h = reg.create(sid);
-  if (content) h.term.write(content + RESTORED(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })));
+  if (content) reg.restore(sid, content);
   startSession(sid, command);
   if (activate) {
     ui.set((u) => ({ ...u, view: 'terminal', focusedSid: sid }));
@@ -311,21 +310,89 @@ function removeSessionFromTab(sid) {
   syncFocus();
 }
 
-export async function closePane(sid = focusedSid(), { force = false } = {}) {
-  if (!sid) return;
+// A command is running, or a program other than the shell holds the terminal.
+function isBusy(sid) {
+  const h = reg.getHandle(sid);
   const r = rt.get()[sid];
-  if (!force && r?.status === 'run') {
-    const ok = await api.sys.confirm({ message: `Close “${r.command || 'this session'}”?`, detail: 'The running process will be stopped.', ok: 'Close' });
-    if (!ok) return;
-  }
-  removeSessionFromTab(sid);
+  return r?.status === 'run' || !!(h?.alive && r?.proc && r.proc !== h.shell && r.proc !== 'login');
 }
 
-export function closeTab(tid) {
-  const tab = app.get().tabs[tid];
-  if (!tab) return;
-  for (const sid of L.leaves(tab.layout)) removeSessionFromTab(sid);
+// An idle Today session just closes. A pinned or Favorite one, or one with something
+// running, asks first. `sids` alone means panes leaving a split that stays open.
+async function okToClose({ tids = [], sids = tids.flatMap((tid) => L.leaves(app.get().tabs[tid]?.layout)), archive = false }) {
+  const s = app.get();
+  const r = rt.get();
+  const busy = sids.filter(isBusy);
+  const kept = tids.filter((tid) => ['pinned', 'fav'].includes(locate(tid, s)?.section));
+  if (!busy.length && !kept.length) return true;
+  const what = tids.length > 1 ? `${tids.length} sessions` : `“${s.tabs[tids[0]]?.name || sessionName(null, r[busy[0] || sids[0]], home()) || 'this session'}”`;
+  const detail = [];
+  if (busy.length === 1) detail.push(`${r[busy[0]]?.command || r[busy[0]]?.proc || 'A process'} is still running and will be stopped.`);
+  else if (busy.length) detail.push(`${busy.length} running processes will be stopped.`);
+  if (archive) detail.push('Scrollback and history are kept in the Library.');
+  else if (kept.length > 1) detail.push(`${kept.length} of them are pinned.`);
+  else if (kept.length) detail.push(locate(kept[0], s).section === 'fav' ? "It's a Favorite, shared by every Space." : "It's pinned to this Space.");
+  return api.sys.confirm({ message: archive ? `Move ${what} to the Library?` : `Close ${what}?`, detail: detail.join(' '), ok: archive ? 'Move to Library' : 'Close' });
 }
+
+export async function closePane(sid = focusedSid(), { force = false } = {}) {
+  const tab = sid && tabOfSession(sid);
+  if (!tab) return;
+  const whole = L.leaves(tab.layout).length === 1;
+  if (!force && !(await okToClose(whole ? { tids: [tab.id] } : { sids: [sid] }))) return;
+  removeSessionFromTab(sid);
+  ensureSession({ closed: true });
+}
+
+export async function closeTab(tid) {
+  const tab = app.get().tabs[tid];
+  if (!tab || !(await okToClose({ tids: [tid] }))) return;
+  for (const sid of L.leaves(tab.layout)) removeSessionFromTab(sid);
+  ensureSession({ closed: true });
+}
+
+// ---- Always a session ---------------------------------------------------------------
+// The active Space always shows a session: another of its own, or a fresh terminal. When
+// the user closes the last one in a Space they move to the nearest Space that has
+// sessions, and closing the very last session quits.
+let quitRequested = false;
+let ensureQueued = false;
+
+function ensureSession({ closed = false } = {}) {
+  const s = app.get();
+  if (!loaded || quitting || quitRequested || !s.onboarded) return;
+  const sp = activeSpace(s);
+  if (s.tabs[sp.activeTabId]) return;
+  const fallback = [...tabsOfSpace(sp), ...s.favorites].find((tid) => s.tabs[tid]);
+  if (fallback) {
+    app.set((st) => setActiveTab(st, sp.id, fallback));
+    return syncFocus();
+  }
+  if (closed) {
+    const at = s.spaces.indexOf(sp);
+    const near = s.spaces
+      .map((x, i) => ({ x, d: Math.abs(i - at) }))
+      .filter(({ x }) => x !== sp && tabsOfSpace(x).some((tid) => s.tabs[tid]))
+      .sort((a, b) => a.d - b.d)[0];
+    if (near) return switchSpace(near.x.id);
+    quitRequested = true;
+    return api.app.quit();
+  }
+  openTerminal({ spaceId: sp.id, viaRules: false });
+}
+
+// Catches every other way a Space ends up empty: switching to it, creating it, archiving
+// or moving its sessions away. Deferred so a close can decide first.
+app.subscribe(() => {
+  if (ensureQueued || !loaded) return;
+  const s = app.get();
+  if (s.tabs[activeSpace(s)?.activeTabId]) return;
+  ensureQueued = true;
+  queueMicrotask(() => {
+    ensureQueued = false;
+    ensureSession();
+  });
+});
 
 function onExit(sid, exitCode) {
   // Shells die because we're quitting: keep their tabs for the next launch.
@@ -339,6 +406,7 @@ function onExit(sid, exitCode) {
     patchRt(sid, { alive: false, status: 'idle' });
   } else {
     removeSessionFromTab(sid);
+    ensureSession({ closed: true });
   }
 }
 
@@ -435,11 +503,10 @@ export async function deleteSpace(id) {
   if (s.spaces.length < 2) return;
   const sp = s.spaces.find((x) => x.id === id);
   const n = tabsOfSpace(sp).length;
-  if (n) {
-    const ok = await api.sys.confirm({ message: `Delete “${sp.name}”?`, detail: `Its ${n} session${n > 1 ? 's' : ''} will be moved to the Library.`, ok: 'Delete Space' });
-    if (!ok) return;
-    await commitArchive(tabsOfSpace(sp), 'closed');
-  }
+  const detail = [n ? `Its ${n} session${n > 1 ? 's' : ''} will be moved to the Library.` : '', s.notes[id]?.trim() ? 'Its notes will be deleted.' : ''].filter(Boolean).join(' ');
+  const ok = await api.sys.confirm({ message: `Delete “${sp.name}”?`, detail: detail || "This can't be undone.", ok: 'Delete Space' });
+  if (!ok) return;
+  if (n) await commitArchive(tabsOfSpace(sp), 'closed');
   app.set((st) => {
     const spaces = st.spaces.filter((x) => x.id !== id);
     const notes = { ...st.notes };
@@ -866,9 +933,8 @@ function archiveCandidates() {
       if (!tab || tab.effects?.noArchive) continue;
       const idle = L.leaves(tab.layout).every((sid) => {
         const h = reg.getHandle(sid);
-        const r = rt.get()[sid];
         if (!h) return true;
-        if (r?.status === 'run' || (r?.proc && r.proc !== h.shell && r.proc !== 'login' && h.alive)) return false;
+        if (isBusy(sid)) return false;
         return now - h.lastActivity > hours * 3600000;
       });
       if (idle) out.push(tid);
@@ -936,7 +1002,7 @@ async function commitArchive(tids, reason, locs = {}) {
         commands: cmds.slice(-100),
         lines: h ? h.term.buffer.active.length : 0,
       };
-      if (h) await api.library.add(entry, reg.serializeBuffer(sid, 5000));
+      if (h) await api.library.add(entry, reg.saveHistory(sid, 5000));
       reg.dispose(sid);
       api.scrollback.remove(sid);
     }
@@ -952,9 +1018,12 @@ async function commitArchive(tids, reason, locs = {}) {
   });
 }
 
-export function archiveTab(tid) {
-  tidy([tid], { reason: 'closed' });
+export async function archiveTabs(tids) {
+  if (!tids.length || !(await okToClose({ tids, archive: true }))) return;
+  tidy(tids, { reason: 'closed' });
 }
+
+export const archiveTab = (tid) => archiveTabs([tid]);
 
 export async function restoreFromLibrary(entry, spaceId = entry.spaceId) {
   const content = await api.library.content(entry.id);
@@ -1044,18 +1113,19 @@ export async function boot() {
   const { error, warnings } = ui.get().settingsFile;
   if (error || warnings.length) toast({ title: error ? 'settings.json has an error' : 'settings.json has problems', detail: error || warnings.slice(0, 2).join(' · '), action: { label: 'Open', run: () => openSettings('file') } }, 8000);
 
-  const stamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const restoredAt = Date.now();
   const favSids = new Set(s.favorites.flatMap((tid) => L.leaves(tabs[tid]?.layout)));
   await Promise.all(
     Object.keys(sessions).map(async (sid) => {
       const h = reg.create(sid);
       const content = await api.scrollback.load(sid);
-      if (content) h.term.write(content + RESTORED(stamp));
+      reg.restore(sid, content, restoredAt);
       patchRt(sid, { cwd: sessions[sid].cwd, status: 'idle' });
       if (favSids.has(sid)) startSession(sid);
     }),
   );
   syncFocus();
+  ensureSession();
   api.sys.sshHosts().then((sshHosts) => ui.set((u) => ({ ...u, sshHosts })));
   setInterval(() => tidy(), 5 * 60 * 1000);
   setInterval(checkpointScrollback, 60 * 1000);
@@ -1071,7 +1141,7 @@ function checkpointScrollback() {
   for (const h of reg.allHandles()) {
     if (!s.sessions[h.sid] || (checkpointedAt.get(h.sid) || 0) >= h.lastActivity) continue;
     checkpointedAt.set(h.sid, Date.now());
-    api.scrollback.save(h.sid, reg.serializeBuffer(h.sid, 3000));
+    api.scrollback.save(h.sid, reg.saveHistory(h.sid));
   }
 }
 
@@ -1079,12 +1149,16 @@ export async function prepareQuit({ running }) {
   const s = app.get();
   if (s.settings.confirmQuit && running > 0) {
     const ok = await api.sys.confirm({ message: `Quit Termorc with ${running} running process${running > 1 ? 'es' : ''}?`, detail: 'Running commands will be stopped. Sessions and scrollback are restored next launch.', ok: 'Quit' });
-    if (!ok) return api.app.quitCancel();
+    if (!ok) {
+      quitRequested = false;
+      ensureSession();
+      return api.app.quitCancel();
+    }
   }
   quitting = true;
   const writes = [];
   for (const h of reg.allHandles()) {
-    if (s.sessions[h.sid]) writes.push(api.scrollback.save(h.sid, reg.serializeBuffer(h.sid, 3000)));
+    if (s.sessions[h.sid]) writes.push(api.scrollback.save(h.sid, reg.saveHistory(h.sid)));
   }
   await Promise.allSettled(writes);
   saveNow();

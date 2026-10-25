@@ -974,6 +974,11 @@ fn app_take_folders(app: AppHandle) -> Vec<String> {
 }
 
 #[tauri::command]
+fn app_quit(app: AppHandle) {
+    begin_quit(&app);
+}
+
+#[tauri::command]
 fn app_quit_ready(app: AppHandle) {
     finish_quit(&app);
 }
@@ -1173,6 +1178,7 @@ pub fn run() {
             app_titlebar_double_click,
             app_ready,
             app_take_folders,
+            app_quit,
             app_quit_ready,
             app_quit_cancel,
             quick_loaded,

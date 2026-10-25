@@ -187,6 +187,7 @@ window.termac = {
     focusMain: () => send('app_focus_main'),
     trafficLights: (visible) => send('app_traffic_lights', { visible: !!visible }),
     setZoom: (percent) => send('app_set_zoom', { percent }),
+    quit: () => send('app_quit'),
     quitReady: () => send('app_quit_ready'),
     quitCancel: () => send('app_quit_cancel'),
     onMenu: on('menu:action'),

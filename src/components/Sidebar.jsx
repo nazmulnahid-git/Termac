@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { app, rt, ui, DEFAULT_SETTINGS } from '../state/model.js';
 import * as A from '../state/actions.js';
-import { useTabView, StatusMark, Chip, FailTip } from './common.jsx';
+import { useTabView, StatusMark, Chip, FailTip, SpaceGlyph } from './common.jsx';
 import { formatAccel } from '../lib/keys.js';
 import { shortName, sessionName, formatDuration } from '../lib/meta.js';
 import { tildify } from '../lib/routing.js';
@@ -361,9 +361,7 @@ function FindRow({ hit, sel, onHover, onOpen }) {
       {(byPath || elsewhere) && (
         <span className={`where${byPath ? ' path' : ''}`}>
           {elsewhere && (
-            <span className="glyph" style={{ color: elsewhere.color }}>
-              {elsewhere.glyph}
-            </span>
+            <SpaceGlyph space={elsewhere} className="glyph" style={{ color: elsewhere.color }} />
           )}
           {byPath ? <span className="txt">&lrm;<Marked text={hit.path} indices={hit.indices} /></span> : <span className="txt">{elsewhere.name}</span>}
         </span>
@@ -381,7 +379,7 @@ function Marked({ text, indices }) {
 function SpaceHeader({ space }) {
   return (
     <div className="sec-title" data-drop-into={destAttr('pinned', space.id, null, 0)} onDoubleClick={() => ui.set((u) => ({ ...u, overlay: 'spaceEditor', overlayArg: space.id }))}>
-      <span className="glyph">{space.glyph}</span>
+      <SpaceGlyph space={space} className="glyph" />
       <span className="grow ellipsis">{space.name}</span>
       <span className="sec-actions">
         <button className="icon-btn sm" title="New folder" onClick={() => newFolder(space.id)}>

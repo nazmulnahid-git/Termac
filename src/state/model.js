@@ -44,8 +44,8 @@ export function defaultProfile() {
   return { id: 'default', name: 'Login shell', command: '', cwdMode: 'space', cwd: '', env: [], startup: '' };
 }
 
-export function newSpace({ name = 'Space', glyph = '◆', color = '#3b82f6', startDir = '~', profileId = null } = {}) {
-  return { id: uid('sp'), name, glyph, color, startDir, profileId, archiveAfterH: null, term: { ...DEFAULT_LOOK }, pinned: [], folders: [], today: [], activeTabId: null };
+export function newSpace({ name = 'Space', glyph = '◆', iconImage = null, color = '#3b82f6', startDir = '~', profileId = null } = {}) {
+  return { id: uid('sp'), name, glyph, iconImage, color, startDir, profileId, archiveAfterH: null, term: { ...DEFAULT_LOOK }, pinned: [], folders: [], today: [], activeTabId: null };
 }
 
 export function initialState() {

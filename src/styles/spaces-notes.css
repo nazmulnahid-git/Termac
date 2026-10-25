@@ -59,13 +59,16 @@
 /* ---------- Space editor ---------- */
 .se { width: 720px; }
 .se-strip { height: 72px; flex: none; display: flex; align-items: flex-end; gap: 9px; padding: 0 20px 14px; background: var(--panel-2); box-shadow: inset 0 2px 0 var(--c); border-bottom: 1px solid var(--panel-line); }
-.se-strip .g { color: var(--c); }
+.se-strip .g { color: var(--c); font-size: 1.5em; }
 .se-strip .n { font-weight: var(--bold); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .se-strip .n.ph { color: var(--dim); font-weight: var(--bold); }
 .se .modal-body { padding-top: 16px; min-height: 0; }
 .se .form { grid-template-columns: 150px 1fr; }
 .se .glyphs { flex-wrap: wrap; }
 .se .glyph-btn.on { background: var(--c); color: #fff; }
+.se-icon-img { color: var(--dim); overflow: hidden; }
+.se-icon-img img { width: 100%; height: 100%; object-fit: cover; }
+.se-icon-img.on { padding: 0; box-shadow: 0 0 0 2px var(--panel), 0 0 0 4px var(--c); }
 .se .swatches { align-items: center; }
 .se-custom { position: relative; width: 26px; height: 26px; border-radius: var(--r-sm); overflow: hidden; box-shadow: inset 0 0 0 1.5px var(--faint); display: inline-flex; align-items: center; justify-content: center; color: var(--dim); }
 .se-custom.on { box-shadow: 0 0 0 2px var(--panel), 0 0 0 4px var(--c); background: var(--c); color: transparent; }

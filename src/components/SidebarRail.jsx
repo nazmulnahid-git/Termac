@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { app, ui } from '../state/model.js';
 import * as A from '../state/actions.js';
-import { useTabView } from './common.jsx';
+import { useTabView, SpaceGlyph } from './common.jsx';
 import { formatAccel } from '../lib/keys.js';
 import { IconPlus, IconFolder, IconFolderOpen } from './icons.jsx';
 import { SidebarCards } from './Sidebar.jsx';
@@ -53,7 +53,7 @@ function RailBody({ space, bindings, tipProps, onTip, onTipEnd }) {
   return (
     <>
       <div className="rail-space" style={{ color: space.color }} data-drop-into={destAttr('pinned', space.id, null, 0)} {...tipProps(space.name)} onDoubleClick={() => ui.set((u) => ({ ...u, overlay: 'spaceEditor', overlayArg: space.id }))}>
-        {space.glyph}
+        <SpaceGlyph space={space} />
       </div>
       <RailList items={pinned} dest={destAttr('pinned', space.id)} onTip={onTip} onTipEnd={onTipEnd} />
       {folders.map((f) => (f === PH ? <div key="folder-ph" className="rail-ph folder" data-drop-ph /> : <RailFolder key={f.id} folder={f} spaceId={space.id} tipProps={tipProps} onTip={onTip} onTipEnd={onTipEnd} />))}

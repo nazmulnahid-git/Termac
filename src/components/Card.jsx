@@ -1,6 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { app, rt, ui } from '../state/model.js';
-import { arrayEq } from '../state/store.js';
 import * as A from '../state/actions.js';
 import * as reg from '../term/registry.js';
 import * as L from '../lib/layout.js';
@@ -11,7 +10,6 @@ import { useImageUrl } from './common.jsx';
 import PaneChips from './PaneChips.jsx';
 import Composer from './Composer.jsx';
 
-const api = window.termac;
 const PANE_MIME = 'application/x-termac-pane';
 
 export default function Card() {
@@ -24,7 +22,8 @@ export default function Card() {
   const look = useMemo(() => terminalLook(space, theme), [space.term, space.color, theme]);
   const image = useImageUrl(look.image);
 
-  if (!tab) return <EmptySpace />;
+  // Never empty for long: actions.js opens a terminal or quits when a Space runs out.
+  if (!tab) return null;
   const danger = !!tab.effects?.danger || sshDanger;
   // The sidebar drag engine hit-tests the card and reports the nearest edge as its target.
   const canDrop = dragging?.kind === 'tab' && dragging.tabId !== tab.id && sids.length < L.MAX_PANES;
@@ -293,51 +292,6 @@ function FindBar({ sid }) {
       <button onClick={() => h?.search.findPrevious(q, opts)}>↑</button>
       <button onClick={() => h?.search.findNext(q, opts)}>↓</button>
       <button onClick={close}>✕</button>
-    </div>
-  );
-}
-
-// ---- Empty Space ---------------------------------------------------------------------
-function EmptySpace() {
-  const space = app.use((s) => A.activeSpace(s));
-  const recent = app.use((s) => s.recentDirs.slice(0, 4), arrayEq);
-  const key = app.use((s) => s.settings.keybindings.newTerminal);
-  const home = ui.use((s) => s.home);
-  const open = async () => {
-    const dir = await api.sys.chooseDir(home);
-    if (dir) A.openTerminal({ cwd: dir });
-  };
-  return (
-    <div className="empty">
-      <div className="empty-box">
-        <div className="motd">
-          <span style={{ color: space.color }}>{space.glyph}</span> <b>{space.name}</b> <span className="dim">— no open sessions</span>
-        </div>
-        <p>Open a terminal to get going. Anything you pin here stays with this Space; everything else tidies itself away.</p>
-        <div className="cmds">
-          <button className="cmd" onClick={() => A.openTerminal()}>
-            <span>new terminal</span>
-            <i />
-            <kbd>{formatAccel(key)}</kbd>
-          </button>
-          <button className="cmd" onClick={open}>
-            <span>open directory…</span>
-            <i />
-          </button>
-          {recent.map((d) => (
-            <button key={d.path} className="cmd" onClick={() => A.openTerminal({ cwd: d.path })}>
-              <span>
-                <span className="dim">cd</span> {d.path.replace(home, '~')}
-              </span>
-              <i />
-            </button>
-          ))}
-        </div>
-        <div className="motd-prompt">
-          <span style={{ color: space.color }}>❯</span>
-          <span className="cursor" />
-        </div>
-      </div>
     </div>
   );
 }

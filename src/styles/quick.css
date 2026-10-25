@@ -21,7 +21,7 @@ html, body.quick-body, body.quick-body #root { background: transparent; }
 .qt-item.sel { background: var(--c); color: #fff; }
 .qt-item kbd { color: var(--t-dim); }
 .qt-item.sel kbd, .qt-item.sel .qt-dimtxt { color: inherit; opacity: 0.85; }
-.qt-glyph { width: 12px; text-align: center; color: var(--c); }
+.qt-glyph { width: 16px; color: var(--c); }
 .qt-item.sel .qt-glyph { color: inherit; }
 .qt-dimtxt { color: var(--t-dim); }
 .qt-sep { height: 1px; margin: 4px 6px; background: var(--t-bd); }

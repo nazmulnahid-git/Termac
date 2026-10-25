@@ -5,7 +5,8 @@ import * as A from '../state/actions.js';
 import { SPACE_COLORS, SPACE_GLYPHS } from '../lib/meta.js';
 import { expandHome, tildify } from '../lib/routing.js';
 import { BG_PRESETS, DEFAULT_LOOK, resolveBg, terminalLook } from '../lib/termtheme.js';
-import { useImageUrl } from './common.jsx';
+import { useImageUrl, SpaceGlyph } from './common.jsx';
+import { IconImagePlus } from './icons.jsx';
 
 const api = window.termac;
 const ARCHIVE = [
@@ -20,6 +21,27 @@ const ARCHIVE = [
 const PRESET_BGS = new Set(BG_PRESETS.filter((p) => p.bg && p.bg !== 'tint').map((p) => p.bg.toLowerCase()));
 const isCustomBg = (bg) => !!bg && bg !== 'tint' && !PRESET_BGS.has(bg.toLowerCase());
 const fileName = (p) => (p ? p.split('/').pop() : '');
+const ICON_PX = 96;
+
+// A picked icon image, center-cropped to a small square and kept inline so it survives the file moving.
+async function iconFromFile(file) {
+  const src = await api.sys.readImage(file);
+  if (!src) return null;
+  try {
+    const img = new Image();
+    img.src = src;
+    await img.decode();
+    const side = Math.min(img.naturalWidth, img.naturalHeight);
+    const c = document.createElement('canvas');
+    c.width = c.height = ICON_PX;
+    const g = c.getContext('2d');
+    g.imageSmoothingQuality = 'high';
+    g.drawImage(img, (img.naturalWidth - side) / 2, (img.naturalHeight - side) / 2, side, side, 0, 0, ICON_PX, ICON_PX);
+    return c.toDataURL('image/png');
+  } catch {
+    return null;
+  }
+}
 
 function hoursLabel(h) {
   if (!h) return 'never';
@@ -84,7 +106,7 @@ export default function SpaceEditor({ spaceId, onClose }) {
     e?.preventDefault();
     const name = form.name.trim();
     if (!name) return nameRef.current?.focus();
-    const fields = { name, glyph: form.glyph, color: form.color, profileId: form.profileId || null, startDir: form.startDir.trim() || '~', archiveAfterH: form.archiveAfterH };
+    const fields = { name, glyph: form.glyph, iconImage: form.iconImage || null, color: form.color, profileId: form.profileId || null, startDir: form.startDir.trim() || '~', archiveAfterH: form.archiveAfterH };
     const term = { ...form.term };
     saved.current = true;
     clearTimeout(lookTimer.current);
@@ -105,6 +127,12 @@ export default function SpaceEditor({ spaceId, onClose }) {
     if (!app.get().spaces.some((x) => x.id === form.id)) onClose();
   };
 
+  const chooseIcon = async () => {
+    const picked = await api.sys.chooseImage();
+    const iconImage = picked && (await iconFromFile(picked));
+    if (iconImage) set({ iconImage });
+  };
+
   const chooseImage = async () => {
     const picked = await api.sys.chooseImage();
     if (picked) setTerm({ image: picked });
@@ -119,7 +147,7 @@ export default function SpaceEditor({ spaceId, onClose }) {
   return (
     <form className="modal se" style={{ '--c': form.color }} onSubmit={submit}>
       <div className="se-strip">
-        <span className="g">{form.glyph}</span>
+        <SpaceGlyph space={form} className="g" />
         <span className={`n${form.name.trim() ? '' : ' ph'}`}>{form.name.trim() || (editing ? 'Untitled Space' : 'New Space')}</span>
       </div>
       <div className="modal-body">
@@ -130,10 +158,13 @@ export default function SpaceEditor({ spaceId, onClose }) {
           <label>Icon</label>
           <div className="glyphs">
             {SPACE_GLYPHS.map((g) => (
-              <button type="button" key={g} className={`glyph-btn${form.glyph === g ? ' on' : ''}`} onClick={() => set({ glyph: g })}>
+              <button type="button" key={g} className={`glyph-btn${!form.iconImage && form.glyph === g ? ' on' : ''}`} onClick={() => set({ glyph: g, iconImage: null })}>
                 {g}
               </button>
             ))}
+            <button type="button" className={`glyph-btn se-icon-img${form.iconImage ? ' on' : ''}`} title={form.iconImage ? 'Change image…' : 'Use an image…'} aria-label="Use an image" onClick={chooseIcon}>
+              {form.iconImage ? <img src={form.iconImage} alt="" draggable={false} /> : <IconImagePlus size={17} />}
+            </button>
           </div>
 
           <label>Color</label>
@@ -272,9 +303,9 @@ function TermPreview({ look }) {
 function initialForm(spaceId) {
   const s = app.get();
   const sp = spaceId && s.spaces.find((x) => x.id === spaceId);
-  if (sp) return { id: sp.id, name: sp.name, glyph: sp.glyph, color: sp.color, profileId: sp.profileId, startDir: sp.startDir || '~', archiveAfterH: sp.archiveAfterH ?? null, term: { ...DEFAULT_LOOK, ...sp.term } };
+  if (sp) return { id: sp.id, name: sp.name, glyph: sp.glyph, iconImage: sp.iconImage || null, color: sp.color, profileId: sp.profileId, startDir: sp.startDir || '~', archiveAfterH: sp.archiveAfterH ?? null, term: { ...DEFAULT_LOOK, ...sp.term } };
   // New Space: first color and glyph not already taken.
   const color = SPACE_COLORS.find((c) => !s.spaces.some((x) => x.color.toLowerCase() === c)) || SPACE_COLORS[s.spaces.length % SPACE_COLORS.length];
   const glyph = SPACE_GLYPHS.find((g) => !s.spaces.some((x) => x.glyph === g)) || SPACE_GLYPHS[0];
-  return { id: null, name: '', glyph, color, profileId: null, startDir: '~', archiveAfterH: null, term: { ...DEFAULT_LOOK } };
+  return { id: null, name: '', glyph, iconImage: null, color, profileId: null, startDir: '~', archiveAfterH: null, term: { ...DEFAULT_LOOK } };
 }

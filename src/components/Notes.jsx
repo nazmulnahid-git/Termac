@@ -7,6 +7,7 @@ import { parseBlocks, parseInline, toggleTask } from '../lib/markdown.js';
 import { sessionName, clockTime } from '../lib/meta.js';
 import { formatAccel } from '../lib/keys.js';
 import { promptText } from './Sidebar.jsx';
+import { SpaceGlyph } from './common.jsx';
 
 const api = window.termac;
 const PROVENANCE_MS = 10 * 60 * 1000;
@@ -77,7 +78,7 @@ export default function Notes({ spaceId, onClose }) {
   return (
     <section className="nt">
       <div className="nt-head">
-        <span className="glyph" style={{ color: space.color }}>{space.glyph}</span>
+        <SpaceGlyph space={space} className="glyph" style={{ color: space.color }} />
         <b className="grow ellipsis">{space.name} notes</b>
         <span className="state">{saving ? 'Saving…' : 'Saved'}</span>
         <button className="link" onMouseDown={(e) => editing && e.preventDefault()} onClick={() => (editing ? stopEdit() : startEdit())}>
@@ -284,7 +285,7 @@ function Snippets({ spaceId }) {
     ]);
     if (id === 'run') A.runInSession(sn.command);
     else if (id === 'copy') navigator.clipboard.writeText(sn.command);
-    else if (id === 'delete') A.removeSnippet(sn.id);
+    else if (id === 'delete' && (await api.sys.confirm({ message: `Delete /${sn.name}?`, detail: 'It is removed from this Space and the command bar.', ok: 'Delete' }))) A.removeSnippet(sn.id);
   };
   return (
     <div className="nt-snips">

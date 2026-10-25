@@ -136,7 +136,7 @@ export async function folderMenu(e, spaceId, folder, startRename) {
   ]);
   if (id === 'new') A.openTerminal({ section: 'pinned', spaceId, folderId: folder.id, viaRules: false });
   else if (id === 'rename') startRename();
-  else if (id === 'archive') A.tidy(folder.tabs, { reason: 'closed' });
+  else if (id === 'archive') A.archiveTabs(folder.tabs);
   else if (id === 'delete') A.deleteFolder(spaceId, folder.id);
 }
 
