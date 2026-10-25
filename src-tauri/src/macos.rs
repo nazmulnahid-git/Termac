@@ -1,7 +1,10 @@
 // The few AppKit calls Tauri doesn't wrap. Each one must run on the main thread.
-use objc2::{AllocAnyThread, MainThreadMarker};
-use objc2_app_kit::{NSApplication, NSImage, NSPasteboard, NSPasteboardTypeString, NSWindow, NSWindowButton, NSWindowCollectionBehavior};
-use objc2_foundation::{NSData, NSString, NSUserDefaults};
+use objc2::rc::Retained;
+use objc2::runtime::NSObject;
+use objc2::{define_class, msg_send, AllocAnyThread, MainThreadMarker, MainThreadOnly};
+use objc2_app_kit::{NSApplication, NSImage, NSPasteboard, NSPasteboardTypeString, NSUpdateDynamicServices, NSWindow, NSWindowButton, NSWindowCollectionBehavior};
+use objc2_foundation::{NSData, NSString, NSURL, NSUserDefaults};
+use std::sync::OnceLock;
 use tauri::{Runtime, WebviewWindow};
 
 fn with_ns_window<R: Runtime>(window: &WebviewWindow<R>, f: impl FnOnce(&NSWindow) + Send + 'static) {
@@ -62,4 +65,44 @@ pub fn set_dock_icon(png: &'static [u8]) {
     if let Some(image) = NSImage::initWithData(NSImage::alloc(), &data) {
         unsafe { NSApplication::sharedApplication(mtm).setApplicationIconImage(Some(&image)) };
     }
+}
+
+// ---- Finder service ------------------------------------------------------------------------
+// "New Termorc Tab Here" in Finder's right-click Services menu. Info.plist declares the
+// service (NSMessage openFolder); this object receives the folders Finder hands over.
+static OPEN_FOLDERS: OnceLock<Box<dyn Fn(Vec<String>) + Send + Sync>> = OnceLock::new();
+
+define_class!(
+    // SAFETY: NSObject has no subclassing requirements and this class doesn't implement Drop.
+    #[unsafe(super(NSObject))]
+    #[thread_kind = MainThreadOnly]
+    #[name = "TermorcServiceProvider"]
+    struct ServiceProvider;
+
+    impl ServiceProvider {
+        #[unsafe(method(openFolder:userData:error:))]
+        fn open_folder(&self, pboard: &NSPasteboard, _user_data: Option<&NSString>, _error: *mut std::ffi::c_void) {
+            let file_url = NSString::from_str("public.file-url");
+            let mut paths = Vec::new();
+            for item in pboard.pasteboardItems().map(|a| a.to_vec()).unwrap_or_default() {
+                let Some(url) = item.stringForType(&file_url) else { continue };
+                if let Some(path) = NSURL::URLWithString(&url).and_then(|u| u.path()) {
+                    paths.push(path.to_string());
+                }
+            }
+            if let Some(open) = OPEN_FOLDERS.get() {
+                open(paths);
+            }
+        }
+    }
+);
+
+pub fn register_services(open: impl Fn(Vec<String>) + Send + Sync + 'static) {
+    let _ = OPEN_FOLDERS.set(Box::new(open));
+    let Some(mtm) = MainThreadMarker::new() else { return };
+    let provider: Retained<ServiceProvider> = unsafe { msg_send![ServiceProvider::alloc(mtm), init] };
+    unsafe { NSApplication::sharedApplication(mtm).setServicesProvider(Some(&provider)) };
+    // NSApp keeps only a weak reference; the provider lives as long as the app.
+    std::mem::forget(provider);
+    NSUpdateDynamicServices();
 }

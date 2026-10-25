@@ -76,6 +76,9 @@ struct AppState {
     popup_seq: AtomicU64,
     quick_show_on_load: AtomicBool,
     cleaned_up: AtomicBool,
+    // Folders handed over by Finder (the Services menu, a Dock drop, `open -a`), waiting
+    // for the main window to open tabs for them.
+    opened_folders: Mutex<Vec<String>>,
 }
 
 fn st(app: &AppHandle) -> tauri::State<'_, AppState> {
@@ -338,6 +341,16 @@ async fn sys_list_dir(dir: String) -> Value {
 #[tauri::command]
 async fn sys_read_file(file: String) -> Value {
     system::read_file(&file)
+}
+
+// The editor's save. Written in place, not swapped in, so the file keeps its permissions
+// (an executable script stays executable), owner and any links pointing at it.
+#[tauri::command]
+async fn sys_write_file(file: String, text: String) -> Value {
+    match tokio::fs::write(&file, text.as_bytes()).await {
+        Ok(()) => json!({ "ok": true, "size": text.len() }),
+        Err(e) => json!({ "ok": false, "error": e.to_string() }),
+    }
 }
 
 #[tauri::command]
@@ -937,6 +950,27 @@ fn cleanup(app: &AppHandle) {
     s.ptys.kill_all();
 }
 
+// Queues folders to open as new tabs and tells the main window; the window takes the queue
+// (app_take_folders) when told, and once at startup in case it wasn't listening yet.
+fn open_folders(app: &AppHandle, paths: Vec<PathBuf>) {
+    let dirs: Vec<String> = paths
+        .into_iter()
+        .filter_map(|p| if p.is_dir() { Some(p) } else { p.parent().map(PathBuf::from) })
+        .map(|p| p.to_string_lossy().into_owned())
+        .collect();
+    if dirs.is_empty() {
+        return;
+    }
+    st(app).opened_folders.lock().unwrap().extend(dirs);
+    show_main(app);
+    let _ = app.emit_to(MAIN, "app:foldersOpened", ());
+}
+
+#[tauri::command]
+fn app_take_folders(app: AppHandle) -> Vec<String> {
+    std::mem::take(&mut *st(&app).opened_folders.lock().unwrap())
+}
+
 #[tauri::command]
 fn app_quit_ready(app: AppHandle) {
     finish_quit(&app);
@@ -1034,7 +1068,10 @@ pub fn run() {
                 popup_seq: AtomicU64::new(0),
                 quick_show_on_load: AtomicBool::new(false),
                 cleaned_up: AtomicBool::new(false),
+                opened_folders: Mutex::new(Vec::new()),
             });
+            let services = handle.clone();
+            macos::register_services(move |paths| open_folders(&services, paths.into_iter().map(PathBuf::from).collect()));
             if cfg!(debug_assertions) {
                 macos::set_dock_icon(include_bytes!("../icons/icon.png"));
             } else {
@@ -1102,6 +1139,7 @@ pub fn run() {
             sys_list_dir,
             sys_read_file,
             sys_project_files,
+            sys_write_file,
             sys_git_changes,
             sys_git_diff,
             sys_git_stage,
@@ -1132,6 +1170,7 @@ pub fn run() {
             app_set_zoom,
             app_titlebar_double_click,
             app_ready,
+            app_take_folders,
             app_quit_ready,
             app_quit_cancel,
             quick_loaded,
@@ -1151,6 +1190,8 @@ pub fn run() {
         RunEvent::Exit => cleanup(app),
         #[cfg(target_os = "macos")]
         RunEvent::Reopen { .. } => show_main(app),
+        #[cfg(target_os = "macos")]
+        RunEvent::Opened { urls } => open_folders(app, urls.iter().filter_map(|u| u.to_file_path().ok()).collect()),
         _ => {}
     });
 }

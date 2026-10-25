@@ -240,7 +240,10 @@ export default function App() {
     window.addEventListener('wheel', onWheel, { capture: true, passive: false });
     document.addEventListener('copy', onCopy, true);
     mq.addEventListener('change', onScheme);
-    const offs = [api.app.onMenu(runAction), api.app.onJumpTo(A.jumpTo), api.app.onWillQuit(A.prepareQuit), api.app.onAdopt(A.adopt)];
+    // Each folder Finder hands over opens as a new tab there.
+    const takeFolders = () => api.app.takeFolders().then((dirs) => dirs.forEach((cwd) => A.openTerminal({ cwd })));
+    takeFolders();
+    const offs = [api.app.onMenu(runAction), api.app.onJumpTo(A.jumpTo), api.app.onWillQuit(A.prepareQuit), api.app.onAdopt(A.adopt), api.app.onFoldersOpened(takeFolders)];
     return () => {
       window.removeEventListener('keydown', onKeyDown, true);
       window.removeEventListener('wheel', onWheel, true);

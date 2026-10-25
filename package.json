@@ -8,13 +8,21 @@
     "build": "vite build",
     "start": "tauri build --debug --bundles app && open src-tauri/target/debug/bundle/macos/Termorc.app",
     "test": "node --test \"tests/**/*.test.js\"",
-    "dist": "tauri build",
+    "dist": "tauri build --bundles app && scripts/make-dmg.sh",
     "tauri": "tauri"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.12.4"
   },
   "devDependencies": {
+    "@codemirror/autocomplete": "^6.20.4",
+    "@codemirror/commands": "^6.11.1",
+    "@codemirror/language": "^6.13.1",
+    "@codemirror/language-data": "^6.5.2",
+    "@codemirror/search": "^6.7.2",
+    "@codemirror/state": "^6.7.6",
+    "@codemirror/view": "^6.43.15",
+    "@lezer/highlight": "^1.2.5",
     "@tauri-apps/cli": "^2.12.4",
     "@vitejs/plugin-react": "^4.3.4",
     "@xterm/addon-fit": "^0.11.0",

@@ -26,8 +26,8 @@ base64 = "0.22"
 libc = "0.2"
 mac-notification-sys = "0.6"
 objc2 = "0.6"
-objc2-app-kit = { version = "0.3", features = ["NSWindow", "NSButton", "NSControl", "NSResponder", "NSView", "NSApplication", "NSPasteboard", "NSImage"] }
-objc2-foundation = { version = "0.3", features = ["NSString", "NSUserDefaults", "NSData"] }
+objc2-app-kit = { version = "0.3", features = ["NSWindow", "NSButton", "NSControl", "NSResponder", "NSView", "NSApplication", "NSPasteboard", "NSPasteboardItem", "NSImage"] }
+objc2-foundation = { version = "0.3", features = ["NSString", "NSUserDefaults", "NSData", "NSArray", "NSURL"] }
 
 [profile.release]
 lto = true

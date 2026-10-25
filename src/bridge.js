@@ -148,6 +148,7 @@ window.termac = {
     gitRoot: (cwd) => call('sys_git_root', { cwd }),
     listDir: (dir) => call('sys_list_dir', { dir }),
     readFile: (file) => call('sys_read_file', { file }),
+    writeFile: (file, text) => call('sys_write_file', { file, text }),
     projectFiles: (root) => call('sys_project_files', { root }),
     gitChanges: (cwd) => call('sys_git_changes', { cwd }),
     gitDiff: (root, file, opts) => call('sys_git_diff', { root, file, opts }),
@@ -192,6 +193,9 @@ window.termac = {
     onWillQuit: on('app:willQuit'),
     onJumpTo: on('app:jumpTo'),
     onAdopt: on('session:adopt'),
+    // Folders from Finder's "New Termorc Tab Here", a Dock drop or `open -a Termorc dir`.
+    takeFolders: () => call('app_take_folders'),
+    onFoldersOpened: on('app:foldersOpened'),
   },
   quick: {
     hide: () => send('quick_hide'),
