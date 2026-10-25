@@ -32,8 +32,6 @@ import {
   CornerDownLeft,
   Maximize2,
   Minimize2,
-  Rows2,
-  Columns2,
   MessageSquare,
   MessageSquarePlus,
   GitCommitHorizontal,
@@ -87,8 +85,6 @@ export const IconMinus = icon(Minus);
 export const IconInsert = icon(CornerDownLeft);
 export const IconMaximize = icon(Maximize2);
 export const IconMinimize = icon(Minimize2);
-export const IconUnified = icon(Rows2);
-export const IconSplit = icon(Columns2);
 export const IconComment = icon(MessageSquare);
 export const IconCommentAdd = icon(MessageSquarePlus);
 export const IconCommit = icon(GitCommitHorizontal);

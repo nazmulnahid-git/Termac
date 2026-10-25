@@ -7,7 +7,7 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { app, rt, ui } from '../state/model.js';
 import * as A from '../state/actions.js';
-import { parseDiff, diffStats, hunkPatch, splitRows, splitFiles, hunkInline, markRanges, statBlocks } from '../lib/diff.js';
+import { parseDiff, diffStats, hunkPatch, splitFiles, hunkInline, markRanges, statBlocks } from '../lib/diff.js';
 import { highlightLines, langOf } from '../lib/highlight.js';
 import { reviewMarkdown } from '../lib/review.js';
 import { timeAgo } from '../lib/meta.js';
@@ -16,7 +16,7 @@ import { FileIcon } from './fileicons.jsx';
 import { promptText } from './sidebar-shared.js';
 import { PanelResize } from './ToolsPanel.jsx';
 import {
-  IconClose, IconChevron, IconRefresh, IconPlus, IconMinus, IconUndo, IconFile, IconBranch, IconMaximize, IconMinimize, IconUnified, IconSplit,
+  IconClose, IconChevron, IconRefresh, IconPlus, IconMinus, IconUndo, IconFile, IconBranch, IconMaximize, IconMinimize,
   IconComment, IconCommentAdd, IconCommit, IconPR, IconArrowUp, IconArrowDown, IconChevronDown, IconMore, IconSend, IconTrash, IconPencil,
   IconCollapseAll, IconExpandAll, IconCopy, IconExternal, IconSpinner, IconCheckCircle, IconXCircle, IconDot, IconMerge,
 } from './icons.jsx';
@@ -26,23 +26,6 @@ const BIG = 1500; // lines; bigger diffs stay folded until asked
 const NO_COMMENTS = [];
 const CONTEXT_STEPS = [3, 25, 1000000]; // lines around each change: default, more, the whole file
 
-// Files marked "Viewed", per repository, for as long as the app runs. The key includes the
-// file's line counts, so a file that changes again comes back unviewed (as on GitHub).
-const viewedByRoot = new Map();
-const viewKey = (f, staged) => {
-  const part = staged ? f.staged : f.unstaged;
-  return `${staged ? 's' : 'u'}:${f.path}|${part?.add}|${part?.del}|${staged ? f.x : f.y}`;
-};
-function useViewed(root) {
-  const [, bump] = useState(0);
-  if (!viewedByRoot.has(root)) viewedByRoot.set(root, new Set());
-  const set = viewedByRoot.get(root);
-  const toggle = (key) => {
-    set.has(key) ? set.delete(key) : set.add(key);
-    bump((n) => n + 1);
-  };
-  return [set, toggle];
-}
 
 // ---- Data -----------------------------------------------------------------------------------
 function useReviewData(root, open, bump) {
@@ -111,7 +94,6 @@ export default function ReviewPanel() {
   const open = ui.use((s) => s.review);
   const max = ui.use((s) => s.reviewMax);
   const width = app.use((s) => s.settings.reviewWidth);
-  const view = app.use((s) => s.settings.reviewView);
   const [dragW, setDragW] = useState(null);
   const [tab, setTab] = useState('changes');
   const [fold, setFold] = useState({ n: 0, open: true });
@@ -136,7 +118,7 @@ export default function ReviewPanel() {
   const root = changes?.root || project.root;
   const files = changes?.files || null;
   const notRepo = changes?.notRepo || !project.git;
-  const ctx = { root, run, busy, refresh, view, comments, fold, info, pr, max };
+  const ctx = { root, run, busy, refresh, comments, fold, info, pr, max };
 
   return (
     <aside className={`review${max ? ' max' : ''}`} style={max ? null : { width: dragW ?? width }}>
@@ -154,16 +136,6 @@ export default function ReviewPanel() {
           </button>
         </div>
         <span className="grow" />
-        {tab !== 'pr' && (
-          <div className="seg rv-view" title="Diff layout">
-            <button className={view !== 'split' ? 'on' : ''} title="Unified" onClick={() => A.setSettings({ reviewView: 'unified' })}>
-              <IconUnified size={14} />
-            </button>
-            <button className={view === 'split' ? 'on' : ''} title="Side by side" onClick={() => A.setSettings({ reviewView: 'split' })}>
-              <IconSplit size={14} />
-            </button>
-          </div>
-        )}
         {tab === 'changes' && (
           <button className="icon-btn" title={fold.open ? 'Collapse all' : 'Expand all'} onClick={() => setFold((f) => ({ n: f.n + 1, open: !f.open }))}>
             {fold.open ? <IconCollapseAll size={14} /> : <IconExpandAll size={14} />}
@@ -305,10 +277,8 @@ async function undoCommit({ root, run, info }) {
 }
 
 // ---- Changes -------------------------------------------------------------------------------------
-function Changes({ ctx: base, files, scroller }) {
-  const { root, run, comments } = base;
-  const [viewed, toggleViewed] = useViewed(root);
-  const ctx = { ...base, viewed, toggleViewed };
+function Changes({ ctx, files, scroller }) {
+  const { root, run, comments } = ctx;
   if (!files) return <div className="rv-empty">Loading changes…</div>;
   const staged = files.filter((f) => f.x !== ' ' && f.x !== '?');
   const unstaged = files.filter((f) => f.y !== ' ' || f.untracked);
@@ -344,12 +314,11 @@ function Changes({ ctx: base, files, scroller }) {
           </div>
         )}
         {files.length > 0 && (
-          <Summary
-            files={files.length}
-            total={total}
-            seen={staged.filter((f) => viewed.has(viewKey(f, true))).length + unstaged.filter((f) => viewed.has(viewKey(f, false))).length}
-            of={staged.length + unstaged.length}
-          />
+          <div className="rv-summary">
+            <span>{plural(files.length, 'file')} changed</span>
+            <span className="add">+{total.add}</span>
+            <span className="del">−{total.del}</span>
+          </div>
         )}
         {staged.length > 0 && (
           <Group title="Staged" files={staged} staged ctx={ctx} actions={<button className="rv-gbtn" onClick={() => run('stageAll', { op: 'stageAll', stage: false })}>Unstage all</button>} />
@@ -374,7 +343,7 @@ function Changes({ ctx: base, files, scroller }) {
     return (
       <div className="rv-split">
         <aside className="rv-side">
-          <FileNav files={files} comments={comments} scroller={scroller} viewed={viewed} />
+          <FileNav files={files} comments={comments} scroller={scroller} />
           {commit}
         </aside>
         <div className="rv-col">{diffs}</div>
@@ -406,7 +375,7 @@ function Group({ title, files, staged = false, ctx, actions }) {
 }
 
 // Max mode: the changed files down the left, like a PR's file tree.
-function FileNav({ files, comments, scroller, viewed }) {
+function FileNav({ files, comments, scroller }) {
   const counts = new Map();
   for (const c of comments) counts.set(c.path, (counts.get(c.path) || 0) + 1);
   const seen = new Set();
@@ -422,13 +391,12 @@ function FileNav({ files, comments, scroller, viewed }) {
       <div className="rv-nav-title">Files</div>
       {list.map((f) => {
         const code = f.untracked ? 'U' : f.x !== ' ' && f.x !== '?' ? f.x : f.y;
-        const seenIt = [true, false].some((st) => viewed.has(viewKey(f, st)));
         return (
-          <button key={f.path} className={`rv-nav-row${seenIt ? ' seen' : ''}`} onClick={() => jump(f.path)} title={f.path}>
+          <button key={f.path} className="rv-nav-row" onClick={() => jump(f.path)} title={f.path}>
             <FileIcon name={baseName(f.path)} />
             <span className="rv-nav-name ellipsis">{baseName(f.path)}</span>
             <span className="rv-dir ellipsis">{dirName(f.path)}</span>
-            {seenIt ? <IconCheckCircle size={12} className="rv-seen" /> : <span className={`rv-code c-${code}`}>{code}</span>}
+            <span className={`rv-code c-${code}`}>{code}</span>
             {counts.get(f.path) ? (
               <span className="rv-ncount">
                 <IconComment size={11} />
@@ -439,23 +407,6 @@ function FileNav({ files, comments, scroller, viewed }) {
         );
       })}
     </nav>
-  );
-}
-
-function Summary({ files, total, seen, of }) {
-  return (
-    <div className="rv-summary">
-      <span>{plural(files, 'file')} changed</span>
-      <span className="add">+{total.add}</span>
-      <span className="del">−{total.del}</span>
-      <span className="grow" />
-      <span className="rv-progress-label">
-        {seen} of {of} viewed
-      </span>
-      <span className="rv-progress">
-        <i style={{ width: `${of ? (seen / of) * 100 : 0}%` }} />
-      </span>
-    </div>
   );
 }
 
@@ -475,9 +426,7 @@ function DiffStat({ add, del }) {
 
 function FileDiff({ f, staged, ctx, startOpen, readOnly = false, text: given = null }) {
   const { root, run, fold } = ctx;
-  const key = readOnly ? null : viewKey(f, staged);
-  const isViewed = !!key && !!ctx.viewed?.has(key);
-  const [open, setOpen] = useState(startOpen && !isViewed);
+  const [open, setOpen] = useState(startOpen);
   const [text, setText] = useState(given);
   const [force, setForce] = useState(false);
   const [context, setContext] = useState(0); // index into CONTEXT_STEPS
@@ -489,7 +438,7 @@ function FileDiff({ f, staged, ctx, startOpen, readOnly = false, text: given = n
   const sig = `${known?.add}|${known?.del}|${code}`;
 
   useEffect(() => {
-    if (fold.n) setOpen(fold.open && !isViewed);
+    if (fold.n) setOpen(fold.open);
   }, [fold.n]);
   useEffect(() => {
     const node = el.current;
@@ -522,11 +471,6 @@ function FileDiff({ f, staged, ctx, startOpen, readOnly = false, text: given = n
     await api.sys.gitDiscard(root, f.path, f.untracked);
     ctx.refresh();
   };
-  const toggleViewed = (e) => {
-    e.stopPropagation();
-    ctx.toggleViewed(key);
-    setOpen(isViewed); // marking viewed folds the file; unmarking opens it again
-  };
   // Hunk actions build a one-hunk patch from this diff and hand it to `git apply`.
   const hunkAction = async (i, kind) => {
     const patch = hunkPatch(parsed, i);
@@ -542,7 +486,7 @@ function FileDiff({ f, staged, ctx, startOpen, readOnly = false, text: given = n
   const dir = dirName(f.path);
 
   return (
-    <div className={`rv-file${open ? ' open' : ''}${isViewed ? ' viewed' : ''}`} data-path={f.path} ref={el}>
+    <div className={`rv-file${open ? ' open' : ''}`} data-path={f.path} ref={el}>
       <div className="rv-fhead" onClick={() => setOpen((o) => !o)}>
         <span className={`chev${open ? ' open' : ''}`}>
           <IconChevron size={11} />
@@ -571,12 +515,6 @@ function FileDiff({ f, staged, ctx, startOpen, readOnly = false, text: given = n
             </button>
           )}
         </span>
-        {key && (
-          <label className={`rv-viewed${isViewed ? ' on' : ''}`} onClick={(e) => e.stopPropagation()}>
-            <input type="checkbox" checked={isViewed} onChange={toggleViewed} />
-            Viewed
-          </label>
-        )}
       </div>
       {open && (
         <div className="rv-body">
@@ -607,15 +545,13 @@ function FileDiff({ f, staged, ctx, startOpen, readOnly = false, text: given = n
   );
 }
 
-// ---- Hunks: unified and side by side, with word-level changes and line comments -----------
+// ---- Hunks: word-level changes and line comments ------------------------------------------
 function Hunk({ h, path, lang, ctx, commentable, onOpen, actions, onAction }) {
-  const { view, comments, root } = ctx;
+  const { comments, root } = ctx;
   const tokens = useMemo(() => highlightLines(h.lines.map((l) => l.text), lang), [h, lang]);
   const inline = useMemo(() => hunkInline(h), [h]);
   const [composing, setComposing] = useState(null); // { side, line, snippet }
   const forLine = (side, line) => comments.filter((c) => c.path === path && c.side === side && c.line === line);
-  const split = view === 'split';
-  const cols = split ? 6 : 4;
 
   const code = (i) =>
     h.lines[i].type === 'meta' ? (
@@ -632,10 +568,10 @@ function Hunk({ h, path, lang, ctx, commentable, onOpen, actions, onAction }) {
         );
       })
     );
-  const gutter = (l, side, extra = '') => {
+  const gutter = (l, side) => {
     const no = side === 'old' ? l.oldNo : l.newNo;
     return (
-      <div className={`no ${extra}`}>
+      <div className="no">
         {commentable && no != null && (
           <button className="rv-add-cmt" title="Comment on this line" onClick={() => setComposing({ side, line: no, snippet: l.text })}>
             <IconCommentAdd size={12} />
@@ -650,12 +586,11 @@ function Hunk({ h, path, lang, ctx, commentable, onOpen, actions, onAction }) {
     const rows = [];
     for (const [side, no] of pairs) {
       if (no == null) continue;
-      for (const c of forLine(side, no)) rows.push(<CommentRow key={c.id} c={c} root={root} cols={cols} />);
+      for (const c of forLine(side, no)) rows.push(<CommentRow key={c.id} c={c} root={root} />);
       if (composing?.side === side && composing.line === no)
         rows.push(
           <Composer
             key="composer"
-            cols={cols}
             onCancel={() => setComposing(null)}
             onSave={(text) => {
               A.addReviewComment(root, { path, side, line: no, snippet: composing.snippet, text });
@@ -666,7 +601,6 @@ function Hunk({ h, path, lang, ctx, commentable, onOpen, actions, onAction }) {
     }
     return rows;
   };
-  const kind = (l, want) => (!l ? 'empty' : l.type === want ? want : '');
 
   return (
     <div className="rv-hunk">
@@ -685,31 +619,8 @@ function Hunk({ h, path, lang, ctx, commentable, onOpen, actions, onAction }) {
           </span>
         )}
       </div>
-      <div className={`rv-lines${split ? ' sbs' : ' unified'}`}>
-        {split
-          ? splitRows(h).map((r, k) =>
-              r.meta ? (
-                <div key={k} className="ln meta">
-                  <div className="code full">{code(r.mi)}</div>
-                </div>
-              ) : (
-                <Fragment key={k}>
-                  <div className="ln" onDoubleClick={() => r.right?.newNo && onOpen(r.right.newNo)}>
-                    {r.left ? gutter(r.left, 'old', kind(r.left, 'del')) : <div className="no empty" />}
-                    <div className={`sign ${kind(r.left, 'del')}`}>{r.left?.type === 'del' ? '−' : ''}</div>
-                    <div className={`code left ${kind(r.left, 'del')}`}>{r.left && code(r.li)}</div>
-                    {r.right ? gutter(r.right, 'new', kind(r.right, 'add')) : <div className="no empty" />}
-                    <div className={`sign ${kind(r.right, 'add')}`}>{r.right?.type === 'add' ? '+' : ''}</div>
-                    <div className={`code ${kind(r.right, 'add')}`}>{r.right && code(r.ri)}</div>
-                  </div>
-                  {threads([
-                    ['old', r.left?.type === 'del' ? r.left.oldNo : null],
-                    ['new', r.right?.newNo],
-                  ])}
-                </Fragment>
-              )
-            )
-          : h.lines.map((l, i) => (
+      <div className="rv-lines">
+        {h.lines.map((l, i) => (
               <Fragment key={i}>
                 <div className={`ln ${l.type}`} onDoubleClick={() => l.newNo && onOpen(l.newNo)}>
                   {l.type === 'del' ? gutter(l, 'old') : <div className="no">{l.oldNo ?? ''}</div>}
@@ -725,7 +636,7 @@ function Hunk({ h, path, lang, ctx, commentable, onOpen, actions, onAction }) {
   );
 }
 
-function Composer({ cols, initial = '', onSave, onCancel }) {
+function Composer({ initial = '', onSave, onCancel }) {
   const [text, setText] = useState(initial);
   const save = () => text.trim() && onSave(text.trim());
   return (
@@ -754,12 +665,11 @@ function Composer({ cols, initial = '', onSave, onCancel }) {
   );
 }
 
-function CommentRow({ c, root, cols }) {
+function CommentRow({ c, root }) {
   const [editing, setEditing] = useState(false);
   if (editing)
     return (
       <Composer
-        cols={cols}
         initial={c.text}
         onCancel={() => setEditing(false)}
         onSave={(text) => {

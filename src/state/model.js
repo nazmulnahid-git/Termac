@@ -35,7 +35,6 @@ export const DEFAULT_SETTINGS = {
   sidebarWidth: 248,
   toolsWidth: 300,
   reviewWidth: 520,
-  reviewView: 'unified', // unified | split
   clickToMove: true,
   promptStyle: 'termorc', // termorc (input bar + blocks) | shell (the shell's own prompt)
   terminalWelcome: true, // tips card in a new, empty session

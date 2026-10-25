@@ -1,6 +1,6 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseDiff, hunkPatch, splitRows, splitFiles } from '../src/lib/diff.js';
+import { parseDiff, hunkPatch, splitFiles } from '../src/lib/diff.js';
 import { reviewMarkdown } from '../src/lib/review.js';
 
 const TWO_HUNKS = `diff --git a/x.js b/x.js
@@ -24,20 +24,6 @@ describe('hunkPatch', () => {
     assert.match(p, /^diff --git a\/x.js b\/x.js\nindex 1..2 100644\n--- a\/x.js\n\+\+\+ b\/x.js\n@@ -20,2 \+20,3 @@ tail\(\)\n/);
     assert.ok(!p.includes('+B'));
     assert.ok(p.endsWith('\\ No newline at end of file\n'));
-  });
-});
-
-describe('splitRows', () => {
-  test('pairs removals with the additions that replace them', () => {
-    const h = parseDiff(`@@ -1,4 +1,4 @@
- a
--b
--c
-+B
- d
-+e`).hunks[0];
-    const rows = splitRows(h).map((r) => [r.left?.text ?? null, r.right?.text ?? null]);
-    assert.deepEqual(rows, [['a', 'a'], ['b', 'B'], ['c', null], ['d', 'd'], [null, 'e']]);
   });
 });
 

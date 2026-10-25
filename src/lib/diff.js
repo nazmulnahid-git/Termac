@@ -1,6 +1,6 @@
 // Unified diff (git diff output) → hunks of numbered lines for the review panel, plus what
-// the panel builds from them: a single-hunk patch to stage or discard, side-by-side rows,
-// and per-file pieces of a multi-file patch.
+// the panel builds from them: a single-hunk patch to stage or discard, and per-file pieces
+// of a multi-file patch.
 
 export function parseDiff(text) {
   const head = [];
@@ -44,34 +44,6 @@ export function diffStats(parsed) {
 export function hunkPatch(parsed, index) {
   const h = parsed.hunks[index];
   return [...parsed.head, ...h.raw].join('\n') + '\n';
-}
-
-// Side-by-side rows: context on both sides, and each run of removals paired line for line
-// with the additions that replace it.
-export function splitRows(hunk) {
-  const rows = [];
-  const lines = hunk.lines;
-  for (let i = 0; i < lines.length; ) {
-    const l = lines[i];
-    if (l.type === 'ctx') {
-      rows.push({ left: l, right: l, li: i, ri: i });
-      i++;
-    } else if (l.type === 'meta') {
-      rows.push({ meta: l, mi: i });
-      i++;
-    } else {
-      const dels = [];
-      const adds = [];
-      while (i < lines.length && lines[i].type === 'del') dels.push(i++);
-      while (i < lines.length && lines[i].type === 'add') adds.push(i++);
-      for (let k = 0; k < Math.max(dels.length, adds.length); k++) {
-        const li = dels[k] ?? null;
-        const ri = adds[k] ?? null;
-        rows.push({ left: li == null ? null : lines[li], right: ri == null ? null : lines[ri], li, ri });
-      }
-    }
-  }
-  return rows;
 }
 
 // `git show` / multi-file diff → [{ path, from, status, text }], one entry per file.
