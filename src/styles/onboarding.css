@@ -1,6 +1,6 @@
 /* First-run onboarding: full-window, above every other layer. */
 .ob { position: fixed; inset: 0; z-index: 200; display: flex; flex-direction: column; background: var(--panel); color: var(--ink); animation: fade 0.15s ease-out; }
-.ob-top { height: 44px; flex: none; display: flex; align-items: center; justify-content: flex-end; padding: 0 28px; -webkit-app-region: drag; }
+.ob-top { height: 44px; flex: none; display: flex; align-items: center; justify-content: flex-end; padding: 0 28px; --app-region: drag; }
 .ob-bars { display: flex; gap: 4px; }
 .ob-bars i { width: 16px; height: 3px; border-radius: var(--r-sm); background: var(--line); }
 .ob-bars i.on { background: var(--accent); }
@@ -19,7 +19,8 @@
 /* Welcome */
 .ob-welcome { display: flex; align-items: center; gap: 48px; padding-top: 0; }
 .ob-hero { flex: 1; min-width: 0; max-width: 460px; }
-.ob-logo { width: 56px; height: 56px; border-radius: var(--r-lg); background: linear-gradient(#16191a, #070808); color: #a8f5cf; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08); display: flex; align-items: center; justify-content: center; font-weight: var(--bold);margin-bottom: 26px; }
+/* The app icon's tile, in miniature (build/icon.svg). */
+.ob-logo { width: 64px; height: 64px; border-radius: 15px; background: linear-gradient(#1c1c22, #09090c); color: #a2f1c8; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 1px 2px rgba(0, 0, 0, 0.2), 0 10px 24px -6px rgba(0, 0, 0, 0.35); display: flex; align-items: center; justify-content: center; margin-bottom: 26px; }
 .ob-hero h1 { margin: 0 0 14px; font-weight: var(--bold); }
 .ob-hero p { margin: 0 0 26px; color: var(--dim); max-width: 380px; }
 .btn.ob-big { height: 40px; padding: 0 20px; }

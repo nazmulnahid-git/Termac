@@ -3,7 +3,6 @@ node_modules/
 
 # Production build outputs
 dist/
-dist-electron/
 out/
 release/
 
@@ -23,12 +22,16 @@ yarn-error.log*
 .env.local
 .env.*.local
 
-# Electron build artifacts
+# Build artifacts
 *.dmg
 *.zip
 *.blockmap
 
 
 # Shell state written by the integration scripts during testing
-electron/shell-integration/zsh/.zsh_history
-electron/shell-integration/zsh/.zcompdump*
+src-tauri/shell-integration/zsh/.zsh_history
+src-tauri/shell-integration/zsh/.zcompdump*
+
+# Tauri
+src-tauri/target/
+src-tauri/gen/

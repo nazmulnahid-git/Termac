@@ -1,0 +1,36 @@
+[package]
+name = "termorc"
+version = "2.0.1"
+description = "A terminal for macOS where sessions live in a sidebar, grouped into Spaces"
+edition = "2021"
+
+[lib]
+name = "termorc_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+tauri-plugin-global-shortcut = "2"
+tauri-plugin-single-instance = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["process", "time", "fs", "macros", "rt-multi-thread", "sync"] }
+portable-pty = "0.9"
+notify = "8"
+regex = "1"
+base64 = "0.22"
+libc = "0.2"
+mac-notification-sys = "0.6"
+objc2 = "0.6"
+objc2-app-kit = { version = "0.3", features = ["NSWindow", "NSButton", "NSControl", "NSResponder", "NSView", "NSApplication", "NSPasteboard", "NSImage"] }
+objc2-foundation = { version = "0.3", features = ["NSString", "NSUserDefaults", "NSData"] }
+
+[profile.release]
+lto = true
+codegen-units = 1
+opt-level = 3
+strip = true

@@ -28,11 +28,15 @@ A macOS terminal where every session lives in a vertical sidebar, grouped into c
 
 ## How it works
 
+Termorc is a [Tauri](https://tauri.app) app: a Rust core drives the native side, and the UI runs in the system WebKit view. That makes for a ~8 MB app.
+
 | Layer | Notes |
 | --- | --- |
-| `electron/pty-host.js` | Owns every PTY (`node-pty`). Output is coalesced into one IPC message per window per ~4 ms. Ack-based flow control pauses runaway processes. The foreground process is polled every 1.5 s. |
-| `electron/shell-integration/` | Hooks for zsh, bash and fish. They emit OSC 633 marks (prompt, command, exit code, cwd) and still load your own dotfiles. These marks drive the status marks, names, notifications, ⇧⌘C and the Library. |
-| `electron/library.js` | Archived sessions: a JSON index plus one ANSI scrollback file each. Search reads files lazily with a bounded cache. |
+| `src-tauri/src/pty.rs` | Owns every PTY (`portable-pty`). Output is coalesced into one channel message per window every ~4 ms. Ack-based flow control parks the reader so runaway processes block. The foreground process is polled every 1.5 s. |
+| `src-tauri/shell-integration/` | Hooks for zsh, bash and fish. They emit OSC 633 marks (prompt, command, exit code, cwd) and still load your own dotfiles. These marks drive the status marks, names, notifications, ⇧⌘C and the Library. |
+| `src-tauri/src/library.rs` | Archived sessions: a JSON index plus one ANSI scrollback file each. Search reads files lazily with a bounded cache. |
+| `src-tauri/src/lib.rs` | Windows, menus, Quick Terminal, global hotkey, dialogs, notifications and the quit flow, exposed as Tauri commands. |
+| `src/bridge.js` | The renderer's only door to the native side: the `window.termac` API, backed by Tauri commands, events and a PTY channel. |
 | `src/term/registry.js` | One xterm.js instance per session. Off-screen terminals are parked, so xterm pauses their rendering. Only visible panes hold a WebGL context. Restored sessions get a shell only when first shown. |
 | `src/state/` | Three small stores (persisted app model, runtime status, UI) with selector subscriptions. All mutations live in `actions.js`. |
 
@@ -43,10 +47,16 @@ State lives in `~/Library/Application Support/Termorc/`:
 
 ## Develop
 
+Needs Node and Rust (`curl https://sh.rustup.rs -sSf | sh`).
+
 ```bash
 npm install
-npm run dev     # Vite + Electron with hot reload
+npm run dev     # Vite + Tauri with hot reload
 npm test        # unit tests for routing, layout, fuzzy, keys, markdown
-npm run start   # production build, then launch
-npm run dist    # package a .dmg
+cargo test --manifest-path src-tauri/Cargo.toml --lib   # PTY, git and Library tests
+npm run dist    # release build: Termorc.app and a .dmg in src-tauri/target/release/bundle
 ```
+
+Set `TERMORC_DATA_DIR=/some/folder` to run a build with its own state and settings, apart from your everyday sessions.
+
+The icon's source is `build/icon.svg`. After editing it, regenerate the app icons with `npx tauri icon build/icon.svg -o src-tauri/icons`, then delete the non-macOS sizes.

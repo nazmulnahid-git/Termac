@@ -99,7 +99,7 @@
 /* ---------- Overview ---------- */
 .ov { position: fixed; inset: 0; z-index: 52; display: flex; flex-direction: column; background: rgba(0, 0, 0, 0.35); color: #f3f3f1; animation: ov-in 0.22s cubic-bezier(0.2, 0.8, 0.2, 1); }
 @keyframes ov-in { from { transform: scale(1.04); opacity: 0; } }
-.ov-title { height: 44px; flex: none; display: flex; align-items: center; justify-content: center; font-weight: var(--bold); color: rgba(255, 255, 255, 0.75); -webkit-app-region: drag; }
+.ov-title { height: 44px; flex: none; display: flex; align-items: center; justify-content: center; font-weight: var(--bold); color: rgba(255, 255, 255, 0.75); --app-region: drag; }
 .ov-cards { flex: 1; min-height: 0; display: flex; gap: 20px; padding: 24px 40px 20px; overflow-x: auto; align-items: stretch; }
 .ov-cards > :first-child { margin-left: auto; }
 .ov-cards > :last-child { margin-right: auto; }

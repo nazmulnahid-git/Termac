@@ -123,7 +123,7 @@ function Welcome({ onNext, onSkip }) {
       <div className="ob-body ob-welcome">
         <div className="ob-hero">
           <div className="ob-logo">
-            <LogoMark size={32} />
+            <LogoMark size={40} />
           </div>
           <h1>Welcome to Termorc</h1>
           <p>Terminals that live in a sidebar, sorted into Spaces, and tidy themselves up.</p>

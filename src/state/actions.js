@@ -928,9 +928,6 @@ export function setSettings(patch) {
   applySettings();
 }
 
-// Matches --bar-h in app.css. The traffic lights don't zoom, so main recenters them.
-const TITLE_BAR_H = 36;
-
 let keymap = new Map();
 export const getKeymap = () => keymap;
 
@@ -938,7 +935,6 @@ export function applySettings() {
   const s = app.get();
   applyFontVars(s.settings);
   api.app.setZoom(s.settings.zoomLevel);
-  api.app.titleBarHeight(TITLE_BAR_H * (s.settings.zoomLevel / 100));
   const termTheme = reg.configure(s.settings, ui.get().dark);
   ui.set((u) => (u.termTheme === termTheme ? u : { ...u, termTheme }));
   keymap = buildKeymap(s.settings.keybindings);

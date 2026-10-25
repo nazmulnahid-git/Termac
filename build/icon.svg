@@ -1,29 +1,56 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
   <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#16191a"/>
-      <stop offset="1" stop-color="#070808"/>
+    <linearGradient id="tile" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1c1c22"/>
+      <stop offset="1" stop-color="#09090c"/>
     </linearGradient>
-    <radialGradient id="halo" cx="0.42" cy="0.5" r="0.55">
-      <stop offset="0" stop-color="#a8f5cf" stop-opacity="0.22"/>
-      <stop offset="1" stop-color="#a8f5cf" stop-opacity="0"/>
-    </radialGradient>
-    <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
-      <feGaussianBlur in="SourceGraphic" stdDeviation="14" result="b"/>
-      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    <linearGradient id="rim" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.16"/>
+      <stop offset="0.5" stop-color="#ffffff" stop-opacity="0.04"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0.08"/>
+    </linearGradient>
+    <linearGradient id="mint" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#b4f6d4"/>
+      <stop offset="1" stop-color="#92e8bd"/>
+    </linearGradient>
+    <linearGradient id="paper" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#ecedef"/>
+    </linearGradient>
+    <filter id="drop" color-interpolation-filters="sRGB" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="14"/>
+      <feOffset dy="12"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.35"/></feComponentTransfer>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="lift" color-interpolation-filters="sRGB" x="-10%" y="-10%" width="120%" height="130%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="6"/>
+      <feOffset dy="6"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.45"/></feComponentTransfer>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
     </filter>
   </defs>
-  <!-- macOS icon grid: 824px squircle-ish tile centred on a 1024 canvas -->
-  <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#bg)"/>
-  <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#halo)"/>
-  <rect x="101.5" y="101.5" width="821" height="821" rx="183.5" fill="none" stroke="#ffffff" stroke-opacity="0.08" stroke-width="3"/>
-  <g transform="translate(512 512) scale(1.32) translate(-233 -170)" filter="url(#glow)" fill="none" stroke="#a8f5cf" stroke-linecap="round" stroke-linejoin="round">
-    <path stroke-width="22" d="M278 150V114a40 40 0 0 0-40-40H92a40 40 0 0 0-40 40v96a40 40 0 0 0 40 40h146a40 40 0 0 0 40-40v-10"/>
-    <path stroke-width="18" d="M278 150c22-10 22-90 97-95M278 200c22 10 22 90 97 95M272 175h123"/>
-    <path stroke-width="18" d="M102 132l30 30-30 30"/>
-    <path stroke-width="16" stroke-opacity="0.6" d="M165 208h55"/>
-    <g fill="#a8f5cf" stroke="none">
-      <circle cx="380" cy="55" r="26"/><circle cx="400" cy="175" r="26"/><circle cx="380" cy="285" r="26"/>
+  <!-- macOS icon grid: an 824px tile centred on a 1024 canvas, room left for the shadow -->
+  <g filter="url(#drop)">
+    <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#tile)"/>
+  </g>
+  <rect x="101.5" y="101.5" width="821" height="821" rx="183.5" fill="none" stroke="url(#rim)" stroke-width="3"/>
+  <!-- Prompt, cursor, and a bracket branching to three sessions. Same drawing as LogoMark. -->
+  <g transform="translate(512 512) scale(0.995)" filter="url(#lift)">
+    <g fill="none" stroke="url(#mint)" stroke-linecap="round" stroke-linejoin="round">
+      <path stroke-width="70" d="M-271 -121 L-169 -19 L-271 83"/>
+      <path stroke-width="34" d="M133 -162 H131 A50 50 0 0 0 81 -112 V112 A50 50 0 0 0 131 162 H133 M81 0 H128"/>
+    </g>
+    <rect x="-149" y="46" width="179" height="51" rx="25.5" fill="url(#paper)"/>
+    <g fill="url(#paper)">
+      <rect x="165" y="-219" width="141" height="114" rx="30"/>
+      <rect x="165" y="-57" width="141" height="114" rx="30"/>
+      <rect x="165" y="105" width="141" height="114" rx="30"/>
+    </g>
+    <g fill="url(#mint)">
+      <circle cx="235.5" cy="-162" r="26"/>
+      <circle cx="235.5" cy="0" r="26"/>
+      <circle cx="235.5" cy="162" r="26"/>
     </g>
   </g>
 </svg>

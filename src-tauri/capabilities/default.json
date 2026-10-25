@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "What the Termorc windows may call. App commands are allowed by default.",
+  "windows": ["main", "quick"],
+  "permissions": ["core:default", "core:window:allow-start-dragging"]
+}

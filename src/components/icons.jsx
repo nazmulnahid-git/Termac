@@ -67,17 +67,24 @@ export const IconUndo = icon(Undo2);
 export const IconMinus = icon(Minus);
 export const IconInsert = icon(CornerDownLeft);
 
-// App mark: a terminal window branching out to three sessions. Same drawing as build/icon.svg.
+// App mark: a prompt and cursor, bracketed out to three sessions. Same drawing as build/icon.svg.
+// Mint parts take currentColor; the session tiles stay paper-white on any background.
 export const LogoMark = ({ size = 28, ...rest }) => (
-  <svg width={size} height={(size * 290) / 400} viewBox="33 25 400 290" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...rest}>
-    <path strokeWidth="22" d="M278 150V114a40 40 0 0 0-40-40H92a40 40 0 0 0-40 40v96a40 40 0 0 0 40 40h146a40 40 0 0 0 40-40v-10" />
-    <path strokeWidth="18" d="M278 150c22-10 22-90 97-95M278 200c22 10 22 90 97 95M272 175h123" />
-    <path strokeWidth="18" d="M102 132l30 30-30 30" />
-    <path strokeWidth="16" strokeOpacity="0.6" d="M165 208h55" />
-    <g fill="currentColor" stroke="none">
-      <circle cx="380" cy="55" r="26" />
-      <circle cx="400" cy="175" r="26" />
-      <circle cx="380" cy="285" r="26" />
+  <svg width={size} height={(size * 438) / 612} viewBox="-306 -219 612 438" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...rest}>
+    <path strokeWidth="70" d="M-271 -121L-169 -19L-271 83" />
+    <path strokeWidth="34" d="M133 -162H131A50 50 0 0 0 81 -112V112A50 50 0 0 0 131 162H133M81 0H128" />
+    <g stroke="none">
+      <rect x="-149" y="46" width="179" height="51" rx="25.5" fill="#fbfbfc" />
+      <g fill="#fbfbfc">
+        <rect x="165" y="-219" width="141" height="114" rx="30" />
+        <rect x="165" y="-57" width="141" height="114" rx="30" />
+        <rect x="165" y="105" width="141" height="114" rx="30" />
+      </g>
+      <g fill="currentColor">
+        <circle cx="235.5" cy="-162" r="26" />
+        <circle cx="235.5" cy="0" r="26" />
+        <circle cx="235.5" cy="162" r="26" />
+      </g>
     </g>
   </svg>
 );

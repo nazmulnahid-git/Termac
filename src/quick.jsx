@@ -1,5 +1,6 @@
 // Quick Terminal: a frameless panel dropped from the top of the screen on ⌥Space.
 // It reads (never writes) the persisted state and owns one live session at a time.
+import './bridge.js';
 import { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import './styles/app.css';

@@ -3,19 +3,19 @@
   "version": "2.0.1",
   "description": "A terminal for macOS where sessions live in a sidebar, grouped into Spaces",
   "type": "module",
-  "main": "electron/main.js",
   "scripts": {
-    "postinstall": "chmod +x node_modules/node-pty/prebuilds/darwin-*/spawn-helper 2>/dev/null || true",
-    "dev": "node scripts/dev.js",
+    "dev": "tauri dev",
     "build": "vite build",
-    "start": "vite build && env -u ELECTRON_RUN_AS_NODE electron .",
+    "start": "tauri build --debug --bundles app && open src-tauri/target/debug/bundle/macos/Termorc.app",
     "test": "node --test \"tests/**/*.test.js\"",
-    "dist": "vite build && electron-builder"
+    "dist": "tauri build",
+    "tauri": "tauri"
   },
   "dependencies": {
-    "node-pty": "^1.1.0"
+    "@tauri-apps/api": "^2.12.4"
   },
   "devDependencies": {
+    "@tauri-apps/cli": "^2.12.4",
     "@vitejs/plugin-react": "^4.3.4",
     "@xterm/addon-fit": "^0.11.0",
     "@xterm/addon-search": "^0.16.0",
@@ -24,37 +24,12 @@
     "@xterm/addon-web-links": "^0.12.0",
     "@xterm/addon-webgl": "^0.19.0",
     "@xterm/xterm": "^6.0.0",
-    "electron": "^33.3.1",
-    "electron-builder": "^25.1.8",
     "lucide-react": "1.52.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "vite": "^6.0.7"
   },
-  "build": {
-    "appId": "com.termorc.app",
-    "productName": "Termorc",
-    "directories": {
-      "output": "release"
-    },
-    "npmRebuild": false,
-    "mac": {
-      "category": "public.app-category.developer-tools",
-      "target": "dmg",
-      "icon": "build/icon.icns"
-    },
-    "files": [
-      "electron/**/*",
-      "dist/**/*"
-    ],
-    "asarUnpack": [
-      "electron/shell-integration/**",
-      "node_modules/node-pty/**"
-    ]
-  },
   "allowScripts": {
-    "electron@33.4.11": true,
-    "node-pty@1.1.0": true,
     "esbuild@0.25.12": true
   }
 }

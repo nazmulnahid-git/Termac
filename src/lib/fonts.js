@@ -2,7 +2,7 @@
 // variables that carry them into the stylesheets.
 
 const SANS_FALLBACK = "-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', sans-serif";
-const MONO_FALLBACK = "'SF Mono', Menlo, monospace";
+const MONO_FALLBACK = "'SF Mono', ui-monospace, Menlo, monospace";
 
 // Quotes family names with spaces so they survive a CSS font shorthand.
 const quote = (list) =>
@@ -15,8 +15,12 @@ const quote = (list) =>
 
 export const uiStack = (family) => [quote(family), SANS_FALLBACK].filter(Boolean).join(', ');
 
+// WebKit only reaches SF Mono through the ui-monospace keyword, not by name, so the name
+// always brings the keyword along.
+const withSystemMono = (stack) => stack.replace(/'SF Mono'(?!,\s*ui-monospace)/g, "'SF Mono', ui-monospace");
+
 export function monoStack(family) {
-  const f = quote(family);
+  const f = withSystemMono(quote(family));
   return /monospace\s*$/.test(f) ? f : [f, MONO_FALLBACK].filter(Boolean).join(', ');
 }
 
