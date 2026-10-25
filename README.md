@@ -58,7 +58,7 @@ npm install
 npm run dev     # Vite + Tauri with hot reload
 npm test        # unit tests for routing, layout, fuzzy, keys, markdown
 cargo test --manifest-path src-tauri/Cargo.toml --lib   # PTY, git and Library tests
-npm run dist    # release build: Termorc.app and a styled .dmg in src-tauri/target/release/bundle
+npm run dist    # release build: Termorc.app and a styled .dmg in src-tauri/target.noindex/release/bundle
                 # (the .dmg step needs dmgbuild: pip3 install dmgbuild)
 ```
 

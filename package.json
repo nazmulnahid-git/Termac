@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "tauri dev",
     "build": "vite build",
-    "start": "tauri build --debug --bundles app && open src-tauri/target/debug/bundle/macos/Termorc.app",
+    "start": "tauri build --debug --bundles app && open src-tauri/target.noindex/debug/bundle/macos/Termorc.app",
     "test": "node --test \"tests/**/*.test.js\"",
     "dist": "tauri build --bundles app && scripts/make-dmg.sh",
     "tauri": "tauri"

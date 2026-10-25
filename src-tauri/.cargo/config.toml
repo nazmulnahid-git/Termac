@@ -1,0 +1,4 @@
+# Build output lives in target.noindex: Spotlight and Launch Services skip ".noindex"
+# folders, so the freshly built Termorc.app isn't listed as a second installed copy.
+[build]
+target-dir = "target.noindex"

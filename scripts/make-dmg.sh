@@ -4,7 +4,7 @@
 set -e
 cd "$(dirname "$0")/.."
 version=$(node -p "require('./package.json').version")
-bundle=src-tauri/target/release/bundle
+bundle=src-tauri/target.noindex/release/bundle
 mkdir -p "$bundle/dmg"
 out="$bundle/dmg/Termorc_${version}_$(uname -m).dmg"
 ${DMGBUILD:-dmgbuild} -s scripts/dmg-settings.py \

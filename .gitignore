@@ -33,5 +33,5 @@ src-tauri/shell-integration/zsh/.zsh_history
 src-tauri/shell-integration/zsh/.zcompdump*
 
 # Tauri
-src-tauri/target/
+src-tauri/target.noindex/
 src-tauri/gen/
