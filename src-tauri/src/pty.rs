@@ -35,6 +35,8 @@ pub struct SpawnOpts {
     profile: Option<Profile>,
     space_name: Option<String>,
     initial_command: Option<String>,
+    // Termorc draws the prompt and input bar; the shell integration blanks the shell's own.
+    own_prompt: Option<bool>,
 }
 
 // Lets the reader thread park while the renderer is behind, so the kernel buffer fills
@@ -221,6 +223,9 @@ impl PtyHost {
         env.insert("TERM_PROGRAM".into(), "Termorc".into());
         env.insert("LANG".into(), lang);
         env.insert("SHELL_SPACE".into(), space_name);
+        if opts.own_prompt == Some(true) {
+            env.insert("TERMORC_PROMPT".into(), "1".into());
+        }
         if let Some(startup) = profile.startup.filter(|s| !s.trim().is_empty()) {
             env.insert("TERMAC_STARTUP".into(), startup);
         }
@@ -357,14 +362,13 @@ impl PtyHost {
         if !s.pending_command.is_empty() && (!s.integrated || text.contains(PROMPT_MARK)) {
             let line = format!("{}\r", std::mem::take(&mut s.pending_command)).into_bytes();
             let input = s.input.clone();
-            if s.integrated {
+            // The prompt mark comes just before the line editor starts reading; typed too early,
+            // the terminal driver echoes the line once and the editor again. Give it a moment.
+            let wait = if s.integrated { 60 } else { 300 };
+            std::thread::spawn(move || {
+                std::thread::sleep(Duration::from_millis(wait));
                 let _ = input.send(line);
-            } else {
-                std::thread::spawn(move || {
-                    std::thread::sleep(Duration::from_millis(300));
-                    let _ = input.send(line);
-                });
-            }
+            });
         }
         s.unacked += text.encode_utf16().count();
         if s.unacked > HIGH_WATER {

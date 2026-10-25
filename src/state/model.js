@@ -35,7 +35,10 @@ export const DEFAULT_SETTINGS = {
   sidebarWidth: 248,
   toolsWidth: 300,
   reviewWidth: 520,
+  reviewView: 'unified', // unified | split
   clickToMove: true,
+  promptStyle: 'termorc', // termorc (input bar + blocks) | shell (the shell's own prompt)
+  terminalWelcome: true, // tips card in a new, empty session
 };
 
 export function defaultProfile() {
@@ -65,6 +68,7 @@ export function initialState() {
     notes: {},
     recentDirs: [],
     activity: [],
+    reviewComments: {}, // git root -> [{ id, path, side, line, snippet, text, at }]
   };
 }
 
@@ -116,6 +120,7 @@ export const ui = createStore({
   searchFocus: 0, // bumped by ⌘P to refocus the find-file box
   tabFind: 0, // bumped by ⌘J to focus the sidebar's session filter
   review: false, // code review panel (right)
+  reviewMax: false, // the review panel covers the whole terminal area
   viewer: null, // { path, line } file shown over the terminal card
   settingsFile: { path: '', text: null, error: null, warnings: [] }, // ~/.termorc/settings.json: its text on disk and last parse result
 });

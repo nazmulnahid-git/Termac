@@ -3,10 +3,10 @@
 
 export const TERMINAL_THEMES = {
   dark: {
-    background: '#131417',
+    background: '#0f1012',
     foreground: '#d8dae0',
     cursor: '#d8dae0',
-    cursorAccent: '#131417',
+    cursorAccent: '#0f1012',
     selectionBackground: 'rgba(136,173,255,.28)',
     black: '#2a2c33',
     red: '#ff8080',
@@ -126,6 +126,12 @@ export function terminalLook(space, fallbackTheme = 'dark') {
     '--t-branch': base.magenta,
     '--t-green': base.green,
     '--t-yellow': base.yellow,
+    '--t-blue': base.blue,
+    '--t-cyan': base.cyan,
+    '--t-red': base.red,
+    // The brand mint (build/icon.svg) for commands in the input bar and other highlights.
+    '--t-accent': dark ? '#a2f1c8' : '#0e8a5c',
+    '--t-raise': mix(bg, fg, dark ? 0.06 : 0.045),
   };
   return { key: `${bg}|${image || ''}|${look.dim}|${look.blur}`, bg, dark, xterm, vars, image, dim: look.dim, blur: look.blur, transparent: !!image };
 }

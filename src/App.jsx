@@ -118,7 +118,7 @@ function onKeyDown(e) {
   const raw = eventToAccel(e);
   if (!raw) return;
   const accel = normalizeAccel(raw);
-  const inTerminal = !!e.target.closest?.('.xterm');
+  const inTerminal = !!e.target.closest?.('.xterm, .composer');
   const inInput = !inTerminal && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName);
 
   if (e.defaultPrevented || u.capturingKeys) return;

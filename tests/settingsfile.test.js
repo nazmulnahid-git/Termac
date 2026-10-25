@@ -25,6 +25,8 @@ const DEFAULTS = {
   scrollback: 10000,
   optionAsMeta: false,
   clickToMove: true,
+  promptStyle: 'termorc',
+  terminalWelcome: true,
   shellPriority: false,
   archiveAfterH: 12,
   neverArchiveRunning: true,

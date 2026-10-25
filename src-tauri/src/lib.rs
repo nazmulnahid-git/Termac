@@ -3,6 +3,8 @@
 mod library;
 mod macos;
 mod pty;
+mod review;
+mod shell;
 mod store;
 mod system;
 
@@ -472,6 +474,49 @@ async fn sys_confirm(app: AppHandle, window: WebviewWindow, o: Confirm) -> bool 
             let _ = tx.send(ok);
         });
     rx.await.unwrap_or(false)
+}
+
+// ---- Input bar ---------------------------------------------------------------------------
+#[tauri::command]
+async fn shell_history() -> Vec<String> {
+    tauri::async_runtime::spawn_blocking(shell::history).await.unwrap_or_default()
+}
+
+#[tauri::command]
+async fn shell_complete(cwd: Option<String>, line: String) -> Value {
+    let cwd = cwd.filter(|c| !c.is_empty()).unwrap_or_else(|| system::home().to_string_lossy().into_owned());
+    shell::complete(&cwd, &line).await
+}
+
+// ---- Code review ---------------------------------------------------------------------------
+#[tauri::command]
+async fn review_overview(root: String) -> Value {
+    review::overview(&root).await
+}
+
+#[tauri::command]
+async fn review_log(root: String, limit: Option<u32>) -> Value {
+    review::log(&root, limit.unwrap_or(80)).await
+}
+
+#[tauri::command]
+async fn review_show(root: String, sha: String) -> Value {
+    review::show(&root, &sha).await
+}
+
+#[tauri::command]
+async fn review_remote_branches(root: String) -> Vec<String> {
+    review::remote_branches(&root).await
+}
+
+#[tauri::command]
+async fn review_pr(root: String) -> Value {
+    review::pr(&root).await
+}
+
+#[tauri::command]
+async fn review_op(root: String, op: review::GitOp) -> Value {
+    review::op(&root, op).await
 }
 
 // navigator.clipboard needs a fresh user gesture in WebKit; copies after an awaited menu
@@ -954,8 +999,12 @@ pub fn run() {
     let (user, paths) = app_paths();
     let state: Value = read_json(&paths.state_file).unwrap_or(Value::Null);
 
-    let app = tauri::Builder::default()
-        .plugin(tauri_plugin_single_instance::init(|app, _, _| show_main(app)))
+    let mut builder = tauri::Builder::default();
+    // A dev build runs beside the installed app instead of handing off to it.
+    if !cfg!(debug_assertions) {
+        builder = builder.plugin(tauri_plugin_single_instance::init(|app, _, _| show_main(app)));
+    }
+    let app = builder
         .plugin(tauri_plugin_dialog::init())
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
@@ -988,7 +1037,11 @@ pub fn run() {
             });
             if cfg!(debug_assertions) {
                 macos::set_dock_icon(include_bytes!("../icons/icon.png"));
+            } else {
+                // Notifications otherwise post as another app; a bundled build has its own identity.
+                let _ = mac_notification_sys::set_application(&app.config().identifier);
             }
+            system::warm_login_path();
             app_set_menu(handle.clone(), None);
             create_main_window(handle)?;
             app_set_hotkey(handle.clone(), Some(hotkey));
@@ -1063,6 +1116,14 @@ pub fn run() {
             sys_notify,
             sys_confirm,
             sys_copy,
+            shell_history,
+            shell_complete,
+            review_overview,
+            review_log,
+            review_show,
+            review_remote_branches,
+            review_pr,
+            review_op,
             menu_popup,
             app_set_menu,
             app_set_hotkey,

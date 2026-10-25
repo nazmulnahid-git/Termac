@@ -23,6 +23,7 @@ let hooks = {};
 let termOptions = {};
 let themeName = 'dark';
 let clickToMove = true;
+let ownPrompt = true;
 
 export const setHooks = (h) => (hooks = h);
 export const getHandle = (sid) => handles.get(sid);
@@ -68,6 +69,7 @@ api.pty.onProc(({ id, proc }) => {
 export function configure(settings, dark) {
   themeName = settings.termTheme === 'system' ? (dark ? 'dark' : 'light') : settings.termTheme;
   clickToMove = settings.clickToMove !== false;
+  ownPrompt = settings.promptStyle !== 'shell';
   termOptions = {
     fontFamily: monoStack(settings.fontFamily),
     fontSize: settings.fontSize,
@@ -79,6 +81,9 @@ export function configure(settings, dark) {
     cursorBlink: settings.cursorBlink,
     scrollback: settings.scrollback,
     macOptionIsMeta: settings.optionAsMeta,
+    // With Termorc's input bar, the terminal only has focus while a command runs; hide the
+    // idle cursor so it doesn't sit on the blank prompt line.
+    cursorInactiveStyle: ownPrompt ? 'none' : 'outline',
     theme: THEMES[themeName],
   };
   for (const h of handles.values()) {
@@ -136,6 +141,10 @@ export function create(sid) {
     pendingCmd: '',
     cmds: [],
     newLines: 0,
+    ownPrompt: false, // this session's shell runs with its prompt blanked (TERMORC_PROMPT)
+    atPrompt: false, // the shell is waiting at a prompt (between marks A and C)
+    composer: null, // the input bar's textarea, while one is mounted for this session
+    promptMarker: null,
   };
   handles.set(sid, h);
 
@@ -144,6 +153,11 @@ export function create(sid) {
     return true;
   });
   term.onData((d) => {
+    // At a prompt the input bar owns typing; keys that reach the terminal go there instead.
+    if (composerActive(h)) {
+      hooks.composerInput?.(sid, d);
+      return;
+    }
     // The first keystroke after a prompt marks where the editable input begins: the cursor
     // hasn't moved yet, so it's sitting right after the prompt.
     if (h.awaitInput) {
@@ -177,6 +191,7 @@ export function create(sid) {
     patchRt(sid, { cols, rows });
   });
   term.onBell(() => hooks.bell?.(sid));
+  term.buffer.onBufferChange((b) => patchRt(sid, { alt: b.type === 'alternate' }));
   term.attachCustomKeyEventHandler((e) => hooks.key?.(sid, e) ?? true);
   term.textarea?.addEventListener('focus', () => hooks.focus?.(sid));
 
@@ -202,13 +217,15 @@ export function create(sid) {
 }
 
 // Spawns the PTY for a handle. Called lazily the first time a session is shown.
-export async function start(sid, { cwd, profile, spaceName, initialCommand }) {
+// `inputBar: false` keeps the shell's own prompt (the Quick Terminal has no input bar).
+export async function start(sid, { cwd, profile, spaceName, initialCommand, inputBar = true }) {
   const h = handles.get(sid);
   if (!h || h.alive) return;
   h.started = true;
   h.alive = true;
   const { cols, rows } = h.term;
-  const res = await api.pty.spawn({ id: sid, cwd, cols, rows, profile, spaceName, initialCommand });
+  h.ownPrompt = ownPrompt && inputBar;
+  const res = await api.pty.spawn({ id: sid, cwd, cols, rows, profile, spaceName, initialCommand, ownPrompt: h.ownPrompt });
   if (!res?.ok) {
     h.alive = false;
     h.term.write(`\r\n\x1b[31mCould not start shell: ${res?.error || 'unknown error'}\x1b[0m\r\n`);
@@ -217,7 +234,8 @@ export async function start(sid, { cwd, profile, spaceName, initialCommand }) {
   }
   h.integrated = !!res.integrated;
   h.shell = res.shell;
-  patchRt(sid, { shell: res.shell, proc: res.shell, alive: true, integrated: h.integrated, status: rt.get()[sid]?.status === 'fail' ? 'fail' : 'idle' });
+  if (!h.integrated) h.ownPrompt = false;
+  patchRt(sid, { shell: res.shell, proc: res.shell, alive: true, integrated: h.integrated, ownPrompt: h.ownPrompt, status: rt.get()[sid]?.status === 'fail' ? 'fail' : 'idle' });
 }
 
 export function dispose(sid) {
@@ -316,7 +334,85 @@ export function fit(sid) {
 }
 
 export function focus(sid) {
-  handles.get(sid)?.term.focus();
+  const h = handles.get(sid);
+  if (!h) return;
+  if (composerActive(h)) h.composer.focus();
+  else h.term.focus();
+}
+
+// ---- Input bar ------------------------------------------------------------------------
+// Sessions started with Termorc's prompt take input from the input bar while the shell is
+// at a prompt; once a command runs (or a full-screen app opens), keys go to the terminal.
+export const composerActive = (h) => !!(h?.ownPrompt && h.atPrompt && h.composer?.isConnected && h.term.buffer.active.type === 'normal');
+
+export function setComposer(sid, el) {
+  const h = handles.get(sid);
+  if (h) h.composer = el;
+}
+
+export function commandsOf(sid) {
+  return handles.get(sid)?.cmds || [];
+}
+
+// Block headers: the line each command was typed on gets a tinted band, a hairline above
+// it, and (once it finishes) its status, duration and time on the right. A failed block
+// gets a red edge down its whole output.
+function mixHex(a, b, t) {
+  const p = (hex) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+  const [x, y] = [p(a), p(b)];
+  return '#' + x.map((v, i) => Math.round(v + (y[i] - v) * t).toString(16).padStart(2, '0')).join('');
+}
+
+function themeOf(h) {
+  return h.look?.xterm?.background?.startsWith('#') && h.look.xterm.background.length === 7 ? h.look.xterm : THEMES[themeName];
+}
+
+function decorateHead(h, entry) {
+  const t = themeOf(h);
+  const marker = entry.head;
+  if (!marker || marker.isDisposed) return;
+  const band = h.term.registerDecoration({ marker, width: h.term.cols, backgroundColor: mixHex(t.background, t.foreground, 0.055), layer: 'bottom' });
+  const top = h.term.registerDecoration({ marker, width: h.term.cols, layer: 'top' });
+  entry.decos = [band, top].filter(Boolean);
+  top?.onRender((el) => {
+    el.classList.add('blk-head');
+    el.style.width = '100%';
+    if (!el.firstChild) {
+      const meta = document.createElement('span');
+      meta.className = 'blk-meta';
+      el.appendChild(meta);
+    }
+    entry.metaEl = el.firstChild;
+    paintMeta(entry);
+  });
+}
+
+function paintMeta(entry) {
+  const meta = entry.metaEl;
+  if (!meta) return;
+  const text = blockMeta(entry);
+  if (meta.textContent !== text) meta.textContent = text;
+  meta.dataset.state = entry.exit == null ? 'run' : entry.exit === 0 ? 'ok' : entry.exit === 130 ? 'int' : 'fail';
+}
+
+function decorateEnd(h, entry) {
+  paintMeta(entry);
+  if (!entry.head || entry.head.isDisposed || entry.exit === 0 || entry.exit === 130) return;
+  const height = Math.max(1, entry.end.line - entry.head.line);
+  const edge = h.term.registerDecoration({ marker: entry.head, width: h.term.cols, height, layer: 'top' });
+  edge?.onRender((el) => {
+    el.classList.add('blk-fail');
+    el.style.width = '100%';
+  });
+  if (edge) entry.decos.push(edge);
+}
+
+const clock = (ts) => new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+function blockMeta(e) {
+  const dur = e.dur == null ? '' : e.dur < 1000 ? `${e.dur}ms` : e.dur < 60000 ? `${(e.dur / 1000).toFixed(1)}s` : `${Math.floor(e.dur / 60000)}m ${Math.round((e.dur % 60000) / 1000)}s`;
+  const status = e.exit == null ? '' : e.exit === 0 ? '✓' : e.exit === 130 ? '⌃C' : `✗ ${e.exit}`;
+  // Running blocks show when they started; finished ones how long they took and how it went.
+  return e.exit == null ? `started ${clock(e.at)}` : [dur, status].filter(Boolean).join('  ');
 }
 
 // ---- Shell integration marks --------------------------------------------------------
@@ -334,6 +430,11 @@ function onShellMark(h, data) {
       h.awaitInput = true;
       h.inputStart?.marker.dispose();
       h.inputStart = null;
+      h.atPrompt = true;
+      // The prompt line is where the command will be echoed: the block's header line.
+      if (!h.promptMarker?.isDisposed) h.promptMarker?.dispose();
+      h.promptMarker = h.term.registerMarker(0);
+      patchRt(h.sid, { atPrompt: true });
       break;
     case 'C': {
       h.awaitInput = false;
@@ -341,10 +442,18 @@ function onShellMark(h, data) {
       h.inputStart = null;
       const cmd = h.pendingCmd;
       h.pendingCmd = '';
-      const entry = { cmd, at: now, start: h.term.registerMarker(0), end: null, exit: null, dur: null };
+      const entry = { cmd, at: now, start: h.term.registerMarker(0), head: h.promptMarker, end: null, exit: null, dur: null, decos: [] };
+      h.promptMarker = null;
+      h.atPrompt = false;
+      if (h.ownPrompt) decorateHead(h, entry);
       h.cmds.push(entry);
-      if (h.cmds.length > 200) h.cmds.shift()?.start?.dispose();
-      patchRt(h.sid, { status: 'run', command: cmd, cmdStart: now, exitCode: null, dropped: null });
+      if (h.cmds.length > 200) {
+        const old = h.cmds.shift();
+        old?.start?.dispose();
+        old?.head?.dispose();
+        old?.decos?.forEach((d) => d.dispose());
+      }
+      patchRt(h.sid, { status: 'run', atPrompt: false, command: cmd, cmdStart: now, exitCode: null, dropped: null });
       hooks.commandStart?.(h.sid, cmd);
       break;
     }
@@ -355,6 +464,7 @@ function onShellMark(h, data) {
       entry.end = h.term.registerMarker(0);
       entry.exit = exit;
       entry.dur = now - entry.at;
+      if (h.ownPrompt) decorateEnd(h, entry);
       hooks.commandEnd?.(h.sid, entry);
       break;
     }

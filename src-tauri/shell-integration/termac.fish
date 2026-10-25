@@ -10,6 +10,13 @@ function __termac_prompt --on-event fish_prompt
     printf '\e]633;P;Cwd=%s\a' $PWD
     printf '\e]633;A\a'
 end
+# Termorc draws its own prompt (TERMORC_PROMPT); the shell's would only repeat it.
+if set -q TERMORC_PROMPT
+    function fish_prompt; end
+    function fish_right_prompt; end
+    function fish_mode_prompt; end
+    set -g fish_greeting
+end
 if set -q TERMAC_STARTUP
     eval $TERMAC_STARTUP
     set -e TERMAC_STARTUP

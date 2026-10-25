@@ -30,6 +30,25 @@ import {
   Undo2,
   Minus,
   CornerDownLeft,
+  Maximize2,
+  Minimize2,
+  Rows2,
+  Columns2,
+  MessageSquare,
+  MessageSquarePlus,
+  GitCommitHorizontal,
+  GitMerge,
+  ArrowDown,
+  ChevronDown,
+  Send,
+  Trash2,
+  Pencil,
+  ChevronsDownUp,
+  ChevronsUpDown,
+  CircleCheck,
+  CircleX,
+  CircleDot,
+  LoaderCircle,
 } from 'lucide-react';
 
 const icon = (Glyph) => {
@@ -66,6 +85,27 @@ export const IconRefresh = icon(RotateCw);
 export const IconUndo = icon(Undo2);
 export const IconMinus = icon(Minus);
 export const IconInsert = icon(CornerDownLeft);
+export const IconMaximize = icon(Maximize2);
+export const IconMinimize = icon(Minimize2);
+export const IconUnified = icon(Rows2);
+export const IconSplit = icon(Columns2);
+export const IconComment = icon(MessageSquare);
+export const IconCommentAdd = icon(MessageSquarePlus);
+export const IconCommit = icon(GitCommitHorizontal);
+export const IconPR = icon(GitPullRequest);
+export const IconMerge = icon(GitMerge);
+export const IconArrowDown = icon(ArrowDown);
+export const IconChevronDown = icon(ChevronDown);
+export const IconSend = icon(Send);
+export const IconTrash = icon(Trash2);
+export const IconPencil = icon(Pencil);
+export const IconCollapseAll = icon(ChevronsDownUp);
+export const IconExpandAll = icon(ChevronsUpDown);
+export const IconCheckCircle = icon(CircleCheck);
+export const IconXCircle = icon(CircleX);
+export const IconDot = icon(CircleDot);
+// Spins while a git or gh action runs (.spin in app.css).
+export const IconSpinner = ({ size = 16, ...rest }) => <LoaderCircle size={size} strokeWidth={2} className="spin" aria-hidden="true" {...rest} />;
 
 // App mark: a prompt and cursor, bracketed out to three sessions. Same drawing as build/icon.svg.
 // Mint parts take currentColor; the session tiles stay paper-white on any background.

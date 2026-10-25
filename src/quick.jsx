@@ -71,7 +71,7 @@ async function ensureSession(cwdHint) {
     q.set((st) => ({ ...st, sid, startCwd: cwd, startedAt: Date.now() }));
     patchRt(sid, { cwd, status: 'idle' });
     if (slotEl) reg.mount(sid, slotEl); // size the terminal before the pty spawns
-    await reg.start(sid, { cwd, profile: defaultProfile(), spaceName: '', initialCommand: '' });
+    await reg.start(sid, { cwd, profile: defaultProfile(), spaceName: '', initialCommand: '', inputBar: false });
     return sid;
   })();
   try {

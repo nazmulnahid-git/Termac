@@ -9,6 +9,7 @@ import { formatAccel } from '../lib/keys.js';
 import { terminalLook } from '../lib/termtheme.js';
 import { useImageUrl } from './common.jsx';
 import PaneChips from './PaneChips.jsx';
+import Composer from './Composer.jsx';
 
 const api = window.termac;
 const PANE_MIME = 'application/x-termac-pane';
@@ -125,6 +126,9 @@ function Pane({ sid, focused, multi, danger, look }) {
   const confirm = ui.use((s) => (s.confirm?.sid === sid ? s.confirm : null));
   const copied = ui.use((s) => s.copied?.sid === sid);
   const find = ui.use((s) => s.find && s.focusedSid === sid);
+  const fontSize = app.use((s) => s.settings.fontSize);
+  const lineHeight = app.use((s) => s.settings.lineHeight);
+  const composer = r.ownPrompt && !r.alt;
 
   useLayoutEffect(() => {
     reg.create(sid);
@@ -172,16 +176,31 @@ function Pane({ sid, focused, multi, danger, look }) {
         }}
       >
         {danger && <span className="prod-chip">PRODUCTION</span>}
-        <PaneChips sid={sid} r={r} cwd={r.cwd || meta?.cwd || home} />
+        {/* With the input bar, the folder and branch chips live in it instead. */}
+        {!composer && <PaneChips sid={sid} r={r} cwd={r.cwd || meta?.cwd || home} />}
         <span className="grow" />
         <span className="pill proc" title={r.command || ''}>
           <span className={`dot6${r.status === 'run' ? ' st-run' : ''}`} style={{ background: procColor }} />
           {procLabel(r, r.shell)}
         </span>
       </div>
-      <div className="term-wrap">
+      <div
+        className="term-wrap"
+        onMouseUp={() => {
+          // Clicking the output at a prompt goes back to the input bar, unless text was selected.
+          const h = reg.getHandle(sid);
+          if (composer && r.atPrompt && !h?.term.hasSelection()) requestAnimationFrame(() => reg.focus(sid));
+        }}
+      >
         <div className="term-slot" ref={slot} />
       </div>
+      {composer && (
+        // Fixed height whatever the bar shows, so the terminal never resizes under a command;
+        // extra input lines and popups grow upward over the output.
+        <div className="composer-slot" style={{ height: Math.round(fontSize * lineHeight) + 86 }}>
+          <Composer sid={sid} focused={focused} cwd={r.cwd || meta?.cwd || home} home={home} />
+        </div>
+      )}
       {r.scrolledUp && (
         <button className="float-pill" onClick={() => reg.getHandle(sid)?.term.scrollToBottom()}>
           ↓ Jump to bottom{r.newLines ? <span>· {r.newLines} new lines</span> : null}

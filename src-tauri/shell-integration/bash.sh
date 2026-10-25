@@ -15,7 +15,11 @@ __termac_precmd() {
   printf '\e]633;P;Cwd=%s\a' "$PWD"
   printf '\e]633;A\a'
 }
-__termac_ready() { __termac_in_prompt=1; }
+__termac_ready() {
+  __termac_in_prompt=1
+  # Termorc draws its own prompt (TERMORC_PROMPT); blank the shell's, after any theme set it.
+  [[ -n "$TERMORC_PROMPT" ]] && PS1='' PS2=''
+}
 __termac_preexec() {
   [[ -z "$__termac_in_prompt" ]] && return
   __termac_in_prompt=

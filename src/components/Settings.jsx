@@ -294,6 +294,12 @@ function GeneralTab() {
         <Row label="Use ⌥ as Meta key" hint="Sends Esc-prefixed keys to the shell instead of typing special characters.">
           <Switch on={s.optionAsMeta} onChange={setSetting('optionAsMeta')} />
         </Row>
+        <Row label="Prompt" hint="Termorc: an input bar with history, completion and suggestions, and each command in its own block. Shell: your shell's own prompt and theme. Applies to new sessions.">
+          <Seg value={s.promptStyle} onChange={setSetting('promptStyle')} options={[['termorc', 'Termorc'], ['shell', 'Shell']]} />
+        </Row>
+        <Row label="Tips in new sessions" hint="A short card of shortcuts above the input bar until you run something.">
+          <Switch on={s.terminalWelcome} onChange={setSetting('terminalWelcome')} />
+        </Row>
         <Row label="Click to move the cursor" hint="Click inside the command you're typing to put the cursor there. Needs shell integration.">
           <Switch on={s.clickToMove} onChange={setSetting('clickToMove')} />
         </Row>

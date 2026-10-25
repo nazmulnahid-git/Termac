@@ -11,19 +11,101 @@ pub fn home() -> PathBuf {
     PathBuf::from(std::env::var("HOME").unwrap_or_else(|_| "/".into()))
 }
 
-// Runs a command and returns its stdout, or None if it failed, timed out or exited non-zero.
-pub async fn run(cmd: &str, args: &[&str], timeout_ms: u64, cwd: Option<&str>, raw: bool) -> Option<String> {
+// Apps opened from Finder get launchd's bare PATH; git hooks (husky, lint-staged) and gh
+// expect the one the user's login shell sets up, so read it once and hand it to children.
+static LOGIN_PATH: LazyLock<Option<String>> = LazyLock::new(|| {
+    let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".into());
+    let mut child = std::process::Command::new(shell)
+        .args(["-l", "-c", "printf %s \"$PATH\""])
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::null())
+        .spawn()
+        .ok()?;
+    let start = Instant::now();
+    while child.try_wait().ok()?.is_none() {
+        if start.elapsed() > Duration::from_secs(4) {
+            let _ = child.kill();
+            return None;
+        }
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    let out = child.wait_with_output().ok()?;
+    let path = String::from_utf8_lossy(&out.stdout).trim().to_string();
+    (!path.is_empty()).then_some(path)
+});
+
+pub fn login_path() -> Option<&'static str> {
+    LOGIN_PATH.as_deref()
+}
+
+// Starts the login-shell PATH lookup early so the first git action doesn't wait for it.
+pub fn warm_login_path() {
+    std::thread::spawn(|| LazyLock::force(&LOGIN_PATH));
+}
+
+fn command(cmd: &str, args: &[&str], cwd: Option<&str>) -> Command {
     let mut c = Command::new(cmd);
-    c.args(args).kill_on_drop(true).stdin(std::process::Stdio::null());
+    c.args(args).kill_on_drop(true);
+    if let Some(path) = LOGIN_PATH.as_deref() {
+        c.env("PATH", path);
+    }
+    // Never sit waiting on a credentials prompt nobody can see.
+    c.env("GIT_TERMINAL_PROMPT", "0").env("GH_PROMPT_DISABLED", "1").env("GIT_EDITOR", "true");
     if let Some(dir) = cwd {
         c.current_dir(dir);
     }
+    c
+}
+
+// Runs a command and returns its stdout, or None if it failed, timed out or exited non-zero.
+pub async fn run(cmd: &str, args: &[&str], timeout_ms: u64, cwd: Option<&str>, raw: bool) -> Option<String> {
+    let mut c = command(cmd, args, cwd);
+    c.stdin(std::process::Stdio::null());
     let out = tokio::time::timeout(Duration::from_millis(timeout_ms), c.output()).await.ok()?.ok()?;
     if !out.status.success() {
         return None;
     }
     let text = String::from_utf8_lossy(&out.stdout).into_owned();
     Some(if raw { text } else { text.trim().to_string() })
+}
+
+pub struct Output {
+    pub ok: bool,
+    pub out: String,
+    pub err: String,
+}
+
+// Like run(), but keeps stderr for the UI to show and can feed stdin.
+pub async fn run_full(cmd: &str, args: &[&str], timeout_ms: u64, cwd: Option<&str>, stdin: Option<&str>) -> Output {
+    use std::process::Stdio;
+    use tokio::io::AsyncWriteExt;
+    let mut c = command(cmd, args, cwd);
+    c.stdin(if stdin.is_some() { Stdio::piped() } else { Stdio::null() }).stdout(Stdio::piped()).stderr(Stdio::piped());
+    let fail = |err: String| Output { ok: false, out: String::new(), err };
+    let mut child = match c.spawn() {
+        Ok(ch) => ch,
+        Err(e) => return fail(format!("Couldn't run {cmd}: {e}")),
+    };
+    if let (Some(text), Some(mut pipe)) = (stdin, child.stdin.take()) {
+        let _ = pipe.write_all(text.as_bytes()).await;
+    }
+    match tokio::time::timeout(Duration::from_millis(timeout_ms), child.wait_with_output()).await {
+        Err(_) => fail(format!("{cmd} timed out")),
+        Ok(Err(e)) => fail(e.to_string()),
+        Ok(Ok(o)) => Output {
+            ok: o.status.success(),
+            out: String::from_utf8_lossy(&o.stdout).into_owned(),
+            err: String::from_utf8_lossy(&o.stderr).trim().to_string(),
+        },
+    }
+}
+
+pub fn gh_bin() -> &'static str {
+    if LOGIN_PATH.is_some() {
+        return "gh";
+    }
+    ["/opt/homebrew/bin/gh", "/usr/local/bin/gh"].into_iter().find(|p| Path::new(p).exists()).unwrap_or("gh")
 }
 
 // Like Finder: case-insensitive, with digit runs compared by value ("file2" < "file10").
@@ -201,9 +283,9 @@ pub async fn git_branches(cwd: &str) -> Vec<String> {
     run("git", &args, 3000, None, false).await.filter(|o| !o.is_empty()).map_or(vec![], |o| o.lines().map(str::to_string).collect())
 }
 
-// Open PR for the branch via the GitHub CLI, if it's installed and signed in. GUI apps don't
-// inherit the shell's PATH, so look in the usual Homebrew spots too. Cached: it hits the network.
-static PRS: LazyLock<Mutex<HashMap<String, (Instant, Value)>>> = LazyLock::new(Default::default);
+// Open PR for the branch via the GitHub CLI, if it's installed and signed in. Cached: it hits
+// the network.
+pub static PRS: LazyLock<Mutex<HashMap<String, (Instant, Value)>>> = LazyLock::new(Default::default);
 
 pub async fn git_pr(cwd: &str, branch: &str) -> Value {
     if cwd.is_empty() || branch.is_empty() {
@@ -215,7 +297,7 @@ pub async fn git_pr(cwd: &str, branch: &str) -> Value {
             return pr.clone();
         }
     }
-    let gh = ["/opt/homebrew/bin/gh", "/usr/local/bin/gh"].into_iter().find(|p| Path::new(p).exists()).unwrap_or("gh");
+    let gh = gh_bin();
     let out = run(gh, &["pr", "view", "--json", "number,url,state"], 8000, Some(cwd), false).await;
     let pr = out
         .and_then(|o| serde_json::from_str::<Value>(&o).ok())

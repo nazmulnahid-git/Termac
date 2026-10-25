@@ -621,6 +621,10 @@ reg.setHooks({
     confirmThen(sid, { title: `Run this on ${host}?`, detail: "You're about to run a privileged command on production.", label: 'Run', danger: true }, () => api.pty.write(sid, '\r'));
     return false;
   },
+  // Keys that reached the terminal while the input bar owns the prompt (Composer.jsx).
+  composerInput(sid, data) {
+    window.dispatchEvent(new CustomEvent('composer-input', { detail: { sid, data } }));
+  },
   bell(sid) {
     const h = reg.getHandle(sid);
     if (h?.visible && document.hasFocus()) return;
@@ -751,18 +755,64 @@ export function typeCommand(sid, command) {
   return true;
 }
 
+// Runs a command typed in the input bar, with the same production guard as typing it in
+// the terminal. Multi-line input goes as one bracketed paste so the shell runs it whole.
+export function submitCommand(sid, command) {
+  const h = reg.getHandle(sid);
+  if (h && !h.alive) startSession(sid);
+  const data = command.includes('\n') ? `\x1b[200~${command}\x1b[201~\r` : command + '\r';
+  if (isDanger(sid) && isRiskyCommand(command)) {
+    const host = rt.get()[sid]?.dangerHost || 'production';
+    confirmThen(sid, { title: `Run this on ${host}?`, detail: "You're about to run a privileged command on production.", label: 'Run', danger: true }, () => api.pty.write(sid, data));
+    return false;
+  }
+  api.pty.write(sid, data);
+  return true;
+}
+
 // Type text at the cursor without running it (e.g. a path from the explorer).
 export function insertText(sid, text) {
   if (!sid) return;
   const h = reg.getHandle(sid);
   if (h && !h.alive) startSession(sid);
-  api.pty.write(sid, text);
+  if (reg.composerActive(h)) window.dispatchEvent(new CustomEvent('composer-input', { detail: { sid, data: text } }));
+  else api.pty.write(sid, text);
   focusSession(sid);
 }
 
 // ---- Tool panels: explorer / search (left), code review (right), file viewer -------------
 export const togglePanel = (name) => ui.set((u) => ({ ...u, tools: u.tools === name ? null : name }));
-export const toggleReview = () => ui.set((u) => ({ ...u, review: !u.review }));
+export const toggleReview = () => ui.set((u) => ({ ...u, review: !u.review, reviewMax: u.review ? false : u.reviewMax }));
+export const toggleReviewMax = () => ui.set((u) => ({ ...u, review: true, reviewMax: !u.reviewMax }));
+
+// Review comments are drafts kept per repository until they're sent, posted or cleared.
+export function addReviewComment(root, c) {
+  const comment = { id: uid('rc'), at: Date.now(), ...c };
+  app.set((s) => ({ ...s, reviewComments: { ...s.reviewComments, [root]: [...(s.reviewComments?.[root] || []), comment] } }));
+}
+export function updateReviewComment(root, id, text) {
+  app.set((s) => ({ ...s, reviewComments: { ...s.reviewComments, [root]: (s.reviewComments?.[root] || []).map((c) => (c.id === id ? { ...c, text } : c)) } }));
+}
+export function removeReviewComment(root, id) {
+  app.set((s) => ({ ...s, reviewComments: { ...s.reviewComments, [root]: (s.reviewComments?.[root] || []).filter((c) => c.id !== id) } }));
+}
+export function clearReviewComments(root) {
+  app.set((s) => {
+    const { [root]: _, ...rest } = s.reviewComments || {};
+    return { ...s, reviewComments: rest };
+  });
+}
+
+// Pastes text into the focused session as one bracketed paste, so a coding agent running
+// there gets it as a single message instead of line-by-line commands.
+export function pasteIntoSession(text, sid = focusedSid()) {
+  const h = sid && reg.getHandle(sid);
+  if (!h) return false;
+  if (!h.alive) startSession(sid);
+  h.term.paste(text);
+  focusSession(sid);
+  return true;
+}
 export const openFile = (path, line = null) => ui.set((u) => ({ ...u, viewer: { path, line } }));
 export function closeFile() {
   ui.set((u) => (u.viewer ? { ...u, viewer: null } : u));

@@ -24,6 +24,8 @@ const FIELDS = [
   ['general.confirm_quit', 'confirmQuit', { desc: 'Ask before quitting while processes are running.' }],
   ['terminal.scrollback', 'scrollback', { min: 100, max: 200000, int: true, desc: 'Lines kept per session.' }],
   ['terminal.option_as_meta', 'optionAsMeta', { desc: 'Send ⌥ as Meta (Esc-prefixed keys) instead of typing special characters.' }],
+  ['terminal.prompt', 'promptStyle', { values: ['termorc', 'shell'], desc: '"termorc": Termorc\'s input bar and command blocks. "shell": your shell\'s own prompt. Applies to new sessions.' }],
+  ['terminal.welcome', 'terminalWelcome', { desc: 'Show the tips card in a new, empty session.' }],
   ['terminal.click_to_move', 'clickToMove', { desc: 'Click inside the command you are typing to move the cursor there.' }],
   ['terminal.shell_priority', 'shellPriority', { desc: 'Let the shell have Ctrl shortcuts that the app would otherwise take.' }],
   ['sessions.archive_after_hours', 'archiveAfterH', { min: 0, max: 8760, desc: 'Archive idle unpinned sessions after this many hours. 0 = never.' }],

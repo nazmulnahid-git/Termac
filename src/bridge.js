@@ -163,6 +163,19 @@ window.termac = {
     notify: (n) => send('sys_notify', { n }),
     confirm: (o) => call('sys_confirm', { o }),
   },
+  shell: {
+    history: () => call('shell_history'),
+    complete: (cwd, line) => call('shell_complete', { cwd, line }),
+  },
+  review: {
+    overview: (root) => call('review_overview', { root }),
+    log: (root, limit) => call('review_log', { root, limit }),
+    show: (root, sha) => call('review_show', { root, sha }),
+    remoteBranches: (root) => call('review_remote_branches', { root }),
+    pr: (root) => call('review_pr', { root }),
+    // op: { op: 'commit' | 'push' | 'pull' | 'fetch' | 'apply' | 'stageAll' | 'discardAll' | 'switch' | 'undoCommit' | 'prCreate' | 'prComment' | 'prReady' | 'prMerge', ... }
+    run: (root, op) => call('review_op', { root, op }),
+  },
   app: {
     popupMenu: (items) => call('menu_popup', { items }),
     setMenu: (bindings) => {
