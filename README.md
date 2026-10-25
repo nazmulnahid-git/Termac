@@ -18,6 +18,10 @@ A macOS terminal where every session lives in a vertical sidebar, grouped into c
 - **Auto-archive and Library (⌘Y).** Idle Today sessions move to the Library after 12 h (configurable, with Undo). Library search covers names, commands, output and paths. Restore brings back the scrollback.
 - **Routing rules.** Rules decide where new sessions land, by directory glob, SSH host or command prefix. They can also add effects: a red danger frame, confirmation for multi-line pastes, or no auto-archive. On danger sessions, `sudo`, restarts and `rm -rf` ask before running.
 - **Notes (⇧⌘N).** One Markdown doc per Space. It supports checklists and pasted output that remembers which session it came from. Code blocks can run in the current session or be saved as `/snippets`.
+- **Input bar and blocks.** Type commands in Termorc's own input bar: syntax colors, a suggestion from history (→ accepts), ↑/↓ recall, ⌃R search, ⇥ completion for commands, paths and git branches. Each command's output is a block with its time, duration and exit status. Settings → Terminal → Prompt → Shell brings back your shell's own prompt.
+- **Code review (⇧⌘G).** Changes, Commits and Pull request tabs. Unified or side-by-side diffs with word-level highlights; stage, unstage or discard whole files or single hunks; mark files Viewed; comment on lines and send the comments to the terminal (for a coding agent) or post them on the PR. Commit (amend, commit & push), switch branches, fetch/pull/push, and open or merge pull requests with the GitHub CLI. Maximize to cover the terminal area.
+- **Editor.** Files open in a code editor (CodeMirror): syntax colors, search and replace, multiple cursors; ⌘S saves.
+- **Finder.** Right-click a folder › Services › **New Termorc Tab Here**, or drop a folder on the Dock icon.
 - **Quick Terminal (⌥Space).** A global drop-down panel. It opens in the frontmost Finder folder. "Move to Space" promotes it to a sidebar row with its scrollback intact.
 - **Extras:**
   - ⇧⌘C copies only the last command's output.
@@ -54,9 +58,12 @@ npm install
 npm run dev     # Vite + Tauri with hot reload
 npm test        # unit tests for routing, layout, fuzzy, keys, markdown
 cargo test --manifest-path src-tauri/Cargo.toml --lib   # PTY, git and Library tests
-npm run dist    # release build: Termorc.app and a .dmg in src-tauri/target/release/bundle
+npm run dist    # release build: Termorc.app and a styled .dmg in src-tauri/target/release/bundle
+                # (the .dmg step needs dmgbuild: pip3 install dmgbuild)
 ```
 
 Set `TERMORC_DATA_DIR=/some/folder` to run a build with its own state and settings, apart from your everyday sessions.
+
+The installer window's background is `build/dmg/background.svg`, rendered to `background.tiff` (1× and 2×); the layout lives in `scripts/dmg-settings.py`.
 
 The icon's source is `build/icon.svg`. After editing it, regenerate the app icons with `npx tauri icon build/icon.svg -o src-tauri/icons`, then delete the non-macOS sizes.

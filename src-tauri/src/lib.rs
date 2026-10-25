@@ -369,12 +369,14 @@ struct DiffOpts {
     staged: bool,
     #[serde(default)]
     untracked: bool,
+    // Lines of context around each change (git's -U); the panel widens it on request.
+    context: Option<u32>,
 }
 
 #[tauri::command]
 async fn sys_git_diff(root: String, file: String, opts: Option<DiffOpts>) -> Option<String> {
     let o = opts.unwrap_or_default();
-    system::git_diff(&root, &file, o.staged, o.untracked).await
+    system::git_diff(&root, &file, o.staged, o.untracked, o.context.unwrap_or(3)).await
 }
 
 #[tauri::command]

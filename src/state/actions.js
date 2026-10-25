@@ -813,9 +813,23 @@ export function pasteIntoSession(text, sid = focusedSid()) {
   focusSession(sid);
   return true;
 }
-export const openFile = (path, line = null) => ui.set((u) => ({ ...u, viewer: { path, line } }));
-export function closeFile() {
-  ui.set((u) => (u.viewer ? { ...u, viewer: null } : u));
+// Unsaved edits in the editor are only thrown away after asking.
+async function discardEdits() {
+  const u = ui.get();
+  if (!u.viewerDirty) return true;
+  const name = u.viewer?.path.split('/').pop();
+  return api.sys.confirm({ message: `Discard your changes to ${name}?`, detail: "They haven't been saved. Press ⌘S in the editor to save them.", ok: 'Discard' });
+}
+
+export async function openFile(path, line = null) {
+  const cur = ui.get().viewer;
+  if (cur && cur.path !== path && !(await discardEdits())) return;
+  ui.set((u) => ({ ...u, viewer: { path, line }, viewerDirty: cur?.path === path ? u.viewerDirty : false }));
+}
+
+export async function closeFile() {
+  if (!(await discardEdits())) return;
+  ui.set((u) => (u.viewer ? { ...u, viewer: null, viewerDirty: false } : u));
   const sid = focusedSid();
   if (sid) requestAnimationFrame(() => reg.focus(sid));
 }

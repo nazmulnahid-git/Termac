@@ -122,6 +122,7 @@ export const ui = createStore({
   review: false, // code review panel (right)
   reviewMax: false, // the review panel covers the whole terminal area
   viewer: null, // { path, line } file shown over the terminal card
+  viewerDirty: false, // the open file has unsaved edits
   settingsFile: { path: '', text: null, error: null, warnings: [] }, // ~/.termorc/settings.json: its text on disk and last parse result
 });
 

@@ -7,11 +7,12 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { app, rt, ui } from '../state/model.js';
 import * as A from '../state/actions.js';
-import { parseDiff, diffStats, hunkPatch, splitRows, splitFiles } from '../lib/diff.js';
+import { parseDiff, diffStats, hunkPatch, splitRows, splitFiles, hunkInline, markRanges, statBlocks } from '../lib/diff.js';
 import { highlightLines, langOf } from '../lib/highlight.js';
 import { reviewMarkdown } from '../lib/review.js';
 import { timeAgo } from '../lib/meta.js';
 import { useProject, baseName, dirName } from './project.js';
+import { FileIcon } from './fileicons.jsx';
 import { promptText } from './sidebar-shared.js';
 import { PanelResize } from './ToolsPanel.jsx';
 import {
@@ -23,6 +24,25 @@ import {
 const api = window.termac;
 const BIG = 1500; // lines; bigger diffs stay folded until asked
 const NO_COMMENTS = [];
+const CONTEXT_STEPS = [3, 25, 1000000]; // lines around each change: default, more, the whole file
+
+// Files marked "Viewed", per repository, for as long as the app runs. The key includes the
+// file's line counts, so a file that changes again comes back unviewed (as on GitHub).
+const viewedByRoot = new Map();
+const viewKey = (f, staged) => {
+  const part = staged ? f.staged : f.unstaged;
+  return `${staged ? 's' : 'u'}:${f.path}|${part?.add}|${part?.del}|${staged ? f.x : f.y}`;
+};
+function useViewed(root) {
+  const [, bump] = useState(0);
+  if (!viewedByRoot.has(root)) viewedByRoot.set(root, new Set());
+  const set = viewedByRoot.get(root);
+  const toggle = (key) => {
+    set.has(key) ? set.delete(key) : set.add(key);
+    bump((n) => n + 1);
+  };
+  return [set, toggle];
+}
 
 // ---- Data -----------------------------------------------------------------------------------
 function useReviewData(root, open, bump) {
@@ -116,7 +136,7 @@ export default function ReviewPanel() {
   const root = changes?.root || project.root;
   const files = changes?.files || null;
   const notRepo = changes?.notRepo || !project.git;
-  const ctx = { root, run, busy, refresh, view, comments, fold, info, pr };
+  const ctx = { root, run, busy, refresh, view, comments, fold, info, pr, max };
 
   return (
     <aside className={`review${max ? ' max' : ''}`} style={max ? null : { width: dragW ?? width }}>
@@ -161,7 +181,6 @@ export default function ReviewPanel() {
       </div>
       {!notRepo && info && <BranchBar ctx={ctx} onPr={() => setTab('pr')} />}
       <div className="rv-main">
-        {max && tab === 'changes' && files?.length > 0 && <FileNav files={files} comments={comments} scroller={scroller} />}
         <div className="rv-col">
           {notRepo ? (
             <div className="rv-empty">
@@ -286,8 +305,10 @@ async function undoCommit({ root, run, info }) {
 }
 
 // ---- Changes -------------------------------------------------------------------------------------
-function Changes({ ctx, files, scroller }) {
-  const { root, run, comments } = ctx;
+function Changes({ ctx: base, files, scroller }) {
+  const { root, run, comments } = base;
+  const [viewed, toggleViewed] = useViewed(root);
+  const ctx = { ...base, viewed, toggleViewed };
   if (!files) return <div className="rv-empty">Loading changes…</div>;
   const staged = files.filter((f) => f.x !== ' ' && f.x !== '?');
   const unstaged = files.filter((f) => f.y !== ' ' || f.untracked);
@@ -311,8 +332,8 @@ function Changes({ ctx, files, scroller }) {
     if (ok) run('discardAll', { op: 'discardAll', untracked });
   };
 
-  return (
-    <>
+  const commit = <CommitBox ctx={ctx} staged={staged} unstaged={unstaged} key={root} />;
+  const diffs = (
       <div className="rv-scroll" ref={scroller}>
         {comments.length > 0 && <CommentsSummary ctx={ctx} />}
         {!files.length && (
@@ -323,11 +344,12 @@ function Changes({ ctx, files, scroller }) {
           </div>
         )}
         {files.length > 0 && (
-          <div className="rv-summary">
-            {plural(files.length, 'file')} changed
-            <span className="add">+{total.add}</span>
-            <span className="del">−{total.del}</span>
-          </div>
+          <Summary
+            files={files.length}
+            total={total}
+            seen={staged.filter((f) => viewed.has(viewKey(f, true))).length + unstaged.filter((f) => viewed.has(viewKey(f, false))).length}
+            of={staged.length + unstaged.length}
+          />
         )}
         {staged.length > 0 && (
           <Group title="Staged" files={staged} staged ctx={ctx} actions={<button className="rv-gbtn" onClick={() => run('stageAll', { op: 'stageAll', stage: false })}>Unstage all</button>} />
@@ -346,13 +368,28 @@ function Changes({ ctx, files, scroller }) {
           />
         )}
       </div>
-      <CommitBox ctx={ctx} staged={staged} unstaged={unstaged} key={root} />
+  );
+  // Maximized: files and the commit box down the left, like an editor's source control view.
+  if (ctx.max && files.length)
+    return (
+      <div className="rv-split">
+        <aside className="rv-side">
+          <FileNav files={files} comments={comments} scroller={scroller} viewed={viewed} />
+          {commit}
+        </aside>
+        <div className="rv-col">{diffs}</div>
+      </div>
+    );
+  return (
+    <>
+      {diffs}
+      {commit}
     </>
   );
 }
 
 function Group({ title, files, staged = false, ctx, actions }) {
-  const autoOpen = files.length <= 12;
+  const autoOpen = files.length <= (ctx.max ? 40 : 12);
   return (
     <section className="rv-group">
       <div className="rv-gtitle">
@@ -369,7 +406,7 @@ function Group({ title, files, staged = false, ctx, actions }) {
 }
 
 // Max mode: the changed files down the left, like a PR's file tree.
-function FileNav({ files, comments, scroller }) {
+function FileNav({ files, comments, scroller, viewed }) {
   const counts = new Map();
   for (const c of comments) counts.set(c.path, (counts.get(c.path) || 0) + 1);
   const seen = new Set();
@@ -385,11 +422,13 @@ function FileNav({ files, comments, scroller }) {
       <div className="rv-nav-title">Files</div>
       {list.map((f) => {
         const code = f.untracked ? 'U' : f.x !== ' ' && f.x !== '?' ? f.x : f.y;
+        const seenIt = [true, false].some((st) => viewed.has(viewKey(f, st)));
         return (
-          <button key={f.path} className="rv-nav-row" onClick={() => jump(f.path)} title={f.path}>
-            <span className={`rv-code c-${code}`}>{code}</span>
-            <span className="ellipsis">{baseName(f.path)}</span>
+          <button key={f.path} className={`rv-nav-row${seenIt ? ' seen' : ''}`} onClick={() => jump(f.path)} title={f.path}>
+            <FileIcon name={baseName(f.path)} />
+            <span className="rv-nav-name ellipsis">{baseName(f.path)}</span>
             <span className="rv-dir ellipsis">{dirName(f.path)}</span>
+            {seenIt ? <IconCheckCircle size={12} className="rv-seen" /> : <span className={`rv-code c-${code}`}>{code}</span>}
             {counts.get(f.path) ? (
               <span className="rv-ncount">
                 <IconComment size={11} />
@@ -403,11 +442,45 @@ function FileNav({ files, comments, scroller }) {
   );
 }
 
+function Summary({ files, total, seen, of }) {
+  return (
+    <div className="rv-summary">
+      <span>{plural(files, 'file')} changed</span>
+      <span className="add">+{total.add}</span>
+      <span className="del">−{total.del}</span>
+      <span className="grow" />
+      <span className="rv-progress-label">
+        {seen} of {of} viewed
+      </span>
+      <span className="rv-progress">
+        <i style={{ width: `${of ? (seen / of) * 100 : 0}%` }} />
+      </span>
+    </div>
+  );
+}
+
+function DiffStat({ add, del }) {
+  return (
+    <span className="rv-stat" title={`${add} additions, ${del} deletions`}>
+      {add != null && <span className="add">+{add}</span>}
+      {del ? <span className="del">−{del}</span> : null}
+      <span className="rv-blocks">
+        {statBlocks(add || 0, del || 0).map((k, i) => (
+          <i key={i} className={k} />
+        ))}
+      </span>
+    </span>
+  );
+}
+
 function FileDiff({ f, staged, ctx, startOpen, readOnly = false, text: given = null }) {
   const { root, run, fold } = ctx;
-  const [open, setOpen] = useState(startOpen);
+  const key = readOnly ? null : viewKey(f, staged);
+  const isViewed = !!key && !!ctx.viewed?.has(key);
+  const [open, setOpen] = useState(startOpen && !isViewed);
   const [text, setText] = useState(given);
   const [force, setForce] = useState(false);
+  const [context, setContext] = useState(0); // index into CONTEXT_STEPS
   const el = useRef(null);
   const known = readOnly ? null : staged ? f.staged : f.unstaged;
   const code = readOnly ? f.status : staged ? f.x : f.untracked ? 'U' : f.y;
@@ -416,7 +489,7 @@ function FileDiff({ f, staged, ctx, startOpen, readOnly = false, text: given = n
   const sig = `${known?.add}|${known?.del}|${code}`;
 
   useEffect(() => {
-    if (fold.n) setOpen(fold.open);
+    if (fold.n) setOpen(fold.open && !isViewed);
   }, [fold.n]);
   useEffect(() => {
     const node = el.current;
@@ -427,11 +500,11 @@ function FileDiff({ f, staged, ctx, startOpen, readOnly = false, text: given = n
   useEffect(() => {
     if (!open || readOnly) return;
     let on = true;
-    api.sys.gitDiff(root, f.path, { staged, untracked: f.untracked }).then((t) => on && setText(t ?? ''));
+    api.sys.gitDiff(root, f.path, { staged, untracked: f.untracked, context: CONTEXT_STEPS[context] }).then((t) => on && setText(t ?? ''));
     return () => {
       on = false;
     };
-  }, [open, root, f.path, staged, sig]);
+  }, [open, root, f.path, staged, sig, context]);
 
   const parsed = useMemo(() => (text == null ? null : parseDiff(text)), [text]);
   const lineCount = parsed ? parsed.hunks.reduce((n, h) => n + h.lines.length, 0) : 0;
@@ -449,6 +522,11 @@ function FileDiff({ f, staged, ctx, startOpen, readOnly = false, text: given = n
     await api.sys.gitDiscard(root, f.path, f.untracked);
     ctx.refresh();
   };
+  const toggleViewed = (e) => {
+    e.stopPropagation();
+    ctx.toggleViewed(key);
+    setOpen(isViewed); // marking viewed folds the file; unmarking opens it again
+  };
   // Hunk actions build a one-hunk patch from this diff and hand it to `git apply`.
   const hunkAction = async (i, kind) => {
     const patch = hunkPatch(parsed, i);
@@ -459,26 +537,27 @@ function FileDiff({ f, staged, ctx, startOpen, readOnly = false, text: given = n
     }
     run('apply', { op: 'apply', patch, cached: true, reverse: kind === 'unstage' });
   };
-  const hunkActions = readOnly || f.untracked ? null : staged ? [['unstage', 'Unstage hunk', IconMinus]] : [['discard', 'Discard hunk', IconUndo], ['stage', 'Stage hunk', IconPlus]];
+  // Hunk-level staging needs the regular 3-line context: git apply matches it against the file.
+  const hunkActions = readOnly || f.untracked || context ? null : staged ? [['unstage', 'Unstage', IconMinus]] : [['discard', 'Discard', IconUndo], ['stage', 'Stage', IconPlus]];
+  const dir = dirName(f.path);
 
   return (
-    <div className={`rv-file${open ? ' open' : ''}`} data-path={f.path} ref={el}>
+    <div className={`rv-file${open ? ' open' : ''}${isViewed ? ' viewed' : ''}`} data-path={f.path} ref={el}>
       <div className="rv-fhead" onClick={() => setOpen((o) => !o)}>
         <span className={`chev${open ? ' open' : ''}`}>
           <IconChevron size={11} />
         </span>
-        <span className={`rv-code c-${code}`}>{code}</span>
-        <span className="rv-name">
-          {baseName(f.path)}
-          <span className="rv-dir">{f.from ? `${f.from} → ` : ''}{dirName(f.path)}</span>
+        <FileIcon name={baseName(f.path)} />
+        <span className="rv-name" title={f.from ? `${f.from} → ${f.path}` : f.path}>
+          {(f.from || dir) && <span className="rv-dir">{f.from ? `${f.from} → ` : ''}{dir && `${dir}/`}</span>}
+          <b>{baseName(f.path)}</b>
         </span>
-        {counts && (
-          <span className="rv-counts">
-            {counts.add != null ? <span className="add">+{counts.add}</span> : <span className="dim">bin</span>} {counts.del ? <span className="del">−{counts.del}</span> : null}
-          </span>
-        )}
+        <span className={`rv-code c-${code}`} title={{ M: 'Modified', A: 'Added', U: 'Untracked', D: 'Deleted', R: 'Renamed', C: 'Copied' }[code] || code}>
+          {code}
+        </span>
+        {counts && (counts.add != null ? <DiffStat add={counts.add} del={counts.del} /> : <span className="dim">binary</span>)}
         <span className="rv-actions">
-          <button className="icon-btn sm" title="Open file" onClick={(e) => (e.stopPropagation(), A.openFile(abs))}>
+          <button className="icon-btn sm" title="Open in editor" onClick={(e) => (e.stopPropagation(), A.openFile(abs))}>
             <IconFile size={13} />
           </button>
           {!readOnly && !staged && (
@@ -492,6 +571,12 @@ function FileDiff({ f, staged, ctx, startOpen, readOnly = false, text: given = n
             </button>
           )}
         </span>
+        {key && (
+          <label className={`rv-viewed${isViewed ? ' on' : ''}`} onClick={(e) => e.stopPropagation()}>
+            <input type="checkbox" checked={isViewed} onChange={toggleViewed} />
+            Viewed
+          </label>
+        )}
       </div>
       {open && (
         <div className="rv-body">
@@ -510,34 +595,54 @@ function FileDiff({ f, staged, ctx, startOpen, readOnly = false, text: given = n
               <Hunk key={i} h={h} path={f.path} lang={langOf(f.path)} ctx={ctx} commentable={!readOnly} onOpen={(line) => A.openFile(abs, line)} actions={hunkActions} onAction={(kind) => hunkAction(i, kind)} />
             ))
           )}
+          {!readOnly && parsed?.hunks.length > 0 && context < CONTEXT_STEPS.length - 1 && (
+            <button className="rv-more" onClick={() => setContext((c) => c + 1)}>
+              <IconExpandAll size={12} />
+              {context === 0 ? 'Show more context' : 'Show the whole file'}
+            </button>
+          )}
         </div>
       )}
     </div>
   );
 }
 
-// ---- Hunks: unified and side by side, with line comments ---------------------------------------
+// ---- Hunks: unified and side by side, with word-level changes and line comments -----------
 function Hunk({ h, path, lang, ctx, commentable, onOpen, actions, onAction }) {
   const { view, comments, root } = ctx;
   const tokens = useMemo(() => highlightLines(h.lines.map((l) => l.text), lang), [h, lang]);
+  const inline = useMemo(() => hunkInline(h), [h]);
   const [composing, setComposing] = useState(null); // { side, line, snippet }
   const forLine = (side, line) => comments.filter((c) => c.path === path && c.side === side && c.line === line);
   const split = view === 'split';
   const cols = split ? 6 : 4;
 
   const code = (i) =>
-    h.lines[i].type === 'meta' ? <i>{h.lines[i].text}</i> : tokens[i].map(([cls, t], k) => <Fragment key={k}>{cls ? <span className={`hl-${cls}`}>{t}</span> : t}</Fragment>);
-  const gutter = (l, side) => {
+    h.lines[i].type === 'meta' ? (
+      <i>{h.lines[i].text}</i>
+    ) : (
+      markRanges(tokens[i], inline.get(i)).map(([cls, t, changed], k) => {
+        const piece = cls ? <span className={`hl-${cls}`}>{t}</span> : t;
+        return changed ? (
+          <mark key={k} className="wd">
+            {piece}
+          </mark>
+        ) : (
+          <Fragment key={k}>{piece}</Fragment>
+        );
+      })
+    );
+  const gutter = (l, side, extra = '') => {
     const no = side === 'old' ? l.oldNo : l.newNo;
     return (
-      <td className="no">
+      <div className={`no ${extra}`}>
         {commentable && no != null && (
           <button className="rv-add-cmt" title="Comment on this line" onClick={() => setComposing({ side, line: no, snippet: l.text })}>
             <IconCommentAdd size={12} />
           </button>
         )}
         {no ?? ''}
-      </td>
+      </div>
     );
   };
   // Comment threads and the composer sit under the line they belong to, across all columns.
@@ -561,18 +666,18 @@ function Hunk({ h, path, lang, ctx, commentable, onOpen, actions, onAction }) {
     }
     return rows;
   };
+  const kind = (l, want) => (!l ? 'empty' : l.type === want ? want : '');
 
   return (
     <div className="rv-hunk">
       <div className="rv-hhead">
-        <span className="ellipsis">
-          {h.header.replace(/@@(.*)@@.*/, '@@$1@@')}
-          {h.context && <span className="ctx">{h.context}</span>}
-        </span>
+        <span className="rv-hrange">{h.header.replace(/^@@ (.*?) @@.*/, '$1')}</span>
+        {h.context && <span className="ctx ellipsis">{h.context}</span>}
+        <span className="grow" />
         {actions && (
           <span className="rv-hactions">
-            {actions.map(([kind, title, Icon]) => (
-              <button key={kind} className="rv-hbtn" onClick={() => onAction(kind)}>
+            {actions.map(([act, title, Icon]) => (
+              <button key={act} className={`rv-hbtn ${act}`} onClick={() => onAction(act)}>
                 <Icon size={12} />
                 {title}
               </button>
@@ -580,56 +685,42 @@ function Hunk({ h, path, lang, ctx, commentable, onOpen, actions, onAction }) {
           </span>
         )}
       </div>
-      <table className={`rv-lines${split ? ' split' : ''}`}>
-        {split && (
-          <colgroup>
-            <col className="c-no" />
-            <col className="c-sign" />
-            <col className="c-code" />
-            <col className="c-no" />
-            <col className="c-sign" />
-            <col className="c-code" />
-          </colgroup>
-        )}
-        <tbody>
-          {split
-            ? splitRows(h).map((r, k) =>
-                r.meta ? (
-                  <tr key={k} className="ln meta">
-                    <td colSpan={6} className="code">
-                      {code(r.mi)}
-                    </td>
-                  </tr>
-                ) : (
-                  <Fragment key={k}>
-                    <tr className="ln" onDoubleClick={() => r.right?.newNo && onOpen(r.right.newNo)}>
-                      {r.left ? gutter(r.left, 'old') : <td className="no empty" />}
-                      <td className={`sign ${r.left?.type === 'del' ? 'del' : r.left ? '' : 'empty'}`}>{r.left?.type === 'del' ? '−' : ''}</td>
-                      <td className={`code half ${r.left?.type === 'del' ? 'del' : r.left ? '' : 'empty'}`}>{r.left && code(r.li)}</td>
-                      {r.right ? gutter(r.right, 'new') : <td className="no empty" />}
-                      <td className={`sign ${r.right?.type === 'add' ? 'add' : r.right ? '' : 'empty'}`}>{r.right?.type === 'add' ? '+' : ''}</td>
-                      <td className={`code half ${r.right?.type === 'add' ? 'add' : r.right ? '' : 'empty'}`}>{r.right && code(r.ri)}</td>
-                    </tr>
-                    {threads([
-                      ['old', r.left?.type === 'del' ? r.left.oldNo : null],
-                      ['new', r.right?.newNo],
-                    ])}
-                  </Fragment>
-                )
-              )
-            : h.lines.map((l, i) => (
-                <Fragment key={i}>
-                  <tr className={`ln ${l.type}`} onDoubleClick={() => l.newNo && onOpen(l.newNo)}>
-                    {l.type === 'del' ? gutter(l, 'old') : <td className="no">{l.oldNo ?? ''}</td>}
-                    {l.type === 'del' ? <td className="no" /> : gutter(l, 'new')}
-                    <td className="sign">{l.type === 'add' ? '+' : l.type === 'del' ? '−' : ''}</td>
-                    <td className="code">{code(i)}</td>
-                  </tr>
-                  {threads([[l.type === 'del' ? 'old' : 'new', l.type === 'del' ? l.oldNo : l.newNo]])}
+      <div className={`rv-lines${split ? ' sbs' : ' unified'}`}>
+        {split
+          ? splitRows(h).map((r, k) =>
+              r.meta ? (
+                <div key={k} className="ln meta">
+                  <div className="code full">{code(r.mi)}</div>
+                </div>
+              ) : (
+                <Fragment key={k}>
+                  <div className="ln" onDoubleClick={() => r.right?.newNo && onOpen(r.right.newNo)}>
+                    {r.left ? gutter(r.left, 'old', kind(r.left, 'del')) : <div className="no empty" />}
+                    <div className={`sign ${kind(r.left, 'del')}`}>{r.left?.type === 'del' ? '−' : ''}</div>
+                    <div className={`code left ${kind(r.left, 'del')}`}>{r.left && code(r.li)}</div>
+                    {r.right ? gutter(r.right, 'new', kind(r.right, 'add')) : <div className="no empty" />}
+                    <div className={`sign ${kind(r.right, 'add')}`}>{r.right?.type === 'add' ? '+' : ''}</div>
+                    <div className={`code ${kind(r.right, 'add')}`}>{r.right && code(r.ri)}</div>
+                  </div>
+                  {threads([
+                    ['old', r.left?.type === 'del' ? r.left.oldNo : null],
+                    ['new', r.right?.newNo],
+                  ])}
                 </Fragment>
-              ))}
-        </tbody>
-      </table>
+              )
+            )
+          : h.lines.map((l, i) => (
+              <Fragment key={i}>
+                <div className={`ln ${l.type}`} onDoubleClick={() => l.newNo && onOpen(l.newNo)}>
+                  {l.type === 'del' ? gutter(l, 'old') : <div className="no">{l.oldNo ?? ''}</div>}
+                  {l.type === 'del' ? <div className="no" /> : gutter(l, 'new')}
+                  <div className="sign">{l.type === 'add' ? '+' : l.type === 'del' ? '−' : ''}</div>
+                  <div className="code">{code(i)}</div>
+                </div>
+                {threads([[l.type === 'del' ? 'old' : 'new', l.type === 'del' ? l.oldNo : l.newNo]])}
+              </Fragment>
+            ))}
+      </div>
     </div>
   );
 }
@@ -638,8 +729,7 @@ function Composer({ cols, initial = '', onSave, onCancel }) {
   const [text, setText] = useState(initial);
   const save = () => text.trim() && onSave(text.trim());
   return (
-    <tr className="rv-cmt-row">
-      <td colSpan={cols}>
+    <div className="rv-cmt-row">
         <div className="rv-composer">
           <textarea
             autoFocus
@@ -660,8 +750,7 @@ function Composer({ cols, initial = '', onSave, onCancel }) {
             </button>
           </div>
         </div>
-      </td>
-    </tr>
+    </div>
   );
 }
 
@@ -680,8 +769,7 @@ function CommentRow({ c, root, cols }) {
       />
     );
   return (
-    <tr className="rv-cmt-row">
-      <td colSpan={cols}>
+    <div className="rv-cmt-row">
         <div className="rv-cmt">
           <IconComment size={13} />
           <div className="rv-cmt-text">{c.text}</div>
@@ -693,8 +781,7 @@ function CommentRow({ c, root, cols }) {
             <IconTrash size={12} />
           </button>
         </div>
-      </td>
-    </tr>
+    </div>
   );
 }
 

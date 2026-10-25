@@ -100,6 +100,9 @@ export function runAction(action) {
   }
 }
 
+// Keys the code editor (Editor.jsx) keeps for itself: save, find and replace, next match.
+const EDITOR_KEYS = new Set(['Cmd+S', 'Cmd+F', 'Alt+Cmd+F', 'Cmd+D', 'Cmd+G', 'Cmd+/', 'Cmd+[', 'Cmd+]']);
+
 // Actions that still work while typing in a text field (not the terminal).
 const FROM_INPUTS = new Set(['commandBar', 'findTab', 'newTerminal', 'settings', 'library', 'notes', 'toggleSidebar', 'focusMode', 'prevSpace', 'nextSpace', 'overview', 'newSpace', 'toggleFiles', 'quickOpen', 'toggleReview']);
 
@@ -119,7 +122,9 @@ function onKeyDown(e) {
   if (!raw) return;
   const accel = normalizeAccel(raw);
   const inTerminal = !!e.target.closest?.('.xterm, .composer');
-  const inInput = !inTerminal && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName);
+  const inEditor = !!e.target.closest?.('.cm-editor');
+  const inInput = inEditor || (!inTerminal && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName));
+  if (inEditor && EDITOR_KEYS.has(accel)) return;
 
   if (e.defaultPrevented || u.capturingKeys) return;
   if (u.overlay) {

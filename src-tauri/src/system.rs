@@ -468,7 +468,7 @@ pub async fn git_changes(cwd: &str) -> Value {
     json!({ "root": root, "files": files })
 }
 
-pub async fn git_diff(root: &str, file: &str, staged: bool, untracked: bool) -> Option<String> {
+pub async fn git_diff(root: &str, file: &str, staged: bool, untracked: bool, context: u32) -> Option<String> {
     if untracked {
         // git diff --no-index exits 1 when files differ, so read stdout whatever the status.
         let out = tokio::time::timeout(
@@ -478,7 +478,8 @@ pub async fn git_diff(root: &str, file: &str, staged: bool, untracked: bool) -> 
         .await;
         return Some(out.ok().and_then(Result::ok).map_or(String::new(), |o| String::from_utf8_lossy(&o.stdout).into_owned()));
     }
-    let mut args = vec!["-C", root, "diff", "--no-color", "-U3"];
+    let unified = format!("-U{}", context.min(1_000_000));
+    let mut args = vec!["-C", root, "diff", "--no-color", &unified];
     if staged {
         args.push("--cached");
     }
@@ -581,7 +582,7 @@ mod tests {
         assert_eq!(renamed["from"], "a.txt");
         assert_eq!(renamed["unstaged"]["add"], 1);
         assert!(files.iter().any(|f| f["path"] == "new.txt" && f["untracked"] == true));
-        assert!(git_diff(&d, "new.txt", false, true).await.unwrap().contains("+x"));
+        assert!(git_diff(&d, "new.txt", false, true, 3).await.unwrap().contains("+x"));
         assert_eq!(git_branch(&d).as_deref().map(|b| !b.is_empty()), Some(true));
         let _ = std::fs::remove_dir_all(&dir);
     }

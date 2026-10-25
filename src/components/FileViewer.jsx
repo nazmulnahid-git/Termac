@@ -1,57 +1,111 @@
-// Read-only file viewer shown over the terminal card: line numbers, light syntax colors,
-// and only the visible rows rendered so large files stay quick. Esc closes.
-import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+// The file viewer and editor shown over the terminal card. Text files open in the editor
+// (Editor.jsx): edit, ⌘S to save, and an edited file asks before it's closed. If the file
+// changes on disk, an untouched copy reloads by itself; an edited one says so and lets you
+// choose. Images are shown as they are; binaries and files over 2 MB are read-only.
+import { Fragment, lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { app, ui } from '../state/model.js';
 import * as A from '../state/actions.js';
-import { highlightLines, langOf } from '../lib/highlight.js';
 import { useProject, relPath, baseName } from './project.js';
 import { FileIcon } from './fileicons.jsx';
-import { IconClose, IconCopy, IconInsert, IconExternal, IconReview } from './icons.jsx';
+import { IconClose, IconCopy, IconInsert, IconExternal, IconReview, IconUndo } from './icons.jsx';
+
+// CodeMirror is sizeable; load it the first time a file is opened, not at startup.
+const Editor = lazy(() => import('./Editor.jsx'));
 
 const api = window.termac;
 const IMAGE = /\.(png|jpe?g|gif|webp|bmp|ico)$/i;
 
 export default function FileViewer() {
   const v = ui.use((s) => s.viewer);
+  const dirty = ui.use((s) => s.viewerDirty);
+  const fontSize = app.use((s) => s.settings.fontSize);
   const project = useProject();
-  const [file, setFile] = useState(null);
+  const [file, setFile] = useState(null); // { text, size, truncated, binary, error }
   const [image, setImage] = useState(null);
-  const ref = useRef(null);
+  const [conflict, setConflict] = useState(null); // text on disk that differs from ours
+  const [cursor, setCursor] = useState(null);
+  const [lang, setLang] = useState({ name: null, indent: null });
+  const [saving, setSaving] = useState(false);
+  const draft = useRef(null); // the editor's current text, kept without re-rendering
+  const base = useRef(null); // the text last read from or written to disk
+
+  const setDirty = (d) => ui.set((u) => (u.viewerDirty === d ? u : { ...u, viewerDirty: d }));
 
   useEffect(() => {
     if (!v) return;
     let on = true;
     setFile(null);
     setImage(null);
+    setConflict(null);
+    setCursor(null);
+    draft.current = null;
     if (IMAGE.test(v.path)) api.sys.readImage(v.path).then((url) => on && (url ? setImage(url) : setFile({ error: 'Could not read image' })));
-    else api.sys.readFile(v.path).then((f) => on && setFile(f));
+    else
+      api.sys.readFile(v.path).then((f) => {
+        if (!on) return;
+        base.current = f?.text ?? null;
+        setFile(f);
+      });
     return () => {
       on = false;
     };
   }, [v?.path]);
 
+  // Coming back to the window: has someone else changed the file?
   useEffect(() => {
-    ref.current?.focus({ preventScroll: true });
-  }, [v?.path, !!file || !!image]);
-
-  const lines = useMemo(() => {
-    if (file?.text == null) return null;
-    const l = file.text.split('\n');
-    if (l.length > 1 && l[l.length - 1] === '') l.pop();
-    return l;
-  }, [file]);
+    if (!v || !file || file.text == null) return;
+    const check = () =>
+      api.sys.readFile(v.path).then((f) => {
+        if (f?.text == null || f.text === base.current) return;
+        if (!ui.get().viewerDirty) {
+          base.current = f.text;
+          setFile(f);
+        } else setConflict(f.text);
+      });
+    window.addEventListener('focus', check);
+    return () => window.removeEventListener('focus', check);
+  }, [v?.path, !!file]);
 
   if (!v) return null;
   const rel = project.root ? relPath(project.root, v.path) : v.path;
   const parts = rel.split('/');
+  const editable = file && file.text != null && !file.binary && !file.truncated;
+
+  const save = async (text = draft.current ?? base.current) => {
+    if (!editable || text == null) return;
+    setSaving(true);
+    const r = await api.sys.writeFile(v.path, text);
+    setSaving(false);
+    if (!r?.ok) return A.toast({ title: `Couldn't save ${baseName(v.path)}`, detail: r?.error }, 8000);
+    base.current = text;
+    setConflict(null);
+    setDirty(draft.current != null && draft.current !== text);
+  };
+  const revert = async () => {
+    const ok = await api.sys.confirm({ message: `Revert ${baseName(v.path)}?`, detail: 'Your unsaved changes are thrown away and the file is read again from disk.', ok: 'Revert' });
+    if (!ok) return;
+    const f = await api.sys.readFile(v.path);
+    base.current = f?.text ?? null;
+    draft.current = null;
+    setDirty(false);
+    setConflict(null);
+    setFile({ ...f, rev: (file?.rev || 0) + 1 });
+  };
+  const takeDisk = () => {
+    base.current = conflict;
+    draft.current = null;
+    setDirty(false);
+    setFile((f) => ({ ...f, text: conflict, rev: (f?.rev || 0) + 1 }));
+    setConflict(null);
+  };
 
   return (
     <div
       className="viewer"
       tabIndex={-1}
-      ref={ref}
       onKeyDown={(e) => {
-        if (e.key === 'Escape') {
+        // Esc closes, unless the editor used it (closing its search bar, say).
+        if (e.key === 'Escape' && !e.defaultPrevented) {
           e.stopPropagation();
           A.closeFile();
         }
@@ -67,8 +121,19 @@ export default function FileViewer() {
             </Fragment>
           ))}
         </span>
-        {lines && <span className="vw-meta">{lines.length.toLocaleString()} lines · {formatSize(file.size)}</span>}
+        {dirty && <span className="vw-dirty" title="Unsaved changes" />}
         <span className="grow" />
+        {dirty && (
+          <>
+            <button className="btn sm ghosty" onClick={revert}>
+              <IconUndo size={13} />
+              Revert
+            </button>
+            <button className="btn sm primary" disabled={saving} onClick={() => save()}>
+              {saving ? 'Saving…' : 'Save'} <kbd>⌘S</kbd>
+            </button>
+          </>
+        )}
         <button className="icon-btn" title="Insert path at the prompt" onClick={() => A.insertText(project.sid, A.shellQuote(rel) + ' ')}>
           <IconInsert size={14} />
         </button>
@@ -85,6 +150,19 @@ export default function FileViewer() {
           <IconClose />
         </button>
       </div>
+      {conflict != null && (
+        <div className="vw-banner">
+          <b>{baseName(v.path)} changed on disk.</b>
+          <span className="dim">You have unsaved edits too.</span>
+          <span className="grow" />
+          <button className="btn sm" onClick={takeDisk}>
+            Load theirs
+          </button>
+          <button className="btn sm primary" onClick={() => save()}>
+            Keep mine and save
+          </button>
+        </div>
+      )}
       {!file && !image && <div className="vw-note">Loading…</div>}
       {file?.error && <div className="vw-note">{file.error}</div>}
       {file?.binary && <div className="vw-note">Binary file · {formatSize(file.size)}</div>}
@@ -93,53 +171,40 @@ export default function FileViewer() {
           <img src={image} alt={baseName(v.path)} />
         </div>
       )}
-      {lines && <Code lines={lines} lang={langOf(v.path)} line={v.line} truncated={file.truncated} />}
-    </div>
-  );
-}
-
-function Code({ lines, lang, line, truncated }) {
-  const scroller = useRef(null);
-  const [top, setTop] = useState(0);
-  const [height, setHeight] = useState(800);
-  // Highlighting is cheap but not free; do it once per file, not per scroll.
-  const tokens = useMemo(() => highlightLines(lines, lang), [lines, lang]);
-  const gutter = String(lines.length).length;
-  // Rows are absolutely placed, so their height is fixed: the UI size at a code-friendly 1.6.
-  const rowH = app.use((s) => Math.round(s.settings.uiFontSize * 1.6));
-
-  useLayoutEffect(() => {
-    const el = scroller.current;
-    setHeight(el.clientHeight);
-    const ro = new ResizeObserver(() => setHeight(el.clientHeight));
-    ro.observe(el);
-    if (line) el.scrollTop = Math.max(0, (line - 6) * rowH);
-    return () => ro.disconnect();
-  }, [lines, line, rowH]);
-
-  const first = Math.max(0, Math.floor(top / rowH) - 20);
-  const last = Math.min(lines.length, Math.ceil((top + height) / rowH) + 20);
-  const rows = [];
-  for (let i = first; i < last; i++) {
-    rows.push(
-      <div key={i} className={`vw-ln${line === i + 1 ? ' hit' : ''}`} style={{ top: i * rowH, height: rowH }}>
-        <span className="no" style={{ width: `${gutter + 2}ch` }}>
-          {i + 1}
-        </span>
-        <span className="code">{tokens[i].map(([cls, t], k) => (cls ? <span key={k} className={`hl-${cls}`}>{t}</span> : <Fragment key={k}>{t}</Fragment>))}</span>
-      </div>
-    );
-  }
-  return (
-    <div className="vw-scroll" ref={scroller} style={{ lineHeight: `${rowH}px` }} onScroll={(e) => setTop(e.currentTarget.scrollTop)}>
-      <div className="vw-lines" style={{ height: lines.length * rowH + (truncated ? 40 : 12) }}>
-        {rows}
-        {truncated && (
-          <div className="vw-trunc" style={{ top: lines.length * rowH + 8 }}>
-            File is larger than 2 MB; showing the beginning.
+      {file && file.text != null && !file.binary && (
+        <Suspense fallback={<div className="vw-note">Loading editor…</div>}>
+          <Editor
+            key={`${v.path}:${file.rev || 0}`}
+            path={v.path}
+            text={file.text}
+            line={v.line}
+            readOnly={!editable}
+            fontSize={fontSize}
+            onChange={(doc) => {
+              const text = doc.toString();
+              draft.current = text;
+              setDirty(text !== base.current);
+            }}
+            onSave={save}
+            onCursor={setCursor}
+            onLanguage={(name, indent) => setLang({ name, indent })}
+          />
+          <div className="vw-status">
+            {file.truncated && <span className="warn">Read-only: the file is larger than 2 MB and only its beginning is shown</span>}
+            {cursor && (
+              <span>
+                Ln {cursor.line}, Col {cursor.col}
+                {cursor.selections > 1 ? ` · ${cursor.selections} cursors` : ''}
+              </span>
+            )}
+            <span className="grow" />
+            {lang.indent && <span>{lang.indent.tabs ? 'Tabs' : `Spaces: ${lang.indent.size}`}</span>}
+            <span>{lang.name || 'Plain text'}</span>
+            <span>{formatSize(file.size)}</span>
+            {editable && <span className={dirty ? 'unsaved' : 'saved'}>{dirty ? 'Edited' : 'Saved'}</span>}
           </div>
-        )}
-      </div>
+        </Suspense>
+      )}
     </div>
   );
 }
