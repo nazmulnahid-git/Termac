@@ -195,14 +195,8 @@ export default function App() {
       setUi({ dark: mq.matches });
       A.applySettings();
     };
-    const onCopy = () => {
-      const sid = document.activeElement?.closest?.('.term-host')?.dataset.sid;
-      const text = sid && reg.getHandle(sid)?.term.getSelection();
-      if (text) A.rememberCopy({ text, sid, mark: reg.getHandle(sid).term.getSelectionPosition()?.start.y ?? null });
-    };
     window.addEventListener('keydown', onKeyDown, true);
     window.addEventListener('wheel', onWheel, { capture: true, passive: false });
-    document.addEventListener('copy', onCopy, true);
     mq.addEventListener('change', onScheme);
     // Each folder Finder hands over opens as a new tab there.
     const takeFolders = () => api.app.takeFolders().then((dirs) => dirs.forEach((cwd) => A.openTerminal({ cwd })));
@@ -211,7 +205,6 @@ export default function App() {
     return () => {
       window.removeEventListener('keydown', onKeyDown, true);
       window.removeEventListener('wheel', onWheel, true);
-      document.removeEventListener('copy', onCopy, true);
       mq.removeEventListener('change', onScheme);
       offs.forEach((off) => off());
     };

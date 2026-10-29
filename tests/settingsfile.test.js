@@ -18,7 +18,6 @@ const DEFAULTS = {
   cursorStyle: 'block',
   cursorBlink: true,
   sidebarMode: 'expanded',
-  sidebarWidth: 300,
   onLaunch: 'restore',
   newTerminalDir: 'current',
   confirmQuit: true,

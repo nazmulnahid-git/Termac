@@ -447,52 +447,7 @@ function SidebarGroup({ s }) {
       <Row label="Sidebar" hint={hint || null}>
         <Seg value={s.sidebarMode} onChange={(m) => A.setSidebarMode(m)} options={[['expanded', 'Expanded'], ['compact', 'Compact'], ['hidden', 'Hidden']]} />
       </Row>
-      {s.sidebarMode === 'expanded' && (
-        <Row label="Width">
-          <WidthSlider value={s.sidebarWidth} />
-        </Row>
-      )}
     </Group>
-  );
-}
-
-// Local draft while dragging; the store is written debounced and on release.
-function WidthSlider({ value }) {
-  const [v, setV] = useState(value);
-  const timer = useRef(0);
-  const pending = useRef(null);
-  const flush = () => {
-    clearTimeout(timer.current);
-    if (pending.current == null) return;
-    const x = pending.current;
-    pending.current = null;
-    A.setSettings({ sidebarWidth: x });
-  };
-  useEffect(() => {
-    if (pending.current == null) setV(value);
-  }, [value]);
-  useEffect(() => flush, []);
-  return (
-    <span className="st-range">
-      <input
-        type="range"
-        min={200}
-        max={380}
-        step={4}
-        value={v}
-        onChange={(e) => {
-          const x = Number(e.target.value);
-          setV(x);
-          pending.current = x;
-          clearTimeout(timer.current);
-          timer.current = setTimeout(flush, 150);
-        }}
-        onPointerUp={flush}
-        onKeyUp={flush}
-        onBlur={flush}
-      />
-      <span>{v}px</span>
-    </span>
   );
 }
 

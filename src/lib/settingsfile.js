@@ -3,8 +3,10 @@
 // maps one to the other and also drives validation and the generated JSON Schema.
 // Settings not listed here (panel widths and the like) live only in state.json.
 
-// Shortcuts for features that have since been removed: older files may still list them.
+// Shortcuts and settings for features that have since been removed: older files may still
+// list them.
 const RETIRED_ACTIONS = new Set(['findTab', 'notes', 'toggleFiles', 'quickOpen', 'toggleReview']);
+const RETIRED_SETTINGS = new Set(['appearance.sidebar.width']);
 
 const FIELDS = [
   ['appearance.theme', 'termTheme', { values: ['system', 'dark', 'light'], desc: 'Light or dark for the whole app, or follow the system. Spaces with a custom terminal background keep it.' }],
@@ -21,7 +23,6 @@ const FIELDS = [
   ['appearance.terminal.cursor_style', 'cursorStyle', { values: ['block', 'bar', 'underline'] }],
   ['appearance.terminal.cursor_blink', 'cursorBlink', {}],
   ['appearance.sidebar.mode', 'sidebarMode', { values: ['expanded', 'compact', 'hidden'] }],
-  ['appearance.sidebar.width', 'sidebarWidth', { min: 200, max: 380, int: true, desc: 'Width of the expanded sidebar in px.' }],
   ['general.on_launch', 'onLaunch', { values: ['restore', 'fresh'], desc: '"fresh" starts with only pinned sessions.' }],
   ['general.new_terminal_dir', 'newTerminalDir', { values: ['current', 'space', 'home'], desc: 'Where new terminals start.' }],
   ['general.confirm_quit', 'confirmQuit', { desc: 'Ask before quitting while processes are running.' }],
@@ -97,7 +98,7 @@ function unknownKeys(obj, known, prefix = []) {
     const p = [...prefix, k];
     const id = p.join('.');
     if (v && typeof v === 'object' && !Array.isArray(v) && known.sections.has(id)) out.push(...unknownKeys(v, known, p));
-    else if (!known.leaves.has(id)) out.push(`${id}: unknown setting`);
+    else if (!known.leaves.has(id) && !RETIRED_SETTINGS.has(id)) out.push(`${id}: unknown setting`);
   }
   return out;
 }

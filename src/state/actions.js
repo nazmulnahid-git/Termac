@@ -734,17 +734,10 @@ export function copyLastOutput(sid = focusedSid()) {
     return;
   }
   navigator.clipboard.writeText(text);
-  rememberCopy({ text, sid, mark: entry.start?.line ?? null });
   reg.flashRange(sid, entry);
   ui.set((u) => ({ ...u, copied: { sid, at: Date.now() } }));
   setTimeout(() => ui.set((u) => (u.copied?.sid === sid ? { ...u, copied: null } : u)), 1600);
 }
-
-let lastCopy = null;
-export function rememberCopy(c) {
-  lastCopy = { ...c, at: Date.now() };
-}
-export const getLastCopy = () => lastCopy;
 
 export function jumpToFailure(sid) {
   const h = reg.getHandle(sid);
@@ -815,16 +808,6 @@ export function insertText(sid, text) {
   focusSession(sid);
 }
 
-// Pastes text into the focused session as one bracketed paste, so a coding agent running
-// there gets it as a single message instead of line-by-line commands.
-export function pasteIntoSession(text, sid = focusedSid()) {
-  const h = sid && reg.getHandle(sid);
-  if (!h) return false;
-  if (!h.alive) startSession(sid);
-  h.term.paste(text);
-  focusSession(sid);
-  return true;
-}
 export function runInSession(command, sid = focusedSid()) {
   if (!sid) return openTerminal({ command });
   const h = reg.getHandle(sid);

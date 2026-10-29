@@ -32,7 +32,6 @@ export const DEFAULT_SETTINGS = {
   shellPriority: false,
   gestures: { swipeSpaces: true, pinch: true, edgeReveal: true, peek: true },
   sidebarMode: 'expanded', // expanded | compact | hidden
-  sidebarWidth: 248,
   clickToMove: true,
   promptStyle: 'termorc', // termorc (input bar + blocks) | shell (the shell's own prompt)
   terminalWelcome: true, // tips card in a new, empty session
@@ -76,6 +75,7 @@ export function migrate(saved) {
   // Left over from removed features: routing rules, notes, code review, the tool panels.
   for (const k of ['rules', 'ruleHits', 'notes', 'reviewComments']) delete s[k];
   delete s.settings.toolsWidth;
+  delete s.settings.sidebarWidth;
   delete s.settings.reviewWidth;
   for (const id of Object.keys(s.settings.keybindings)) if (!(id in DEFAULT_SETTINGS.keybindings)) delete s.settings.keybindings[id];
   if (!s.spaces?.length) s.spaces = base.spaces;

@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { app, rt, ui, DEFAULT_SETTINGS } from '../state/model.js';
+import { app, rt, ui } from '../state/model.js';
 import * as A from '../state/actions.js';
 import { useTabView, StatusMark, Chip, FailTip, SpaceGlyph } from './common.jsx';
 import { formatAccel } from '../lib/keys.js';
@@ -14,6 +14,7 @@ import { PH, pressTab, pressPane, pressFolder, useDropList, useDropFolders, dest
 export { promptText };
 
 const RAIL_WIDTH = 56;
+const SIDEBAR_WIDTH = 248; // fixed: the sidebar doesn't resize
 const HIDE_SLOP = 8; // px past the right edge before a revealed sidebar starts to hide
 const HIDE_DELAY = 150;
 const isPaneDrag = (e) => e.dataTransfer.types.includes(PANE_MIME);
@@ -21,8 +22,6 @@ const isPaneDrag = (e) => e.dataTransfer.types.includes(PANE_MIME);
 // `phase` is 'opening' or 'closing' while App slides the sidebar in or out.
 export default function Sidebar({ floating, onLeave, phase }) {
   const mode = app.use((s) => s.settings.sidebarMode);
-  const width = app.use((s) => s.settings.sidebarWidth);
-  const [dragW, setDragW] = useState(null);
   const ref = useRef(null);
   const loader = useRef(null);
   const onWheel = useSpaceMotion(loader);
@@ -54,11 +53,11 @@ export default function Sidebar({ floating, onLeave, phase }) {
   }, [floating]);
 
   // The panel keeps its width while the slot around it animates, so rows never reflow mid-slide.
-  const w = compact ? `calc(${RAIL_WIDTH}px + 2 * var(--inset))` : `${dragW ?? width}px`;
+  const w = compact ? `calc(${RAIL_WIDTH}px + 2 * var(--inset))` : `${SIDEBAR_WIDTH}px`;
   return (
     <aside
       ref={ref}
-      className={`sidebar${compact ? ' compact' : ''}${floating ? ' floating' : ''}${dragW != null ? ' resizing' : ''}${phase ? ` ${phase}` : ''}`}
+      className={`sidebar${compact ? ' compact' : ''}${floating ? ' floating' : ''}${phase ? ` ${phase}` : ''}`}
       style={{ width: w, '--sb-w': w }}
       onWheel={onWheel}
       onMouseLeave={closePeek}
@@ -76,7 +75,6 @@ export default function Sidebar({ floating, onLeave, phase }) {
           <span className="lbl">New Space</span>
         </div>
       </div>
-      {!compact && !floating && <ResizeHandle width={width} onDrag={setDragW} />}
     </aside>
   );
 }
@@ -101,27 +99,6 @@ function SidebarHead() {
       )}
     </div>
   );
-}
-
-function ResizeHandle({ width, onDrag }) {
-  const onMouseDown = (e) => {
-    e.preventDefault();
-    const startX = e.clientX;
-    let w = width;
-    const move = (ev) => {
-      w = Math.min(380, Math.max(200, width + ev.clientX - startX));
-      onDrag(w);
-    };
-    const up = () => {
-      window.removeEventListener('mousemove', move);
-      window.removeEventListener('mouseup', up);
-      onDrag(null);
-      A.setSettings({ sidebarWidth: Math.round(w) });
-    };
-    window.addEventListener('mousemove', move);
-    window.addEventListener('mouseup', up);
-  };
-  return <div className="sb-resize" onMouseDown={onMouseDown} onDoubleClick={() => A.setSettings({ sidebarWidth: DEFAULT_SETTINGS.sidebarWidth })} title="Drag to resize · double-click to reset" />;
 }
 
 // ---- Expanded -----------------------------------------------------------------------
