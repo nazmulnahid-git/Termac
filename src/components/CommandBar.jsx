@@ -9,7 +9,17 @@ import { route, tildify, expandHome } from '../lib/routing.js';
 import { formatAccel } from '../lib/keys.js';
 import { kindOf, sessionName, formatDuration, timeAgo, dayLabel } from '../lib/meta.js';
 import { TabIcon } from './tabicons.jsx';
-import { SpaceGlyph } from './common.jsx';
+import { SpaceGlyph, kindGlyph } from './common.jsx';
+import { IconSearch } from './icons.jsx';
+import { Braces, Columns2, Command, FileText, Folder, Plus, Rows2 } from 'lucide-react';
+
+// Results lead with an icon, as in Spotlight: a session's kind, else what the result is.
+const CHIP_ICONS = { '+': Plus, '{ }': Braces, '›': Command, '⇥': Columns2, '⤓': Rows2, '≡': FileText };
+function ChipIcon({ item }) {
+  if (typeof item.chip !== 'string') return item.chip ?? null;
+  const [Glyph] = (item.group === 'dir' ? [Folder] : null) || (CHIP_ICONS[item.chip] ? [CHIP_ICONS[item.chip]] : kindGlyph(item.chip) || []);
+  return Glyph ? <Glyph size={16} strokeWidth={1.75} aria-hidden="true" /> : item.chip;
+}
 import { promptText } from './Sidebar.jsx';
 import { rootOf } from './project.js';
 
@@ -109,7 +119,7 @@ export default function CommandBar({ onClose, initial = '' }) {
   return (
     <div className="palette cb" onMouseDown={(e) => e.target.tagName !== 'INPUT' && e.preventDefault()}>
       <div className="input-row">
-        <span className="prompt">❯</span>
+        <IconSearch size={20} />
         <input autoFocus spellCheck={false} value={query} placeholder="Search sessions, files, directories, hosts, snippets, actions…" onChange={(e) => setQuery(e.target.value)} onKeyDown={onKeyDown} />
         <button className="filter" onClick={() => cycle(1)}>
           {chipText}
@@ -154,7 +164,9 @@ function Row({ item, head, selected, first, onHover, onPick }) {
         {item.glyph ? (
           <SpaceGlyph space={item} className="chip cb-glyph" style={{ '--c': item.color }} />
         ) : (
-          <span className="chip">{item.chip}</span>
+          <span className="chip icon">
+            <ChipIcon item={item} />
+          </span>
         )}
         <span className={`cb-label${item.mono ? ' cb-mono' : ''}`}>
           <Hl text={item.label} idx={item.hl} />

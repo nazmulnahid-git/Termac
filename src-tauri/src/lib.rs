@@ -23,6 +23,7 @@ use store::{read_json, write_atomic, DebouncedWriter};
 use tauri::ipc::Channel;
 use tauri::utils::config::BackgroundThrottlingPolicy;
 use tauri::menu::{AboutMetadata, CheckMenuItem, IsMenuItem, Menu, MenuItem, PredefinedMenuItem, Submenu};
+use tauri::window::{Effect, EffectState, EffectsBuilder};
 use tauri::{
     AppHandle, Emitter, LogicalPosition, Manager, PhysicalPosition, RunEvent, TitleBarStyle, WebviewUrl, WebviewWindow, WebviewWindowBuilder,
     WindowEvent, Wry,
@@ -729,12 +730,15 @@ fn create_main_window(app: &AppHandle) -> tauri::Result<WebviewWindow> {
         .title_bar_style(TitleBarStyle::Overlay)
         .hidden_title(true)
         .traffic_light_position(TRAFFIC_LIGHTS)
+        // The page is see-through where the sidebar is, over AppKit's own sidebar material,
+        // which blurs what's behind the window and turns opaque while it's inactive.
+        .transparent(true)
+        .effects(EffectsBuilder::new().effect(Effect::Sidebar).state(EffectState::FollowsWindowActiveState).build())
         .disable_drag_drop_handler()
         // Sessions keep streaming while the window is hidden; WebKit mustn't nap the page,
         // or unacked output would pause the shells.
         .background_throttling(BackgroundThrottlingPolicy::Disabled)
         .build()?;
-    paint_background(&window, (0x0f, 0x10, 0x13), (0xf2, 0xf2, 0xf0));
     // Shown once the page has painted (app_ready), or after a beat in case it never says so.
     let w = window.clone();
     std::thread::spawn(move || {
@@ -1106,9 +1110,9 @@ pub fn run() {
             WindowEvent::Focused(false) if window.label() == QUICK => hide_quick(window.app_handle()),
             WindowEvent::ThemeChanged(_) => {
                 if let Some(w) = window.app_handle().get_webview_window(window.label()) {
-                    match w.label() {
-                        MAIN => paint_background(&w, (0x0f, 0x10, 0x13), (0xf2, 0xf2, 0xf0)),
-                        _ => paint_background(&w, (0x13, 0x14, 0x17), (0xfc, 0xfc, 0xfa)),
+                    // The main window is transparent over its vibrancy; only the Quick Terminal paints.
+                    if w.label() != MAIN {
+                        paint_background(&w, (0x13, 0x14, 0x17), (0xfc, 0xfc, 0xfa));
                     }
                 }
             }

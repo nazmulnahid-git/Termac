@@ -16,14 +16,15 @@ import { SlidersHorizontal, Palette, SquareTerminal, Keyboard, Hand, Route, File
 const api = window.termac;
 const RULE_MIME = 'application/x-termac-rule';
 
+// [id, icon, label, tile color]: System Settings' colored icon tiles.
 const TABS = [
-  ['general', SlidersHorizontal, 'General'],
-  ['appearance', Palette, 'Appearance'],
-  ['profiles', SquareTerminal, 'Profiles'],
-  ['keybindings', Keyboard, 'Keybindings'],
-  ['gestures', Hand, 'Gestures'],
-  ['rules', Route, 'Rules'],
-  ['file', FileJson, 'settings.json'],
+  ['general', SlidersHorizontal, 'General', '#8e8e93'],
+  ['appearance', Palette, 'Appearance', '#0a84ff'],
+  ['profiles', SquareTerminal, 'Profiles', '#3a3a3c'],
+  ['keybindings', Keyboard, 'Keybindings', '#636366'],
+  ['gestures', Hand, 'Gestures', '#ff9500'],
+  ['rules', Route, 'Rules', '#5856d6'],
+  ['file', FileJson, 'settings.json', '#34c759'],
 ];
 const ALIASES = { keys: 'keybindings', shortcuts: 'keybindings', routing: 'rules', json: 'file' };
 const tabId = (t) => {
@@ -58,19 +59,20 @@ export default function Settings() {
   return (
     <div className="st-page" aria-label="Settings" tabIndex={-1} ref={page}>
       <nav className="st-nav">
-        <div className="st-nav-title">Settings</div>
-        {TABS.map(([k, Icon, name]) => (
+        {TABS.map(([k, Icon, name, color]) => (
           <Fragment key={k}>
             {k === 'file' && <div className="st-nav-sep" />}
-            <button className={`st-tab${tab === k ? ' on' : ''}${k === 'file' ? ' mono' : ''}`} onClick={() => setTab(k)}>
-              <Icon size={15} strokeWidth={1.75} />
+            <button className={`st-tab${tab === k ? ' on' : ''}`} onClick={() => setTab(k)}>
+              <span className="st-tile" style={{ '--tc': color }}>
+                <Icon size={14} strokeWidth={2} />
+              </span>
               {name}
               {k === 'file' && file.error && <span className="st-tab-err" title={file.error} />}
             </button>
           </Fragment>
         ))}
         <div className="grow" />
-        <button className="st-file" onClick={A.openSettingsFile} title={file.path}>
+        <button className="btn st-file" onClick={A.openSettingsFile} title={file.path}>
           <ExternalLink size={13} strokeWidth={1.75} />
           Open in external editor
         </button>

@@ -1,6 +1,6 @@
-// Window-wide status line (tmux-style). Spaces read as tmux windows — `1:work*` — with
-// `*` on the current one and `#` on any with unseen finished jobs. The right side shows
-// the focused session: what's running, its size, and a clock.
+// The window's bottom bar, as in Finder or Xcode: the Spaces as tabs on the left (a dot
+// marks one with unseen finished jobs), finished jobs and the Library, then the focused
+// session's process, size and a clock in small secondary type.
 import { useEffect, useRef, useState } from 'react';
 import { app, rt, ui } from '../state/model.js';
 import { arrayEq } from '../state/store.js';
@@ -8,6 +8,7 @@ import * as A from '../state/actions.js';
 import { procLabel, timeAgo, formatDuration } from '../lib/meta.js';
 import { StatusMark, SpaceGlyph } from './common.jsx';
 import { openLibrary } from './Sidebar.jsx';
+import { IconActivity, IconLibrary, IconPlus } from './icons.jsx';
 
 export default function StatusBar() {
   const view = ui.use((s) => s.view);
@@ -23,10 +24,12 @@ export default function StatusBar() {
       <SpaceTabs />
       <span className="grow" />
       <button className={`sl-btn${jobs ? ' on' : ''}${unseen ? ' hot' : ''}`} title="Finished jobs" onClick={() => setJobs((o) => !o)}>
-        jobs{unseen > 0 && <b>{unseen}</b>}
+        <IconActivity size={13} />
+        Jobs{unseen > 0 && <b>{unseen}</b>}
       </button>
       <button className={`sl-btn${view === 'library' ? ' on' : ''}`} title="Library" onClick={openLibrary}>
-        library
+        <IconLibrary size={13} />
+        Library
       </button>
       {sid && r && (
         <>
@@ -68,7 +71,7 @@ function SpaceTabs() {
     <div className="sl-spaces">
       {spaces.map((sp, i) => {
         const on = sp.id === activeId;
-        const flag = on ? '*' : unseen.includes(sp.id) ? '#' : '';
+        const flag = !on && unseen.includes(sp.id);
         return (
           <button
             key={sp.id}
@@ -79,15 +82,14 @@ function SpaceTabs() {
             onClick={() => A.switchSpace(sp.id)}
             onDoubleClick={() => ui.set((u) => ({ ...u, overlay: 'spaceEditor', overlayArg: sp.id }))}
           >
-            <span className="n">{i + 1}:</span>
             <SpaceGlyph space={sp} className="g" />
-            {sp.name.toLowerCase()}
-            <span className={`flag${flag === '#' ? ' bell' : ''}`}>{flag}</span>
+            {sp.name}
+            {flag && <span className="flag" />}
           </button>
         );
       })}
-      <button className="sl-btn" title="New Space" onClick={() => ui.set((u) => ({ ...u, overlay: 'spaceEditor', overlayArg: null }))}>
-        +
+      <button className="sl-btn add" title="New Space" onClick={() => ui.set((u) => ({ ...u, overlay: 'spaceEditor', overlayArg: null }))}>
+        <IconPlus size={13} />
       </button>
     </div>
   );
@@ -105,7 +107,7 @@ function ActivityPopover({ onClose }) {
   }, []);
   return (
     <div ref={ref} className="activity-pop">
-      <div className="ap-title">finished jobs</div>
+      <div className="ap-title">Finished Jobs</div>
       <div className="ap-list">
         {!items.length && <div className="ap-empty">Commands that run longer than the notify threshold show up here.</div>}
         {items.map((a) => (

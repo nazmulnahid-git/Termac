@@ -19,7 +19,6 @@ import ReviewPanel from './components/ReviewPanel.jsx';
 import FileViewer from './components/FileViewer.jsx';
 import StatusBar from './components/StatusBar.jsx';
 import TabStyle from './components/TabStyle.jsx';
-import { terminalLook, mix } from './lib/termtheme.js';
 
 const api = window.termac;
 const setUi = (patch) => ui.set((u) => ({ ...u, ...(typeof patch === 'function' ? patch(u) : patch) }));
@@ -175,9 +174,6 @@ function onKeyDown(e) {
 
 export default function App() {
   const color = app.use((s) => A.activeSpace(s)?.color);
-  const term = app.use((s) => A.activeSpace(s)?.term);
-  const termTheme = ui.use((s) => s.termTheme);
-  const dark = ui.use((s) => s.dark);
   const mode = app.use((s) => s.settings.sidebarMode);
   const hidden = mode === 'hidden';
   // The expanded sidebar runs the window's full height and hosts the traffic lights; the
@@ -197,20 +193,6 @@ export default function App() {
   useEffect(() => {
     document.documentElement.style.setProperty('--space', color || '#3b82f6');
   }, [color]);
-
-  // The chrome is a shade of the terminal itself, so the window reads as one surface. A
-  // terminal that fights the system scheme (or shows an image) keeps the stock chrome.
-  useEffect(() => {
-    const look = terminalLook({ color, term }, termTheme);
-    const root = document.documentElement.style;
-    if (look.dark === dark && !look.image) {
-      root.setProperty('--chrome', mix(look.bg, '#000', dark ? 0.24 : 0.035));
-      root.setProperty('--term-bg', look.bg);
-    } else {
-      root.removeProperty('--chrome');
-      root.removeProperty('--term-bg');
-    }
-  }, [color, term, termTheme, dark]);
 
   // The sidebar or the top bar always has room for the traffic lights, so they stay visible in every mode.
   useEffect(() => {

@@ -66,6 +66,8 @@ const KIND_ICONS = {
   top: [Activity, 'Monitor'],
 };
 
+export const kindGlyph = (kind) => KIND_ICONS[kind] || null;
+
 // The gutter before a session's name: its chosen icon, else what it runs (git, npm, ssh…).
 export function Chip({ kind, icon }) {
   if (icon)
