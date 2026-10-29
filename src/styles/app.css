@@ -62,13 +62,15 @@
   /* The sidebar panel: a dark sheet over the vibrancy (enough to darken the light
      material, still letting a little of the desktop through), a hairline rim and a soft
      lift off the window. Its other colors are in the .sidebar block below. */
-  --sb-bg: rgba(22, 22, 24, 0.9);
-  --sb-rim: inset 0 0 0 0.5px rgba(255, 255, 255, 0.09), 0 0 0 0.5px rgba(0, 0, 0, 0.28), 0 1px 3px rgba(0, 0, 0, 0.1), 0 10px 28px -12px rgba(0, 0, 0, 0.35);
+  --sb-bg: rgba(16, 16, 16, 0.95);
+  --sb-rim: inset 0 0 0 0.5px rgba(255, 255, 255, 0.1), 0 0 0 0.5px rgba(0, 0, 0, 0.3), 0 1px 3px rgba(0, 0, 0, 0.1), 0 10px 28px -12px rgba(0, 0, 0, 0.35);
   --pick: rgba(0, 0, 0, 0.09);
-  --sb-solid: #262628;
-  /* Toolbar controls: round glass buttons and capsules. */
-  --btn-glass: rgba(255, 255, 255, 0.8);
-  --btn-rim: 0 0 0 0.5px rgba(0, 0, 0, 0.1), 0 1px 3px rgba(0, 0, 0, 0.08);
+  --sb-solid: #121212;
+  /* Toolbar controls: round glass buttons and capsules, as in macOS 26 toolbars. A
+     translucent fill over a blur, a hairline rim and a soft lift. */
+  --btn-glass: rgba(255, 255, 255, 0.55);
+  --btn-rim: 0 0 0 0.5px rgba(0, 0, 0, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.9), 0 1px 2px rgba(0, 0, 0, 0.06), 0 4px 12px -4px rgba(0, 0, 0, 0.12);
+  --btn-blur: blur(14px) saturate(1.6);
   --btn-hover: rgba(0, 0, 0, 0.05);
   /* Control sizes, by role (CSS px at the default 125% zoom). */
   --ctl-h: 22px; /* push buttons, pop-ups, text fields, segmented controls */
@@ -83,7 +85,7 @@
 }
 @media (prefers-color-scheme: dark) {
   :root {
-    --chrome: #1e1e1e;
+    --chrome: #1d1d1d;
     --ink: #ebebf0;
     --dim: rgba(255, 255, 255, 0.55);
     --faint: rgba(255, 255, 255, 0.25);
@@ -111,13 +113,14 @@
     --rim: inset 0 0 0 0.5px rgba(255, 255, 255, 0.14);
     --tip-bg: #2e2e2e;
     --tip-line: rgba(255, 255, 255, 0.16);
-    --sb-bg: rgba(0, 0, 0, 0.32);
-    --sb-rim: inset 0 0 0 0.5px rgba(255, 255, 255, 0.08), 0 0 0 0.5px rgba(0, 0, 0, 0.5), 0 1px 4px rgba(0, 0, 0, 0.25);
+    --sb-bg: rgba(16, 16, 16, 0.85);
+    --sb-rim: inset 0 0 0 0.5px rgba(255, 255, 255, 0.1), 0 0 0 0.5px rgba(0, 0, 0, 0.6), 0 1px 4px rgba(0, 0, 0, 0.25);
     --pick: rgba(255, 255, 255, 0.11);
-    --sb-solid: #161618;
-    --btn-glass: rgba(255, 255, 255, 0.09);
-    --btn-rim: inset 0 0.5px 0 rgba(255, 255, 255, 0.1), 0 0 0 0.5px rgba(0, 0, 0, 0.5), 0 1px 3px rgba(0, 0, 0, 0.3);
-    --btn-hover: rgba(255, 255, 255, 0.1);
+    --sb-solid: #121212;
+    /* Dark glass sits a shade below the bar, lit by its rim. */
+    --btn-glass: rgba(0, 0, 0, 0.12);
+    --btn-rim: inset 0 0 0 0.5px rgba(255, 255, 255, 0.1), inset 0 -0.5px 0 rgba(255, 255, 255, 0.06), 0 1px 2px rgba(0, 0, 0, 0.25);
+    --btn-hover: rgba(255, 255, 255, 0.07);
     color-scheme: dark;
   }
 }
@@ -132,9 +135,9 @@
   --line: rgba(255, 255, 255, 0.09);
   --field: rgba(255, 255, 255, 0.07);
   --sel: rgba(255, 255, 255, 0.1);
-  --hover: rgba(255, 255, 255, 0.06);
+  --hover: rgba(255, 255, 255, 0.07);
   --tile: rgba(255, 255, 255, 0.05);
-  --pick: rgba(255, 255, 255, 0.12);
+  --pick: rgba(255, 255, 255, 0.22);
   --accent: color-mix(in oklab, var(--space) 88%, white);
   --ring: 0 0 0 3px color-mix(in oklab, var(--accent) 38%, transparent);
   --ok: #30d158;
@@ -150,8 +153,8 @@
   --rim: inset 0 0 0 0.5px rgba(255, 255, 255, 0.14);
   --tip-bg: #2e2e2e;
   --tip-line: rgba(255, 255, 255, 0.16);
-  --btn-glass: rgba(255, 255, 255, 0.09);
-  --btn-hover: rgba(255, 255, 255, 0.1);
+  --btn-glass: rgba(0, 0, 0, 0.12);
+  --btn-hover: rgba(255, 255, 255, 0.07);
   color: var(--ink);
   color-scheme: dark;
 }
@@ -360,7 +363,7 @@ kbd { font: inherit; color: var(--faint); }
 .card { flex: 1; min-width: 0; position: relative; overflow: hidden; background: var(--t-bg); display: flex; }
 .card.danger::before { content: ''; position: absolute; inset: 0; z-index: 6; pointer-events: none; box-shadow: inset 0 0 0 2px var(--fail), inset 0 0 36px rgba(229, 72, 77, 0.22); }
 .card.drop-target::after { content: ''; position: absolute; inset: 0; pointer-events: none; }
-.t-dark { --t-bg: #0f1012; --t-hd: #151619; --t-bd: rgba(255, 255, 255, 0.08); --t-fg: #d8dae0; --t-dim: #7f8392; --t-pill: rgba(255, 255, 255, 0.07); --t-chip: #f3f3f1; --t-chip-fg: #131417; --t-branch: #c8a0f5; }
+.t-dark { --t-bg: #1d1d1d; --t-hd: #1d1d1d; --t-bd: rgba(255, 255, 255, 0.08); --t-fg: #d8dae0; --t-dim: #7f8392; --t-pill: rgba(255, 255, 255, 0.07); --t-chip: #f3f3f1; --t-chip-fg: #131417; --t-branch: #c8a0f5; }
 .t-light { --t-bg: #fcfcfa; --t-hd: #f4f4f1; --t-bd: rgba(0, 0, 0, 0.08); --t-fg: #2b2d33; --t-dim: #80838c; --t-pill: rgba(0, 0, 0, 0.05); --t-chip: #1d1e24; --t-chip-fg: #f3f3f1; --t-branch: #7f42c4; }
 
 .split { display: flex; flex: 1; min-width: 0; min-height: 0; }
@@ -643,10 +646,11 @@ html.is-dragging .row:hover .close + .status { display: inline-flex; }
 .tb-heading .t { overflow: hidden; text-overflow: ellipsis; font-weight: var(--bold); font-size: 1.08em; color: var(--ink); }
 .tb-heading .s { overflow: hidden; text-overflow: ellipsis; color: var(--dim); font-size: 0.9em; }
 /* Glass controls: round buttons. */
-.tb-btn.round { width: var(--tool-h); height: var(--tool-h); min-width: 0; padding: 0; border-radius: 50%; background: var(--btn-glass); box-shadow: var(--btn-rim); }
+.tb-btn.round { width: var(--tool-h); height: var(--tool-h); min-width: 0; padding: 0; border-radius: 50%; background: var(--btn-glass); box-shadow: var(--btn-rim); color: var(--ink); -webkit-backdrop-filter: var(--btn-blur); backdrop-filter: var(--btn-blur); }
 .tb-btn.round:hover { background: color-mix(in oklab, var(--btn-glass), var(--ink) 8%); }
+.tb-btn.round:active { transform: scale(0.96); }
 /* The window title: where you are and what's running. Click it for the command bar. */
-.tb-title { flex: 0 1 420px; min-width: 200px; height: var(--tool-h); display: flex; align-items: center; gap: 7px; padding: 0 4px 0 10px; border-radius: calc(var(--tool-h) / 2); background: var(--btn-glass); box-shadow: var(--btn-rim); color: var(--dim); white-space: nowrap; transition: background-color 0.12s, box-shadow 0.12s, color 0.12s; }
+.tb-title { flex: 0 1 420px; min-width: 200px; height: var(--tool-h); display: flex; align-items: center; gap: 7px; padding: 0 4px 0 10px; border-radius: calc(var(--tool-h) / 2); background: var(--btn-glass); box-shadow: var(--btn-rim); -webkit-backdrop-filter: var(--btn-blur); backdrop-filter: var(--btn-blur); color: var(--dim); white-space: nowrap; transition: background-color 0.12s, box-shadow 0.12s, color 0.12s; }
 .tb-title:hover { background: color-mix(in oklab, var(--btn-glass), var(--ink) 6%); color: var(--ink); }
 .tb-ic { flex: none; color: var(--dim); }
 .tb-path { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--ink); font-weight: 500; }

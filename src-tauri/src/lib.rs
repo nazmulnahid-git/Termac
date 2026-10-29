@@ -682,7 +682,7 @@ fn create_quick_window(app: &AppHandle) -> tauri::Result<WebviewWindow> {
         .disable_drag_drop_handler()
         .background_throttling(BackgroundThrottlingPolicy::Disabled)
         .build()?;
-    paint_background(&window, (0x13, 0x14, 0x17), (0xfc, 0xfc, 0xfa));
+    paint_background(&window, (0x1d, 0x1d, 0x1d), (0xfc, 0xfc, 0xfa));
     // Keeps the native rounded corners and shadow, without the buttons.
     macos::set_traffic_lights_visible(&window, false);
     macos::float_on_all_spaces(&window);
@@ -1050,7 +1050,7 @@ pub fn run() {
                 if let Some(w) = window.app_handle().get_webview_window(window.label()) {
                     // The main window is transparent over its vibrancy; only the Quick Terminal paints.
                     if w.label() != MAIN {
-                        paint_background(&w, (0x13, 0x14, 0x17), (0xfc, 0xfc, 0xfa));
+                        paint_background(&w, (0x1d, 0x1d, 0x1d), (0xfc, 0xfc, 0xfa));
                     }
                 }
             }

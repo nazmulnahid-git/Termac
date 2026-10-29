@@ -3,10 +3,10 @@
 
 export const TERMINAL_THEMES = {
   dark: {
-    background: '#0f1012',
+    background: '#1d1d1d', // the window's own dark background, so the terminal and chrome read as one surface
     foreground: '#d8dae0',
     cursor: '#d8dae0',
-    cursorAccent: '#0f1012',
+    cursorAccent: '#1d1d1d',
     selectionBackground: 'rgba(136,173,255,.28)',
     black: '#2a2c33',
     red: '#ff8080',
@@ -116,7 +116,8 @@ export function terminalLook(space, fallbackTheme = 'dark') {
   const vars = {
     '--t-bg': bg,
     '--t-surface': image ? 'transparent' : bg,
-    '--t-hd': image ? rgba(bg, 0.55) : mix(bg, fg, dark ? 0.045 : 0.035),
+    // Pane headers share the terminal's surface, set off only by their hairline.
+    '--t-hd': image ? rgba(bg, 0.55) : bg,
     '--t-bd': rgba(fg, dark ? 0.08 : 0.08),
     '--t-fg': fg,
     '--t-dim': base.brightBlack,
