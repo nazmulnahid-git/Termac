@@ -28,15 +28,6 @@ export default function PaneChips({ sid, r, cwd }) {
   };
   const on = (kind) => (menu?.kind === kind ? ' open' : '');
 
-  if (r.dangerHost) {
-    return (
-      <span className="pchip host" title="Remote session">
-        <IconExternal size={13} />
-        <span className="txt">{r.dangerHost}</span>
-      </span>
-    );
-  }
-
   const Menu = { dir: DirMenu, branch: BranchMenu, diff: DiffMenu }[menu?.kind];
   return (
     <>

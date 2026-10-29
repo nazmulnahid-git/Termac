@@ -3,6 +3,9 @@
 // maps one to the other and also drives validation and the generated JSON Schema.
 // Settings not listed here (panel widths and the like) live only in state.json.
 
+// Shortcuts for features that have since been removed: older files may still list them.
+const RETIRED_ACTIONS = new Set(['findTab', 'notes', 'toggleFiles', 'quickOpen', 'toggleReview']);
+
 const FIELDS = [
   ['appearance.theme', 'termTheme', { values: ['system', 'dark', 'light'], desc: 'Terminal theme for Spaces without a custom background.' }],
   ['appearance.zoom_level', 'zoomLevel', { min: 50, max: 200, int: true, desc: 'Zoom for the whole window, in percent.' }],
@@ -132,6 +135,7 @@ export function parseSettingsFile(text, defaults) {
   if (kb !== undefined && (typeof kb !== 'object' || Array.isArray(kb) || kb === null)) warnings.push('keybindings: expected an object of "action": "Shortcut"');
   else if (kb) {
     for (const [action, accel] of Object.entries(kb)) {
+      if (RETIRED_ACTIONS.has(action)) continue;
       if (!(action in defaults.keybindings)) warnings.push(`keybindings.${action}: unknown action`);
       else if (typeof accel !== 'string') warnings.push(`keybindings.${action}: expected a shortcut like "Cmd+T", or "" to turn it off`);
       else settings.keybindings[action] = accel.trim();

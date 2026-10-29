@@ -5,7 +5,7 @@ import * as A from '../state/actions.js';
 import * as reg from '../term/registry.js';
 import * as L from '../lib/layout.js';
 import { fuzzy, highlight } from '../lib/fuzzy.js';
-import { route, tildify, expandHome } from '../lib/routing.js';
+import { tildify, expandHome } from '../lib/routing.js';
 import { formatAccel } from '../lib/keys.js';
 import { kindOf, sessionName, formatDuration, timeAgo, dayLabel } from '../lib/meta.js';
 import { TabIcon } from './tabicons.jsx';
@@ -13,14 +13,13 @@ import { SpaceGlyph, kindGlyph } from './common.jsx';
 import { IconSearch, Sym } from './icons.jsx';
 
 // Results lead with an icon, as in Spotlight: a session's kind, else what the result is.
-const CHIP_ICONS = { '+': 'plus', '{ }': 'curlybraces', '›': 'command', '⇥': 'rectangle.split.2x1', '⤓': 'rectangle.split.1x2', '≡': 'doc.text' };
+const CHIP_ICONS = { '+': 'plus', '{ }': 'curlybraces', '›': 'command', '⇥': 'rectangle.split.2x1', '⤓': 'rectangle.split.1x2' };
 function ChipIcon({ item }) {
   if (typeof item.chip !== 'string') return item.chip ?? null;
   const symbol = item.group === 'dir' ? 'folder' : CHIP_ICONS[item.chip] || kindGlyph(item.chip)?.[0];
   return symbol ? <Sym name={symbol} size={16} /> : item.chip;
 }
 import { promptText } from './Sidebar.jsx';
-import { rootOf } from './project.js';
 
 const api = window.termac;
 
@@ -28,7 +27,6 @@ const GROUPS = [
   ['path', 'Directory'],
   ['run', 'Run'],
   ['session', 'Open sessions'],
-  ['file', 'Files'],
   ['dir', 'Recent directories'],
   ['host', 'SSH hosts'],
   ['snippet', 'Snippets'],
@@ -37,7 +35,6 @@ const GROUPS = [
 const FILTERS = [
   ['all', 'All'],
   ['session', 'Sessions'],
-  ['file', 'Files'],
   ['dir', 'Directories'],
   ['host', 'Hosts'],
   ['snippet', 'Snippets'],
@@ -58,9 +55,7 @@ export default function CommandBar({ onClose, initial = '' }) {
   const listRef = useRef(null);
 
   // Snapshot of everything searchable, taken once per open.
-  const base = useMemo(buildCandidates, []);
-  const files = useProjectFiles();
-  const cands = useMemo(() => ({ ...base, files }), [base, files]);
+  const cands = useMemo(buildCandidates, []);
 
   const { prefix, term } = parseQuery(query);
   const scope = prefix === '>' ? 'run' : PREFIX[prefix] || filter;
@@ -119,7 +114,7 @@ export default function CommandBar({ onClose, initial = '' }) {
     <div className="palette cb" onMouseDown={(e) => e.target.tagName !== 'INPUT' && e.preventDefault()}>
       <div className="input-row">
         <IconSearch size={20} />
-        <input autoFocus spellCheck={false} value={query} placeholder="Search sessions, files, directories, hosts, snippets, actions…" onChange={(e) => setQuery(e.target.value)} onKeyDown={onKeyDown} />
+        <input autoFocus spellCheck={false} value={query} placeholder="Search sessions, directories, hosts, snippets, actions…" onChange={(e) => setQuery(e.target.value)} onKeyDown={onKeyDown} />
         <button className="filter" onClick={() => cycle(1)}>
           {chipText}
         </button>
@@ -170,7 +165,6 @@ function Row({ item, head, selected, first, onHover, onPick }) {
         <span className={`cb-label${item.mono ? ' cb-mono' : ''}`}>
           <Hl text={item.label} idx={item.hl} />
         </span>
-        {item.prod && <span className="prod">PROD</span>}
         {item.sub && (
           <span className={`sub${item.subMono ? ' cb-mono' : ''}`}>
             <Hl text={item.sub} idx={item.subHl} />
@@ -221,11 +215,6 @@ function buildCandidates() {
   const activeTid = A.activeTabId(s);
   const keys = s.settings.keybindings;
   const spaceById = Object.fromEntries(s.spaces.map((sp) => [sp.id, sp]));
-  const routeHint = (rule) => {
-    if (rule?.action?.type !== 'space') return null;
-    const sp = spaceById[rule.action.spaceId];
-    return sp ? `Opens in ${sp.glyph} ${sp.name}` : null;
-  };
 
   // Sessions: every tab across Favorites and all Spaces.
   const placed = [];
@@ -289,8 +278,6 @@ function buildCandidates() {
   const hosts = (u.sshHosts || []).map((h) => {
     const target = h.hostname || h.alias;
     const command = `ssh ${h.alias}`;
-    const m = route(s.rules, { host: target, command }, home) || (target !== h.alias ? route(s.rules, { host: h.alias, command }, home) : null);
-    const rule = m?.rule;
     return {
       key: `h:${h.alias}`,
       group: 'host',
@@ -299,10 +286,8 @@ function buildCandidates() {
       sub: h.alias !== target ? h.alias : '',
       subMono: true,
       chip: 'ssh',
-      prod: !!rule?.effects?.danger,
-      hint: routeHint(rule),
       selHint: 'Connect ↵',
-      run: (mode) => A.openTerminal({ command, host: target, ...(mode === 'split' ? { splitOf: A.activeTabId(), edge: 'right' } : {}) }),
+      run: (mode) => A.openTerminal({ command, ...(mode === 'split' ? { splitOf: A.activeTabId(), edge: 'right' } : {}) }),
     };
   });
 
@@ -320,7 +305,7 @@ function buildCandidates() {
       selHint: 'Run ↵',
       run(mode) {
         if (mode === 'new') return A.openTerminal({ command: sn.command });
-        if (mode === 'split') return A.openTerminal({ command: sn.command, splitOf: A.activeTabId(), edge: 'right', viaRules: false });
+        if (mode === 'split') return A.openTerminal({ command: sn.command, splitOf: A.activeTabId(), edge: 'right' });
         A.runInSession(sn.command);
       },
     };
@@ -345,7 +330,6 @@ function buildCandidates() {
     act('prevSpace', 'Previous Space', () => A.switchSpace(-1)),
     act('nextSpace', 'Next Space', () => A.switchSpace(1)),
     act('library', 'Library', () => setUi({ view: 'library' }), { words: 'archive history' }),
-    act('notes', 'Notes', () => ui.set((x) => ({ ...x, notesOpen: !x.notesOpen })), { words: 'toggle panel' }),
     act('settings', 'Settings', () => A.openSettings(), { words: 'preferences' }),
     act('settingsFile', 'Edit settings.json', () => A.openSettings('file'), { hint: '', words: 'preferences config json customize' }),
     act('toggleSidebar', 'Show / hide sidebar', () => A.toggleSidebar()),
@@ -369,40 +353,15 @@ function buildCandidates() {
     act('zoomReset', 'Actual size', () => A.zoom(0), { words: 'zoom font reset' }),
   ].filter((a) => !a.current);
 
-  return { home, rules: s.rules, spaces: spaceById, activeTid, activeSpaceId, sessions, dirs, hosts, snippets, actions };
+  return { home, activeTid, activeSpaceId, sessions, dirs, hosts, snippets, actions };
 }
 
 function openDir(path, mode) {
-  if (mode === 'split') return A.openTerminal({ cwd: path, splitOf: A.activeTabId(), edge: 'right', viaRules: false });
+  if (mode === 'split') return A.openTerminal({ cwd: path, splitOf: A.activeTabId(), edge: 'right' });
   A.openTerminal({ cwd: path });
 }
 
 // ---- Ranking -------------------------------------------------------------------------
-// Files of the focused session's project, as command bar rows (matched by name, then path).
-function useProjectFiles() {
-  const [files, setFiles] = useState([]);
-  useEffect(() => {
-    const sid = ui.get().focusedSid;
-    const cwd = rt.get()[sid]?.cwd || app.get().sessions[sid]?.cwd;
-    let on = true;
-    rootOf(cwd).then(async (p) => {
-      if (!p || !on) return;
-      const list = await api.sys.projectFiles(p.root);
-      if (!on) return;
-      setFiles(
-        list.map((rel) => {
-          const cut = rel.lastIndexOf('/');
-          return { key: `f:${rel}`, group: 'file', label: rel.slice(cut + 1), sub: cut > 0 ? rel.slice(0, cut) : '', subMono: true, extra: rel, chip: '≡', selHint: 'Open file ↵', run: () => A.openFile(`${p.root}/${rel}`) };
-        })
-      );
-    });
-    return () => {
-      on = false;
-    };
-  }, []);
-  return files;
-}
-
 function match(item, term) {
   const m = fuzzy(term, item.label);
   if (m) return { ...item, hl: m.indices, subHl: null, score: m.score + (item.bonus || 0) };
@@ -432,8 +391,6 @@ function rank(c, { prefix, term, scope, path }) {
 
   if (prefix === '>') {
     if (!term) return out;
-    const m = route(c.rules, { command: term }, c.home);
-    const sp = m?.rule?.action?.type === 'space' ? c.spaces[m.rule.action.spaceId] : null;
     out.push({
       key: 'run',
       group: 'run',
@@ -441,8 +398,7 @@ function rank(c, { prefix, term, scope, path }) {
       mono: true,
       sub: 'Run in a new terminal',
       chip: '>_',
-      prod: !!m?.rule?.effects?.danger,
-      hint: sp ? `Opens in ${sp.glyph} ${sp.name}` : m?.rule?.action?.type === 'split' ? 'Opens in split' : '↵',
+      hint: '↵',
       run: (mode) => A.openTerminal({ command: term, ...(mode === 'split' ? { splitOf: A.activeTabId(), edge: 'right' } : {}) }),
     });
     return out;
@@ -466,7 +422,6 @@ function rank(c, { prefix, term, scope, path }) {
   const cap = solo ? SOLO_CAP : GROUP_CAP;
   const sessions = want('session') ? top(c.sessions, term, cap) : [];
   if (want('session')) out.push(...sessions);
-  if (want('file')) out.push(...top(c.files, term, cap));
   if (want('dir')) out.push(...top(c.dirs, term, cap));
   if (want('host')) out.push(...top(c.hosts, term, cap));
   if (want('snippet')) {

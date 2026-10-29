@@ -33,8 +33,6 @@ export const DEFAULT_SETTINGS = {
   gestures: { swipeSpaces: true, pinch: true, edgeReveal: true, peek: true },
   sidebarMode: 'expanded', // expanded | compact | hidden
   sidebarWidth: 248,
-  toolsWidth: 300,
-  reviewWidth: 520,
   clickToMove: true,
   promptStyle: 'termorc', // termorc (input bar + blocks) | shell (the shell's own prompt)
   terminalWelcome: true, // tips card in a new, empty session
@@ -61,13 +59,9 @@ export function initialState() {
     settings: DEFAULT_SETTINGS,
     profiles: [defaultProfile()],
     defaultProfileId: 'default',
-    rules: [],
-    ruleHits: {},
     snippets: [],
-    notes: {},
     recentDirs: [],
     activity: [],
-    reviewComments: {}, // git root -> [{ id, path, side, line, snippet, text, at }]
   };
 }
 
@@ -79,6 +73,11 @@ export function migrate(saved) {
   s.settings = { ...DEFAULT_SETTINGS, ...saved.settings, keybindings: { ...DEFAULT_SETTINGS.keybindings, ...saved.settings?.keybindings }, gestures: { ...DEFAULT_SETTINGS.gestures, ...saved.settings?.gestures } };
   if (saved.settings?.sidebarHidden && !saved.settings?.sidebarMode) s.settings.sidebarMode = 'hidden';
   delete s.settings.sidebarHidden;
+  // Left over from removed features: routing rules, notes, code review, the tool panels.
+  for (const k of ['rules', 'ruleHits', 'notes', 'reviewComments']) delete s[k];
+  delete s.settings.toolsWidth;
+  delete s.settings.reviewWidth;
+  for (const id of Object.keys(s.settings.keybindings)) if (!(id in DEFAULT_SETTINGS.keybindings)) delete s.settings.keybindings[id];
   if (!s.spaces?.length) s.spaces = base.spaces;
   s.spaces = s.spaces.map((sp) => ({ ...sp, term: { ...DEFAULT_LOOK, ...sp.term } }));
   if (!s.spaces.some((sp) => sp.id === s.activeSpaceId)) s.activeSpaceId = s.spaces[0].id;
@@ -100,7 +99,6 @@ export const ui = createStore({
   capturingKeys: false, // a shortcut recorder in Settings owns the keyboard
   overlay: null, // commandBar | settings | spaceEditor | overview | onboarding
   overlayArg: null,
-  notesOpen: false,
   focusedSid: null,
   peek: null, // { sid, top, pinned }
   toast: null, // { id, kind, title, detail, action, expires }
@@ -115,13 +113,6 @@ export const ui = createStore({
   termTheme: 'dark', // resolved terminal theme: dark | light
   notify: null, // finished job in another Space { id, sid, spaceId, command, exit, dur, at }
   prompt: null, // { title, value, resolve }
-  tools: null, // left tool panel: files | search
-  searchFocus: 0, // bumped by ⌘P to refocus the find-file box
-  tabFind: 0, // bumped by ⌘J to focus the sidebar's session filter
-  review: false, // code review panel (right)
-  reviewMax: false, // the review panel covers the whole terminal area
-  viewer: null, // { path, line } file shown over the terminal card
-  viewerDirty: false, // the open file has unsaved edits
   settingsFile: { path: '', text: null, error: null, warnings: [] }, // ~/.termorc/settings.json: its text on disk and last parse result
 });
 

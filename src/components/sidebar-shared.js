@@ -146,7 +146,6 @@ export async function spaceMenu(space) {
     { id: 'edit', label: 'Edit Space…' },
     { id: 'look', label: 'Terminal Background…' },
     { id: 'folder', label: 'New Folder' },
-    { id: 'notes', label: 'Notes' },
     { type: 'separator' },
     { id: 'new', label: 'New Space…' },
     { id: 'overview', label: 'All Spaces' },
@@ -155,7 +154,6 @@ export async function spaceMenu(space) {
   ]);
   if (id === 'edit' || id === 'look') ui.set((u) => ({ ...u, overlay: 'spaceEditor', overlayArg: space.id }));
   else if (id === 'folder') newFolder(space.id);
-  else if (id === 'notes') ui.set((u) => ({ ...u, notesOpen: true }));
   else if (id === 'new') ui.set((u) => ({ ...u, overlay: 'spaceEditor', overlayArg: null }));
   else if (id === 'overview') ui.set((u) => ({ ...u, overlay: 'overview' }));
   else if (id === 'delete') A.deleteSpace(space.id);

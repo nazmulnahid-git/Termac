@@ -2,7 +2,7 @@
 import { app, rt, ui, patchRt, migrate, newSpace, DEFAULT_SETTINGS } from './model.js';
 import * as reg from '../term/registry.js';
 import * as L from '../lib/layout.js';
-import { route, ruleMatches, sshTarget, expandHome, isRiskyCommand } from '../lib/routing.js';
+import { sshTarget, expandHome, isRiskyCommand } from '../lib/routing.js';
 import { uid, formatDuration, leafOf, sessionName, SPACE_COLORS, SPACE_GLYPHS } from '../lib/meta.js';
 import { buildKeymap, ACTIONS } from '../lib/keys.js';
 import { parseSettingsFile, settingsToFile, settingsSchema } from '../lib/settingsfile.js';
@@ -87,7 +87,7 @@ export function saveSettingsText(text) {
 // ---- Settings tab -------------------------------------------------------------------
 // Settings opens in place of the terminal and keeps a tab in the sidebar until closed.
 export function openSettings(tab) {
-  ui.set((u) => ({ ...u, view: 'settings', settingsOpen: true, settingsTab: tab || u.settingsTab, overlay: null, viewer: null }));
+  ui.set((u) => ({ ...u, view: 'settings', settingsOpen: true, settingsTab: tab || u.settingsTab, overlay: null }));
 }
 
 export function closeSettings() {
@@ -224,43 +224,24 @@ export function ensureStarted(sid) {
 }
 
 export function openTerminal(opts = {}) {
-  let { cwd, command = '', host = '', spaceId, section = 'today', folderId = null, splitOf = null, edge = 'right', name = null, profileId = null, activate = true, viaRules = true, content = '' } = opts;
+  const { cwd, command = '', spaceId, section = 'today', folderId = null, splitOf = null, edge = 'right', name = null, profileId = null, activate = true, content = '' } = opts;
   const s0 = app.get();
-  let targetSpace = s0.spaces.find((x) => x.id === spaceId) || activeSpace(s0);
-  let dir = cwd ? expandHome(cwd, home()) : defaultCwd(targetSpace);
-  let effects = {};
-  let profile = profileId || targetSpace.profileId || s0.defaultProfileId;
-  let ruleId = null;
-
-  if (viaRules) {
-    const m = route(s0.rules, { cwd: dir, command, host }, home());
-    if (m) {
-      const r = m.rule;
-      ruleId = r.id;
-      if (r.action?.type === 'space' && !spaceId) targetSpace = s0.spaces.find((x) => x.id === r.action.spaceId) || targetSpace;
-      if (r.action?.type === 'split' && !splitOf && targetSpace.id === s0.activeSpaceId && activeTab(s0)) {
-        splitOf = activeTabId(s0);
-        edge = r.action.edge || 'right';
-      }
-      if (r.profileId) profile = r.profileId;
-      if (!cwd && r.action?.type === 'space') dir = defaultCwd(targetSpace);
-      effects = { ...(r.effects || {}) };
-    }
-  }
+  const targetSpace = s0.spaces.find((x) => x.id === spaceId) || activeSpace(s0);
+  const dir = cwd ? expandHome(cwd, home()) : defaultCwd(targetSpace);
+  const profile = profileId || targetSpace.profileId || s0.defaultProfileId;
 
   const sid = uid('s');
   const now = Date.now();
   let tid = null;
   app.set((s) => {
     let next = { ...s, sessions: { ...s.sessions, [sid]: { id: sid, cwd: dir, profileId: profile, command, createdAt: now } } };
-    if (ruleId) next.ruleHits = { ...next.ruleHits, [ruleId]: (next.ruleHits[ruleId] || 0) + 1 };
     const host = splitOf && next.tabs[splitOf];
     if (host && L.leaves(host.layout).length < L.MAX_PANES) {
       tid = splitOf;
-      next.tabs = { ...next.tabs, [tid]: { ...host, layout: L.insert(host.layout, host.activeSid, sid, edge), activeSid: sid, effects: { ...host.effects, ...effects } } };
+      next.tabs = { ...next.tabs, [tid]: { ...host, layout: L.insert(host.layout, host.activeSid, sid, edge), activeSid: sid } };
     } else {
       tid = uid('t');
-      next.tabs = { ...next.tabs, [tid]: { id: tid, name, layout: L.leaf(sid), activeSid: sid, effects, createdAt: now } };
+      next.tabs = { ...next.tabs, [tid]: { id: tid, name, layout: L.leaf(sid), activeSid: sid, effects: {}, createdAt: now } };
       next = attach(next, tid, { section, spaceId: targetSpace.id, folderId });
     }
     if (activate) next = setActiveTab(next, section === 'fav' ? next.activeSpaceId : spaceForTab(tid, next), tid);
@@ -378,7 +359,7 @@ function ensureSession({ closed = false } = {}) {
     quitRequested = true;
     return api.app.quit();
   }
-  openTerminal({ spaceId: sp.id, viaRules: false });
+  openTerminal({ spaceId: sp.id });
 }
 
 // Catches every other way a Space ends up empty: switching to it, creating it, archiving
@@ -503,15 +484,13 @@ export async function deleteSpace(id) {
   if (s.spaces.length < 2) return;
   const sp = s.spaces.find((x) => x.id === id);
   const n = tabsOfSpace(sp).length;
-  const detail = [n ? `Its ${n} session${n > 1 ? 's' : ''} will be moved to the Library.` : '', s.notes[id]?.trim() ? 'Its notes will be deleted.' : ''].filter(Boolean).join(' ');
-  const ok = await api.sys.confirm({ message: `Delete “${sp.name}”?`, detail: detail || "This can't be undone.", ok: 'Delete Space' });
+  const detail = n ? `Its ${n} session${n > 1 ? 's' : ''} will be moved to the Library.` : "This can't be undone.";
+  const ok = await api.sys.confirm({ message: `Delete “${sp.name}”?`, detail, ok: 'Delete Space' });
   if (!ok) return;
   if (n) await commitArchive(tabsOfSpace(sp), 'closed');
   app.set((st) => {
     const spaces = st.spaces.filter((x) => x.id !== id);
-    const notes = { ...st.notes };
-    delete notes[id];
-    return { ...st, spaces, notes, activeSpaceId: st.activeSpaceId === id ? spaces[0].id : st.activeSpaceId };
+    return { ...st, spaces, activeSpaceId: st.activeSpaceId === id ? spaces[0].id : st.activeSpaceId };
   });
   syncFocus();
 }
@@ -582,7 +561,7 @@ export function splitActive(edge = 'right') {
   if (!tab) return openTerminal();
   if (L.leaves(tab.layout).length >= L.MAX_PANES) return;
   const cwd = rt.get()[tab.activeSid]?.cwd || app.get().sessions[tab.activeSid]?.cwd;
-  openTerminal({ cwd, splitOf: tab.id, edge, viaRules: false });
+  openTerminal({ cwd, splitOf: tab.id, edge });
 }
 
 // Drop a sidebar tab onto an edge of the active card.
@@ -655,9 +634,7 @@ export function focusDirection(dir) {
 
 // ---- Guard rails & shell hooks -------------------------------------------------------
 function effectsOf(sid) {
-  const tab = tabOfSession(sid);
-  const r = rt.get()[sid];
-  return { ...(tab?.effects || {}), ...(r?.sshEffects || {}) };
+  return tabOfSession(sid)?.effects || {};
 }
 
 export function isDanger(sid) {
@@ -684,8 +661,7 @@ reg.setHooks({
     if (!isDanger(sid)) return true;
     const line = reg.cursorLine(sid);
     if (!isRiskyCommand(line)) return true;
-    const host = rt.get()[sid]?.dangerHost || 'production';
-    confirmThen(sid, { title: `Run this on ${host}?`, detail: "You're about to run a privileged command on production.", label: 'Run', danger: true }, () => api.pty.write(sid, '\r'));
+    confirmThen(sid, { title: 'Run this on production?', detail: "You're about to run a privileged command on production.", label: 'Run', danger: true }, () => api.pty.write(sid, '\r'));
     return false;
   },
   // Keys that reached the terminal while the input bar owns the prompt (Composer.jsx).
@@ -712,13 +688,6 @@ reg.setHooks({
       return { ...s, recentDirs, sessions: { ...s.sessions, [sid]: { ...s.sessions[sid], cwd } } };
     });
   },
-  commandStart(sid, cmd) {
-    const s = app.get();
-    const target = sshTarget(cmd);
-    if (!target) return;
-    const m = s.rules.find((r) => r.trigger?.type === 'ssh' && ruleMatches(r, { command: cmd }, home()));
-    if (m?.effects && Object.values(m.effects).some(Boolean)) patchRt(sid, { sshEffects: m.effects, dangerHost: target.host });
-  },
   commandEnd(sid, entry) {
     const s = app.get();
     const h = reg.getHandle(sid);
@@ -726,7 +695,7 @@ reg.setHooks({
     const interrupted = entry.exit === 130;
     const failed = entry.exit !== 0 && !interrupted;
     const status = failed ? 'fail' : !interrupted && (entry.dur >= 3000 || !visible) ? 'ok' : 'idle';
-    const patch = { status, exitCode: entry.exit, duration: entry.dur, endedAt: Date.now(), sshEffects: null, dangerHost: null };
+    const patch = { status, exitCode: entry.exit, duration: entry.dur, endedAt: Date.now() };
     const ssh = sshTarget(entry.cmd);
     if (ssh && entry.exit === 255 && entry.dur > 5000) patch.dropped = { host: ssh.host, cmd: entry.cmd, at: Date.now(), dur: entry.dur };
     patchRt(sid, patch);
@@ -829,8 +798,7 @@ export function submitCommand(sid, command) {
   if (h && !h.alive) startSession(sid);
   const data = command.includes('\n') ? `\x1b[200~${command}\x1b[201~\r` : command + '\r';
   if (isDanger(sid) && isRiskyCommand(command)) {
-    const host = rt.get()[sid]?.dangerHost || 'production';
-    confirmThen(sid, { title: `Run this on ${host}?`, detail: "You're about to run a privileged command on production.", label: 'Run', danger: true }, () => api.pty.write(sid, data));
+    confirmThen(sid, { title: 'Run this on production?', detail: "You're about to run a privileged command on production.", label: 'Run', danger: true }, () => api.pty.write(sid, data));
     return false;
   }
   api.pty.write(sid, data);
@@ -847,29 +815,6 @@ export function insertText(sid, text) {
   focusSession(sid);
 }
 
-// ---- Tool panels: explorer / search (left), code review (right), file viewer -------------
-export const togglePanel = (name) => ui.set((u) => ({ ...u, tools: u.tools === name ? null : name }));
-export const toggleReview = () => ui.set((u) => ({ ...u, review: !u.review, reviewMax: u.review ? false : u.reviewMax }));
-export const toggleReviewMax = () => ui.set((u) => ({ ...u, review: true, reviewMax: !u.reviewMax }));
-
-// Review comments are drafts kept per repository until they're sent, posted or cleared.
-export function addReviewComment(root, c) {
-  const comment = { id: uid('rc'), at: Date.now(), ...c };
-  app.set((s) => ({ ...s, reviewComments: { ...s.reviewComments, [root]: [...(s.reviewComments?.[root] || []), comment] } }));
-}
-export function updateReviewComment(root, id, text) {
-  app.set((s) => ({ ...s, reviewComments: { ...s.reviewComments, [root]: (s.reviewComments?.[root] || []).map((c) => (c.id === id ? { ...c, text } : c)) } }));
-}
-export function removeReviewComment(root, id) {
-  app.set((s) => ({ ...s, reviewComments: { ...s.reviewComments, [root]: (s.reviewComments?.[root] || []).filter((c) => c.id !== id) } }));
-}
-export function clearReviewComments(root) {
-  app.set((s) => {
-    const { [root]: _, ...rest } = s.reviewComments || {};
-    return { ...s, reviewComments: rest };
-  });
-}
-
 // Pastes text into the focused session as one bracketed paste, so a coding agent running
 // there gets it as a single message instead of line-by-line commands.
 export function pasteIntoSession(text, sid = focusedSid()) {
@@ -880,27 +825,6 @@ export function pasteIntoSession(text, sid = focusedSid()) {
   focusSession(sid);
   return true;
 }
-// Unsaved edits in the editor are only thrown away after asking.
-async function discardEdits() {
-  const u = ui.get();
-  if (!u.viewerDirty) return true;
-  const name = u.viewer?.path.split('/').pop();
-  return api.sys.confirm({ message: `Discard your changes to ${name}?`, detail: "They haven't been saved. Press ⌘S in the editor to save them.", ok: 'Discard' });
-}
-
-export async function openFile(path, line = null) {
-  const cur = ui.get().viewer;
-  if (cur && cur.path !== path && !(await discardEdits())) return;
-  ui.set((u) => ({ ...u, viewer: { path, line }, viewerDirty: cur?.path === path ? u.viewerDirty : false }));
-}
-
-export async function closeFile() {
-  if (!(await discardEdits())) return;
-  ui.set((u) => (u.viewer ? { ...u, viewer: null, viewerDirty: false } : u));
-  const sid = focusedSid();
-  if (sid) requestAnimationFrame(() => reg.focus(sid));
-}
-
 export function runInSession(command, sid = focusedSid()) {
   if (!sid) return openTerminal({ command });
   const h = reg.getHandle(sid);
@@ -1029,11 +953,11 @@ export async function restoreFromLibrary(entry, spaceId = entry.spaceId) {
   const content = await api.library.content(entry.id);
   const s = app.get();
   const target = s.spaces.some((x) => x.id === spaceId) ? spaceId : s.activeSpaceId;
-  openTerminal({ cwd: entry.cwd, spaceId: target, content, viaRules: false, name: null });
+  openTerminal({ cwd: entry.cwd, spaceId: target, content, name: null });
   await api.library.remove(entry.id);
 }
 
-// ---- Snippets, notes, rules, profiles, settings -------------------------------------
+// ---- Snippets, profiles, settings -------------------------------------
 export function addSnippet({ name, command, spaceId = app.get().activeSpaceId }) {
   const clean = name.replace(/^\/+/, '').trim().replace(/\s+/g, '-') || 'snippet';
   app.set((s) => ({ ...s, snippets: [...s.snippets.filter((x) => !(x.name === clean && x.spaceId === spaceId)), { id: uid('sn'), name: clean, command, spaceId, createdAt: Date.now() }] }));
@@ -1042,14 +966,6 @@ export function addSnippet({ name, command, spaceId = app.get().activeSpaceId })
 
 export function removeSnippet(id) {
   app.set((s) => ({ ...s, snippets: s.snippets.filter((x) => x.id !== id) }));
-}
-
-export function setNotes(spaceId, text) {
-  app.set((s) => ({ ...s, notes: { ...s.notes, [spaceId]: text } }));
-}
-
-export function setRules(rules) {
-  app.set((s) => ({ ...s, rules }));
 }
 
 export function setProfiles(profiles, defaultProfileId = app.get().defaultProfileId) {

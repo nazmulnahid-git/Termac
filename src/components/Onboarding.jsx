@@ -14,7 +14,7 @@ const CARD_GLYPHS = ['◆', '●', '■', '✦', '☾', '♣', '★'];
 const CARD_COLORS = [0, 1, 3, 4, 5, 6, 7].map((i) => SPACE_COLORS[i]); // green is kept for Servers
 
 function card(fields, i) {
-  return { key: uid('c'), name: 'New Space', glyph: CARD_GLYPHS[i % CARD_GLYPHS.length], color: CARD_COLORS[i % CARD_COLORS.length], startDir: '~', rule: null, danger: false, hosts: 0, on: true, ...fields };
+  return { key: uid('c'), name: 'New Space', glyph: CARD_GLYPHS[i % CARD_GLYPHS.length], color: CARD_COLORS[i % CARD_COLORS.length], startDir: '~', hosts: 0, on: true, ...fields };
 }
 
 function suggest({ folders = [], ssh = [] }, home) {
@@ -27,9 +27,9 @@ function suggest({ folders = [], ssh = [] }, home) {
     if (names.has(name)) continue;
     names.add(name);
     const dir = tildify(f, home);
-    out.push(card({ name, startDir: dir, rule: { type: 'dir', pattern: `${dir}/*` } }, out.length));
+    out.push(card({ name, startDir: dir }, out.length));
   }
-  if (ssh.length) out.push(card({ name: 'Servers', glyph: '▲', color: SPACE_COLORS[2], rule: { type: 'ssh', pattern: '*.prod*' }, danger: true, hosts: ssh.length }, out.length));
+  if (ssh.length) out.push(card({ name: 'Servers', glyph: '▲', color: SPACE_COLORS[2], hosts: ssh.length }, out.length));
   if (!out.length) out.push(card({ name: 'Personal' }, 0));
   return out;
 }
@@ -62,9 +62,6 @@ export default function Onboarding({ onDone }) {
     const s = app.get();
     const chosen = (cards || []).filter((c) => c.on);
     const spaces = chosen.map((c) => newSpace({ name: c.name.trim() || 'Space', glyph: c.glyph, color: c.color, startDir: c.startDir || '~' }));
-    const rules = chosen.flatMap((c, i) =>
-      c.rule ? [{ id: uid('r'), enabled: true, trigger: { ...c.rule }, action: { type: 'space', spaceId: spaces[i].id }, profileId: null, effects: { danger: !!c.danger, confirmPaste: false, noArchive: false } }] : [],
-    );
     const taken = new Set(s.profiles.map((p) => p.name));
     const imported = pick.iterm
       ? (found?.iterm || [])
@@ -73,7 +70,7 @@ export default function Onboarding({ onDone }) {
       : [];
     if (!spaces.length) return skipAll();
     const kept = s.spaces.filter((sp) => A.tabsOfSpace(sp).length);
-    app.set((st) => ({ ...st, spaces: [...kept, ...spaces], activeSpaceId: spaces[0].id, rules: [...st.rules, ...rules], profiles: [...st.profiles, ...imported], onboarded: true }));
+    app.set((st) => ({ ...st, spaces: [...kept, ...spaces], activeSpaceId: spaces[0].id, profiles: [...st.profiles, ...imported], onboarded: true }));
     A.switchSpace(spaces[0].id); // re-syncs focus when kept Spaces had sessions
     onDone?.();
   };
@@ -166,11 +163,6 @@ function MockRow({ kind, name, status, on }) {
 function MockSidebar() {
   return (
     <div className="ob-mock" aria-hidden>
-      <div className="tab-find">
-        <IconSearch size={13} />
-        <span className="hint">Find a session</span>
-        <kbd>⌘J</kbd>
-      </div>
       <div className="sec-title">
         <span className="glyph">◆</span>
         <span className="grow">Work</span>
@@ -262,11 +254,6 @@ function Spaces({ cards, setCards, sshCount, onBack, onNext }) {
               <div className="ob-card-body">
                 <input className="ob-name" value={c.name} autoFocus={c.fresh} spellCheck={false} onClick={(e) => e.stopPropagation()} onFocus={(e) => e.target.select()} onChange={(e) => update(c.key, { name: e.target.value })} />
                 <div className="ob-meta mono ellipsis">{c.hosts ? `${c.hosts} SSH host${c.hosts > 1 ? 's' : ''}` : c.startDir}</div>
-                {c.rule && (
-                  <div className={`ob-rule mono ellipsis${c.danger ? ' danger' : ''}`}>
-                    {c.danger ? `${c.rule.pattern.replace(/\*$/, '')} → danger frame` : `Rule: ${c.rule.pattern} → ${c.name.trim() || 'Space'}`}
-                  </div>
-                )}
               </div>
             </div>
           ))}

@@ -4,7 +4,7 @@ import { app, ui, defaultProfile, DEFAULT_SETTINGS } from '../state/model.js';
 import * as A from '../state/actions.js';
 import { THEMES } from '../term/registry.js';
 import { ACTIONS, defaultBindings, eventToAccel, normalizeAccel, formatAccel } from '../lib/keys.js';
-import { route, expandHome, tildify } from '../lib/routing.js';
+import { expandHome, tildify } from '../lib/routing.js';
 import { uid } from '../lib/meta.js';
 import { BG_PRESETS, terminalLook } from '../lib/termtheme.js';
 import { highlightLines } from '../lib/highlight.js';
@@ -14,7 +14,6 @@ import { monoStack } from '../lib/fonts.js';
 import { Sym, IconExternal, IconClose } from './icons.jsx';
 
 const api = window.termac;
-const RULE_MIME = 'application/x-termac-rule';
 
 // [id, SF Symbol, label]
 const TABS = [
@@ -23,10 +22,9 @@ const TABS = [
   ['profiles', 'terminal', 'Profiles'],
   ['keybindings', 'keyboard', 'Keybindings'],
   ['gestures', 'hand.draw', 'Gestures'],
-  ['rules', 'signpost.right', 'Rules'],
   ['file', 'curlybraces', 'settings.json'],
 ];
-const ALIASES = { keys: 'keybindings', shortcuts: 'keybindings', routing: 'rules', json: 'file' };
+const ALIASES = { keys: 'keybindings', shortcuts: 'keybindings', json: 'file' };
 const tabId = (t) => {
   const id = ALIASES[t] || t;
   return TABS.some(([k]) => k === id) ? id : null;
@@ -99,7 +97,6 @@ export default function Settings() {
           {tab === 'profiles' && <ProfilesTab />}
           {tab === 'keybindings' && <KeysTab />}
           {tab === 'gestures' && <GesturesTab />}
-          {tab === 'rules' && <RulesTab />}
           {tab === 'file' && <FileTab />}
         </div>
       </div>
@@ -600,13 +597,12 @@ function ProfileEditor({ profile: p, isDefault, canDelete, onDeleted }) {
   };
 
   const remove = async () => {
-    if (api?.sys?.confirm && !(await api.sys.confirm({ message: `Delete profile “${p.name}”?`, detail: 'Spaces and rules using it fall back to the default profile.', ok: 'Delete' }))) return;
+    if (api?.sys?.confirm && !(await api.sys.confirm({ message: `Delete profile “${p.name}”?`, detail: 'Spaces using it fall back to the default profile.', ok: 'Delete' }))) return;
     const s = app.get();
     const rest = s.profiles.filter((x) => x.id !== p.id);
     if (!rest.length) return;
     const def = s.defaultProfileId === p.id ? rest[0].id : s.defaultProfileId;
     for (const sp of s.spaces) if (sp.profileId === p.id) A.updateSpace(sp.id, { profileId: null });
-    if (s.rules.some((r) => r.profileId === p.id)) A.setRules(s.rules.map((r) => (r.profileId === p.id ? { ...r, profileId: null } : r)));
     A.setProfiles(rest, def);
     onDeleted(def);
   };
@@ -846,259 +842,6 @@ function GesturesTab() {
           </div>
         </div>
       ))}
-    </div>
-  );
-}
-
-// ---- Rules ----------------------------------------------------------------------------
-
-const TRIGGERS = [
-  ['dir', 'a terminal opens in'],
-  ['ssh', 'I SSH to'],
-  ['command', 'the command starts with'],
-];
-const PLACEHOLDER = { dir: '~/work/*', ssh: '*.prod.company.com', command: 'docker compose up' };
-const EFFECTS = [
-  ['danger', 'Red danger frame'],
-  ['confirmPaste', 'Confirm multi-line paste'],
-  ['noArchive', 'Never auto-archive'],
-];
-const SHORT_EFFECT = { danger: 'DANGER FRAME', confirmPaste: 'CONFIRM PASTE', noArchive: 'NO ARCHIVE' };
-
-function mutRule(id, fn) {
-  A.setRules(app.get().rules.map((r) => (r.id === id ? { ...r, ...fn(r) } : r)));
-}
-
-function testContext(input, home) {
-  const v = input.trim();
-  if (!v) return null;
-  if (v.startsWith('ssh ')) return { command: v };
-  if (v.startsWith('/') || v.startsWith('~')) return { cwd: expandHome(v, home) };
-  return { command: v };
-}
-
-function RulesTab() {
-  const rules = app.use((s) => s.rules);
-  const hits = app.use((s) => s.ruleHits);
-  const spaces = app.use((s) => s.spaces);
-  const profiles = app.use((s) => s.profiles);
-  const home = ui.use((u) => u.home);
-  const [arm, setArm] = useState(null); // rule id whose handle is pressed (enables drag)
-  const [drop, setDrop] = useState(null); // { id, after }
-  const [fresh, setFresh] = useState(null);
-  const [test, setTest] = useState('');
-
-  const ctx = testContext(test, home);
-  const result = ctx ? route(rules, ctx, home) : null;
-
-  const add = () => {
-    const s = app.get();
-    const r = {
-      id: uid('rule'),
-      enabled: true,
-      trigger: { type: 'dir', pattern: '' },
-      action: { type: 'space', spaceId: s.activeSpaceId },
-      profileId: null,
-      effects: { danger: false, confirmPaste: false, noArchive: false },
-    };
-    A.setRules([...s.rules, r]);
-    setFresh(r.id);
-  };
-
-  const move = (from, to) => {
-    const list = [...app.get().rules];
-    if (from < 0 || to < 0 || to >= list.length || from === to) return;
-    const [r] = list.splice(from, 1);
-    list.splice(to, 0, r);
-    A.setRules(list);
-  };
-
-  const onDrop = (e, targetId) => {
-    e.preventDefault();
-    const id = e.dataTransfer.getData(RULE_MIME);
-    const d = drop;
-    setDrop(null);
-    setArm(null);
-    if (!id || !d || id === targetId) return;
-    const list = app.get().rules;
-    const from = list.findIndex((r) => r.id === id);
-    let to = list.findIndex((r) => r.id === targetId) + (d.after ? 1 : 0);
-    if (from < to) to--;
-    move(from, to);
-  };
-
-  return (
-    <div className="st-rules">
-      <div className="st-rules-head">
-        <div className="grow">
-          <div className="st-h">Routing rules</div>
-          <div className="dim">Checked top to bottom when a session opens. First match wins.</div>
-        </div>
-        <button className="btn primary" onClick={add}>
-          + Add rule
-        </button>
-      </div>
-
-      <div className="st-rule-list">
-        {rules.map((r, i) => (
-          <RuleCard
-            key={r.id}
-            rule={r}
-            index={i}
-            count={rules.length}
-            hits={hits[r.id] || 0}
-            spaces={spaces}
-            profiles={profiles}
-            matched={result?.rule.id === r.id}
-            autoFocus={fresh === r.id}
-            armed={arm === r.id}
-            setArm={setArm}
-            drop={drop?.id === r.id ? (drop.after ? 'after' : 'before') : null}
-            onDragOver={(e) => {
-              if (!e.dataTransfer.types.includes(RULE_MIME)) return;
-              e.preventDefault();
-              const b = e.currentTarget.getBoundingClientRect();
-              const after = e.clientY > b.top + b.height / 2;
-              if (drop?.id !== r.id || drop.after !== after) setDrop({ id: r.id, after });
-            }}
-            onDrop={(e) => onDrop(e, r.id)}
-            onDragEnd={() => {
-              setArm(null);
-              setDrop(null);
-            }}
-            onMove={(delta) => move(i, i + delta)}
-          />
-        ))}
-        {!rules.length && <div className="st-empty">No rules yet — new sessions open in the current Space.</div>}
-      </div>
-
-      <div className="st-test">
-        <div className="st-h">Test a rule</div>
-        <div className="row-inline">
-          <input className="field mono grow" value={test} placeholder="ssh deploy@web-01.prod.company.com  or  ~/work/api" spellCheck={false} onChange={(e) => setTest(e.target.value)} />
-          <TestResult result={ctx ? result : undefined} spaces={spaces} />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function TestResult({ result, spaces }) {
-  if (result === undefined) return <span className="st-test-res dim">Type a command or a path</span>;
-  if (!result) return <span className="st-test-res dim">No rule matches — opens in the current Space</span>;
-  const { rule, index } = result;
-  const sp = rule.action.type === 'space' && spaces.find((s) => s.id === rule.action.spaceId);
-  return (
-    <span className="st-test-res">
-      <span className="dim">→</span>
-      {rule.action.type === 'space' ? (
-        <b className="st-space-name" style={{ '--c': sp?.color }}>
-          <SpaceGlyph space={sp} />
-          {sp?.name || 'Missing Space'}
-        </b>
-      ) : (
-        <b>Split {rule.action.edge === 'down' ? 'down' : 'right'} of current</b>
-      )}
-      {EFFECTS.filter(([k]) => rule.effects?.[k]).map(([k]) => (
-        <span key={k} className={`st-eff-tag${k === 'danger' ? ' danger' : ''}`}>
-          {SHORT_EFFECT[k]}
-        </span>
-      ))}
-      <span className="dim">rule {index + 1}</span>
-    </span>
-  );
-}
-
-function RuleCard({ rule: r, index, count, hits, spaces, profiles, matched, autoFocus, armed, setArm, drop, onDragOver, onDrop, onDragEnd, onMove }) {
-  const [showFx, setShowFx] = useState(false);
-  const fx = r.effects || {};
-  const anyFx = EFFECTS.some(([k]) => fx[k]);
-  const actionValue = r.action?.type === 'split' ? `split:${r.action.edge === 'down' ? 'down' : 'right'}` : `space:${r.action?.spaceId || ''}`;
-  const sp = r.action?.type === 'space' && spaces.find((s) => s.id === r.action.spaceId);
-  const actionOpts = [
-    ...spaces.map((s) => [`space:${s.id}`, `${s.glyph} ${s.name}`]),
-    ...(r.action?.type === 'space' && !sp ? [[actionValue, 'Missing Space']] : []),
-    ['split:right', 'Split right of current'],
-    ['split:down', 'Split down of current'],
-  ];
-  const profOpts = [['', 'Space default'], ...profiles.map((p) => [p.id, p.name || 'Untitled'])];
-  if (r.profileId && !profiles.some((p) => p.id === r.profileId)) profOpts.push([r.profileId, 'Missing profile']);
-
-  const cls = ['st-rule', !r.enabled && 'off', fx.danger && 'danger', matched && 'hit', drop && `drop-${drop}`].filter(Boolean).join(' ');
-  return (
-    <div
-      className={cls}
-      draggable={armed}
-      onDragStart={(e) => {
-        e.dataTransfer.setData(RULE_MIME, r.id);
-        e.dataTransfer.effectAllowed = 'move';
-      }}
-      onDragEnd={onDragEnd}
-      onDragOver={onDragOver}
-      onDrop={onDrop}
-    >
-      <div className="st-rule-line">
-        <button
-          className="st-handle"
-          title="Drag to reorder (↑/↓ to move)"
-          onMouseDown={() => setArm(r.id)}
-          onMouseUp={() => setArm(null)}
-          onKeyDown={(e) => {
-            if (e.key === 'ArrowUp' && index > 0) onMove(-1);
-            else if (e.key === 'ArrowDown' && index < count - 1) onMove(1);
-            else return;
-            e.preventDefault();
-          }}
-        >
-          ⋮⋮
-        </button>
-        <span className="st-w">When</span>
-        <Select className="st-tok" value={r.trigger?.type || 'dir'} options={TRIGGERS} onChange={(type) => mutRule(r.id, (x) => ({ trigger: { ...x.trigger, type } }))} />
-        <DraftInput className="field mono st-pat" value={r.trigger?.pattern || ''} placeholder={PLACEHOLDER[r.trigger?.type] || ''} spellCheck={false} autoFocus={autoFocus} onCommit={(pattern) => mutRule(r.id, (x) => ({ trigger: { ...x.trigger, pattern } }))} />
-        <span className="st-w">→ {r.action?.type === 'space' ? 'put it in' : ''}</span>
-        {sp && <i className="st-sp-dot" style={{ '--c': sp.color }} />}
-        <Select
-          className="st-tok"
-          value={actionValue}
-          options={actionOpts}
-          onChange={(v) => {
-            const [type, arg] = v.split(':');
-            mutRule(r.id, () => ({ action: type === 'split' ? { type, edge: arg } : { type, spaceId: arg } }));
-          }}
-        />
-        <span className="st-w">with profile</span>
-        <Select className="st-tok" value={r.profileId || ''} options={profOpts} onChange={(v) => mutRule(r.id, () => ({ profileId: v || null }))} />
-        <span className="grow" />
-        <span className="st-hits">{r.enabled ? `${hits} ${hits === 1 ? 'match' : 'matches'}` : 'Off'}</span>
-        <Switch on={r.enabled} onChange={(enabled) => mutRule(r.id, () => ({ enabled }))} />
-        <button
-          className="st-x st-rule-del"
-          title="Delete rule"
-          onClick={async () => {
-            if (r.trigger?.pattern && api?.sys?.confirm && !(await api.sys.confirm({ message: `Delete the rule for “${r.trigger.pattern}”?`, detail: 'New sessions that match it will open with the defaults.', ok: 'Delete' }))) return;
-            A.setRules(app.get().rules.filter((x) => x.id !== r.id));
-          }}
-        >
-          ✕
-        </button>
-      </div>
-      <div className="st-rule-line st-fx">
-        {anyFx || showFx ? (
-          <>
-            <span className="st-w">and</span>
-            {EFFECTS.map(([k, label]) => (
-              <button key={k} className={`st-eff${fx[k] ? ' on' : ''}${k === 'danger' ? ' danger' : ''}`} onClick={() => mutRule(r.id, (x) => ({ effects: { ...x.effects, [k]: !x.effects?.[k] } }))}>
-                {k === 'danger' && <i className="st-eff-box" />}
-                {label}
-              </button>
-            ))}
-          </>
-        ) : (
-          <button className="st-link" onClick={() => setShowFx(true)}>
-            + effect
-          </button>
-        )}
-      </div>
     </div>
   );
 }

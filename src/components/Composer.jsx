@@ -363,9 +363,6 @@ function Welcome({ k }) {
           <kbd>⇥</kbd> complete commands, paths and branches
         </li>
         <li>
-          <kbd>{k('toggleReview')}</kbd> open code review
-        </li>
-        <li>
           <kbd>{k('splitRight')}</kbd> split the pane
         </li>
       </ul>

@@ -77,6 +77,12 @@ describe('parseSettingsFile', () => {
     assert.equal(r.settings.keybindings.commandBar, 'Cmd+K');
   });
 
+  test('drops shortcuts of removed features without a warning', () => {
+    const r = parseSettingsFile('{ "keybindings": { "toggleReview": "Shift+Cmd+G", "notes": "Shift+Cmd+N" } }', DEFAULTS);
+    assert.deepEqual(r.warnings, []);
+    assert.equal('toggleReview' in r.settings.keybindings, false);
+  });
+
   test('a syntax error returns only the error', () => {
     const r = parseSettingsFile('{ "appearance": ', DEFAULTS);
     assert.ok(r.error);

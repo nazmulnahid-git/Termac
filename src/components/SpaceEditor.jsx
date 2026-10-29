@@ -1,4 +1,4 @@
-import '../styles/spaces-notes.css';
+import '../styles/spaces.css';
 import { useEffect, useRef, useState } from 'react';
 import { app, ui, newSpace } from '../state/model.js';
 import * as A from '../state/actions.js';

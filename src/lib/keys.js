@@ -3,7 +3,6 @@
 
 export const ACTIONS = [
   { id: 'commandBar', label: 'Command bar', def: 'Cmd+T' },
-  { id: 'findTab', label: 'Find session in sidebar', def: 'Cmd+J' },
   { id: 'newTerminal', label: 'New terminal in current directory', def: 'Cmd+N' },
   { id: 'quickTerminal', label: 'Quick Terminal (global)', def: 'Alt+Space', global: true },
   { id: 'toggleSidebar', label: 'Show / hide sidebar', def: 'Cmd+S' },
@@ -16,10 +15,6 @@ export const ACTIONS = [
   { id: 'nextSpace', label: 'Next Space', def: 'Ctrl+Right' },
   { id: 'overview', label: 'All Spaces overview', def: 'Ctrl+Up' },
   { id: 'library', label: 'Library', def: 'Cmd+Y' },
-  { id: 'notes', label: 'Notes panel', def: 'Shift+Cmd+N' },
-  { id: 'toggleFiles', label: 'Project explorer', def: 'Shift+Cmd+E' },
-  { id: 'quickOpen', label: 'Find file in project', def: 'Cmd+P' },
-  { id: 'toggleReview', label: 'Code review panel', def: 'Shift+Cmd+G' },
   { id: 'settings', label: 'Settings', def: 'Cmd+,' },
   { id: 'prevTab', label: 'Previous session', def: 'Shift+Cmd+[' },
   { id: 'nextTab', label: 'Next session', def: 'Shift+Cmd+]' },

@@ -3,7 +3,6 @@
 mod library;
 mod macos;
 mod pty;
-mod review;
 mod shell;
 mod store;
 mod system;
@@ -331,67 +330,6 @@ async fn sys_list_dirs(dir: String) -> Vec<String> {
 }
 
 #[tauri::command]
-async fn sys_git_root(cwd: Option<String>) -> Option<String> {
-    system::git_root(&cwd.unwrap_or_default()).await
-}
-
-#[tauri::command]
-async fn sys_list_dir(dir: String) -> Value {
-    system::list_dir(&dir)
-}
-
-#[tauri::command]
-async fn sys_read_file(file: String) -> Value {
-    system::read_file(&file)
-}
-
-// The editor's save. Written in place, not swapped in, so the file keeps its permissions
-// (an executable script stays executable), owner and any links pointing at it.
-#[tauri::command]
-async fn sys_write_file(file: String, text: String) -> Value {
-    match tokio::fs::write(&file, text.as_bytes()).await {
-        Ok(()) => json!({ "ok": true, "size": text.len() }),
-        Err(e) => json!({ "ok": false, "error": e.to_string() }),
-    }
-}
-
-#[tauri::command]
-async fn sys_project_files(root: String) -> Vec<String> {
-    system::project_files(&root).await
-}
-
-#[tauri::command]
-async fn sys_git_changes(cwd: Option<String>) -> Value {
-    system::git_changes(&cwd.unwrap_or_default()).await
-}
-
-#[derive(Deserialize, Default)]
-struct DiffOpts {
-    #[serde(default)]
-    staged: bool,
-    #[serde(default)]
-    untracked: bool,
-    // Lines of context around each change (git's -U); the panel widens it on request.
-    context: Option<u32>,
-}
-
-#[tauri::command]
-async fn sys_git_diff(root: String, file: String, opts: Option<DiffOpts>) -> Option<String> {
-    let o = opts.unwrap_or_default();
-    system::git_diff(&root, &file, o.staged, o.untracked, o.context.unwrap_or(3)).await
-}
-
-#[tauri::command]
-async fn sys_git_stage(root: String, file: String, stage: bool) -> bool {
-    system::git_stage(&root, &file, stage).await
-}
-
-#[tauri::command]
-async fn sys_git_discard(root: String, file: String, untracked: bool) -> bool {
-    system::git_discard(&root, &file, untracked).await
-}
-
-#[tauri::command]
 async fn sys_detect_imports() -> Value {
     system::detect_imports().await
 }
@@ -505,37 +443,6 @@ async fn shell_complete(cwd: Option<String>, line: String) -> Value {
     shell::complete(&cwd, &line).await
 }
 
-// ---- Code review ---------------------------------------------------------------------------
-#[tauri::command]
-async fn review_overview(root: String) -> Value {
-    review::overview(&root).await
-}
-
-#[tauri::command]
-async fn review_log(root: String, limit: Option<u32>) -> Value {
-    review::log(&root, limit.unwrap_or(80)).await
-}
-
-#[tauri::command]
-async fn review_show(root: String, sha: String) -> Value {
-    review::show(&root, &sha).await
-}
-
-#[tauri::command]
-async fn review_remote_branches(root: String) -> Vec<String> {
-    review::remote_branches(&root).await
-}
-
-#[tauri::command]
-async fn review_pr(root: String) -> Value {
-    review::pr(&root).await
-}
-
-#[tauri::command]
-async fn review_op(root: String, op: review::GitOp) -> Value {
-    review::op(&root, op).await
-}
-
 // navigator.clipboard needs a fresh user gesture in WebKit; copies after an awaited menu
 // would be refused, so they come through here.
 #[tauri::command]
@@ -633,7 +540,6 @@ fn build_app_menu(app: &AppHandle, bindings: &HashMap<String, String>) -> tauri:
         &[
             &item("New Terminal", "newTerminal")?,
             &item("Command Bar", "commandBar")?,
-            &item("Find Session…", "findTab")?,
             &sep()?,
             &item("Split Right", "splitRight")?,
             &item("Split Down", "splitDown")?,
@@ -666,10 +572,6 @@ fn build_app_menu(app: &AppHandle, bindings: &HashMap<String, String>) -> tauri:
             &item("Toggle Sidebar", "toggleSidebar")?,
             &item("Focus Mode", "focusMode")?,
             &item("Library", "library")?,
-            &item("Notes", "notes")?,
-            &item("Project Explorer", "toggleFiles")?,
-            &item("Find File…", "quickOpen")?,
-            &item("Code Review", "toggleReview")?,
             &item("All Spaces", "overview")?,
             &sep()?,
             &item("Bigger", "zoomIn")?,
@@ -1183,15 +1085,6 @@ pub fn run() {
             sys_git_branches,
             sys_git_pr,
             sys_list_dirs,
-            sys_git_root,
-            sys_list_dir,
-            sys_read_file,
-            sys_project_files,
-            sys_write_file,
-            sys_git_changes,
-            sys_git_diff,
-            sys_git_stage,
-            sys_git_discard,
             sys_detect_imports,
             sys_is_dir,
             sys_choose_dir,
@@ -1204,12 +1097,6 @@ pub fn run() {
             sys_copy,
             shell_history,
             shell_complete,
-            review_overview,
-            review_log,
-            review_show,
-            review_remote_branches,
-            review_pr,
-            review_op,
             menu_popup,
             app_set_menu,
             app_set_hotkey,

@@ -66,7 +66,7 @@ window.addEventListener('blur', setInactive);
 
 // Menu items show their shortcuts, but keys belong to the page (App.jsx). WebKit hands a
 // key the page left alone to the menu, so swallow menu shortcuts the page didn't handle.
-const MENU_ACTIONS = ['settings', 'newTerminal', 'commandBar', 'findTab', 'splitRight', 'splitDown', 'closePane', 'copyLastOutput', 'clear', 'find', 'toggleSidebar', 'focusMode', 'library', 'notes', 'toggleFiles', 'quickOpen', 'toggleReview', 'overview', 'zoomIn', 'zoomOut', 'zoomReset', 'nextSpace', 'prevSpace', 'newSpace'];
+const MENU_ACTIONS = ['settings', 'newTerminal', 'commandBar', 'splitRight', 'splitDown', 'closePane', 'copyLastOutput', 'clear', 'find', 'toggleSidebar', 'focusMode', 'library', 'overview', 'zoomIn', 'zoomOut', 'zoomReset', 'nextSpace', 'prevSpace', 'newSpace'];
 let menuAccels = new Set();
 window.addEventListener('keydown', (e) => {
   if (e.defaultPrevented || !menuAccels.size) return;
@@ -145,15 +145,6 @@ window.termac = {
     gitBranches: (cwd) => call('sys_git_branches', { cwd }),
     gitPr: (cwd, branch) => call('sys_git_pr', { cwd, branch }),
     listDirs: (dir) => call('sys_list_dirs', { dir }),
-    gitRoot: (cwd) => call('sys_git_root', { cwd }),
-    listDir: (dir) => call('sys_list_dir', { dir }),
-    readFile: (file) => call('sys_read_file', { file }),
-    writeFile: (file, text) => call('sys_write_file', { file, text }),
-    projectFiles: (root) => call('sys_project_files', { root }),
-    gitChanges: (cwd) => call('sys_git_changes', { cwd }),
-    gitDiff: (root, file, opts) => call('sys_git_diff', { root, file, opts }),
-    gitStage: (root, file, stage) => call('sys_git_stage', { root, file, stage: !!stage }),
-    gitDiscard: (root, file, untracked) => call('sys_git_discard', { root, file, untracked: !!untracked }),
     detectImports: () => call('sys_detect_imports'),
     isDir: (p) => call('sys_is_dir', { p }),
     chooseDir: (defaultPath) => call('sys_choose_dir', { defaultPath }),
@@ -167,15 +158,6 @@ window.termac = {
   shell: {
     history: () => call('shell_history'),
     complete: (cwd, line) => call('shell_complete', { cwd, line }),
-  },
-  review: {
-    overview: (root) => call('review_overview', { root }),
-    log: (root, limit) => call('review_log', { root, limit }),
-    show: (root, sha) => call('review_show', { root, sha }),
-    remoteBranches: (root) => call('review_remote_branches', { root }),
-    pr: (root) => call('review_pr', { root }),
-    // op: { op: 'commit' | 'push' | 'pull' | 'fetch' | 'apply' | 'stageAll' | 'discardAll' | 'switch' | 'undoCommit' | 'prCreate' | 'prComment' | 'prReady' | 'prMerge', ... }
-    run: (root, op) => call('review_op', { root, op }),
   },
   app: {
     popupMenu: (items) => call('menu_popup', { items }),

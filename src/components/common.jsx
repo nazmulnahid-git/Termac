@@ -24,7 +24,7 @@ export function useTabView(tid) {
   const status = bell ? 'bell' : fail ? 'fail' : pick('run') ? 'run' : pick('ok') ? 'ok' : 'idle';
   const active = panes.find((p) => p.sid === tab.activeSid) || panes[0];
   const name = tab.name || (panes.length > 1 ? panes.map((p) => p.name).join(' · ') : active?.name || '~');
-  const danger = !!tab.effects?.danger || panes.some((p) => p.rt.sshEffects?.danger);
+  const danger = !!tab.effects?.danger;
   const dead = panes.length === 1 && active?.rt.alive === false;
   return { tab, panes, active, name, status, bell, fail, danger, dead };
 }

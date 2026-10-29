@@ -8,15 +8,11 @@ import Card, { resolveConfirm } from './components/Card.jsx';
 import Peek from './components/Peek.jsx';
 import CommandBar from './components/CommandBar.jsx';
 import Library from './components/Library.jsx';
-import Notes from './components/Notes.jsx';
 import Settings from './components/Settings.jsx';
 import SpaceEditor from './components/SpaceEditor.jsx';
 import Overview from './components/Overview.jsx';
 import Onboarding from './components/Onboarding.jsx';
 import TopBar from './components/TopBar.jsx';
-import ToolsPanel from './components/ToolsPanel.jsx';
-import ReviewPanel from './components/ReviewPanel.jsx';
-import FileViewer from './components/FileViewer.jsx';
 import StatusBar from './components/StatusBar.jsx';
 import TabStyle from './components/TabStyle.jsx';
 
@@ -30,10 +26,6 @@ export function runAction(action) {
   switch (action) {
     case 'commandBar':
       return toggleOverlay('commandBar');
-    case 'findTab':
-      // The filter lives in the expanded sidebar, so bring that out first.
-      if (app.get().settings.sidebarMode !== 'expanded') A.setSidebarMode('expanded');
-      return setUi((u) => ({ view: 'terminal', tabFind: (u.tabFind || 0) + 1 }));
     case 'newTerminal':
       return A.openTerminal();
     case 'toggleSidebar':
@@ -56,14 +48,6 @@ export function runAction(action) {
       return toggleOverlay('overview');
     case 'library':
       return setUi((u) => ({ view: u.view === 'library' ? 'terminal' : 'library', overlay: null }));
-    case 'notes':
-      return setUi((u) => ({ notesOpen: !u.notesOpen }));
-    case 'toggleFiles':
-      return A.togglePanel('files');
-    case 'quickOpen':
-      return setUi((u) => ({ tools: 'search', searchFocus: (u.searchFocus || 0) + 1 }));
-    case 'toggleReview':
-      return A.toggleReview();
     case 'settings':
       return A.toggleSettings();
     case 'newSpace':
@@ -99,11 +83,8 @@ export function runAction(action) {
   }
 }
 
-// Keys the code editor (Editor.jsx) keeps for itself: save, find and replace, next match.
-const EDITOR_KEYS = new Set(['Cmd+S', 'Cmd+F', 'Alt+Cmd+F', 'Cmd+D', 'Cmd+G', 'Cmd+/', 'Cmd+[', 'Cmd+]']);
-
 // Actions that still work while typing in a text field (not the terminal).
-const FROM_INPUTS = new Set(['commandBar', 'findTab', 'newTerminal', 'settings', 'library', 'notes', 'toggleSidebar', 'focusMode', 'prevSpace', 'nextSpace', 'overview', 'newSpace', 'toggleFiles', 'quickOpen', 'toggleReview']);
+const FROM_INPUTS = new Set(['commandBar', 'newTerminal', 'settings', 'library', 'toggleSidebar', 'focusMode', 'prevSpace', 'nextSpace', 'overview', 'newSpace']);
 
 function onKeyDown(e) {
   const u = ui.get();
@@ -121,9 +102,7 @@ function onKeyDown(e) {
   if (!raw) return;
   const accel = normalizeAccel(raw);
   const inTerminal = !!e.target.closest?.('.xterm, .composer');
-  const inEditor = !!e.target.closest?.('.cm-editor');
-  const inInput = inEditor || (!inTerminal && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName));
-  if (inEditor && EDITOR_KEYS.has(accel)) return;
+  const inInput = !inTerminal && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName);
 
   if (e.defaultPrevented || u.capturingKeys) return;
   if (u.overlay) {
@@ -138,13 +117,6 @@ function onKeyDown(e) {
   }
   if (e.key === 'Escape' && u.peek) {
     setUi({ peek: null });
-    return;
-  }
-  // The file viewer covers the terminal, so Esc closes it unless you're typing in a field.
-  if (e.key === 'Escape' && u.viewer && !inInput) {
-    e.preventDefault();
-    e.stopPropagation();
-    A.closeFile();
     return;
   }
 
@@ -181,11 +153,9 @@ export default function App() {
   const side = useSlide(mode === 'expanded');
   const edgeReveal = app.use((s) => s.settings.gestures.edgeReveal);
   const onboarded = app.use((s) => s.onboarded);
-  const spaceId = app.use((s) => s.activeSpaceId);
   const view = ui.use((s) => s.view);
   const overlay = ui.use((s) => s.overlay);
   const overlayArg = ui.use((s) => s.overlayArg);
-  const notesOpen = ui.use((s) => s.notesOpen);
   const toast = ui.use((s) => s.toast);
   const [reveal, setReveal] = useState(false);
   const pinch = useRef(0);
@@ -260,13 +230,7 @@ export default function App() {
         <div className="app-body">
           {mode === 'compact' && <Sidebar />}
           <main className="main">
-            <ToolsPanel />
-            <div className="stage">
-              {view === 'library' ? <Library /> : view === 'settings' ? <Settings /> : <Card />}
-              {view === 'terminal' && <FileViewer />}
-            </div>
-            {notesOpen && <Notes key={spaceId} spaceId={spaceId} onClose={() => setUi({ notesOpen: false })} />}
-            <ReviewPanel />
+            <div className="stage">{view === 'library' ? <Library /> : view === 'settings' ? <Settings /> : <Card />}</div>
           </main>
         </div>
         <StatusBar />

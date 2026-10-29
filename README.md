@@ -11,16 +11,13 @@ A macOS terminal where every session lives in a vertical sidebar, grouped into c
   - Today: temporary sessions.
   - Icon & Color… (right-click a row) gives a session its own icon and a tinted row.
   - Live status on every row: running, idle, ✓ done, ✗ failed (hover for the exit code, click to jump to the error), and a bell badge.
-- **Status line.** A tmux-style bar along the bottom lists Spaces as `1:work*` (`*` current, `#` unseen finished jobs; drop a session on one to move it there), plus finished jobs, the Library, the focused session's process and size, and a clock. The title bar shows the focused session's directory and process; click it for the command bar.
+- **Status line.** The bar along the bottom lists the Spaces (a dot marks unseen finished jobs; drop a session on one to move it there). The title bar shows the focused session's directory and process; click it for the command bar.
 - **Command bar (⌘T).** One fuzzy search over open sessions, recent directories, SSH hosts (`~/.ssh/config`), snippets and actions. Prefixes: `>` runs a command, `@` searches hosts, `/` searches snippets. ⇥ cycles filters.
 - **Splits.** ⌘D / ⇧⌘D, up to four panes per card. You can also drag a sidebar row onto a card edge. Dividers snap to ⅓, ½ and ⅔. Drag a pane header back to the sidebar to unsplit it.
 - **Peek.** Hover a row for 400 ms to see its last lines streaming live. ⇧-click keeps the peek open.
 - **Auto-archive and Library (⌘Y).** Idle Today sessions move to the Library after 12 h (configurable, with Undo). Library search covers names, commands, output and paths. Restore brings back the scrollback.
-- **Routing rules.** Rules decide where new sessions land, by directory glob, SSH host or command prefix. They can also add effects: a red danger frame, confirmation for multi-line pastes, or no auto-archive. On danger sessions, `sudo`, restarts and `rm -rf` ask before running.
-- **Notes (⇧⌘N).** One Markdown doc per Space. It supports checklists and pasted output that remembers which session it came from. Code blocks can run in the current session or be saved as `/snippets`.
+- **Danger sessions.** Right-click a row to give it a red danger frame; on those, `sudo`, restarts and `rm -rf` ask before running. The same menu can keep a session from auto-archiving.
 - **Input bar and blocks.** Type commands in Termorc's own input bar: syntax colors, a suggestion from history (→ accepts), ↑/↓ recall, ⌃R search, ⇥ completion for commands, paths and git branches. Each command's output is a block with its time, duration and exit status. Settings → Terminal → Prompt → Shell brings back your shell's own prompt.
-- **Code review (⇧⌘G).** Changes, Commits and Pull request tabs. Diffs with word-level highlights; stage, unstage or discard whole files or single hunks; comment on lines and send the comments to the terminal (for a coding agent) or post them on the PR. Commit (amend, commit & push), switch branches, fetch/pull/push, and open or merge pull requests with the GitHub CLI. Maximize to cover the terminal area.
-- **Editor.** Files open in a code editor (CodeMirror): syntax colors, search and replace, multiple cursors; ⌘S saves.
 - **Finder.** Right-click a folder › Services › **New Termorc Tab Here**, or drop a folder on the Dock icon.
 - **Quick Terminal (⌥Space).** A global drop-down panel. It opens in the frontmost Finder folder. "Move to Space" promotes it to a sidebar row with its scrollback intact.
 - **Extras:**
@@ -56,7 +53,7 @@ Needs Node and Rust (`curl https://sh.rustup.rs -sSf | sh`).
 ```bash
 npm install
 npm run dev     # Vite + Tauri with hot reload
-npm test        # unit tests for routing, layout, fuzzy, keys, markdown
+npm test        # unit tests for paths, layout, fuzzy, keys, settings
 cargo test --manifest-path src-tauri/Cargo.toml --lib   # PTY, git and Library tests
 npm run dist    # release build: Termorc.app and a styled .dmg in src-tauri/target.noindex/release/bundle
                 # (the .dmg step needs dmgbuild: pip3 install dmgbuild)

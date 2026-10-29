@@ -1,4 +1,4 @@
-import '../styles/spaces-notes.css';
+import '../styles/spaces.css';
 import { useEffect, useRef, useState } from 'react';
 import { app, rt, ui } from '../state/model.js';
 import { arrayEq } from '../state/store.js';

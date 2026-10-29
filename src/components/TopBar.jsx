@@ -9,16 +9,13 @@ import * as L from '../lib/layout.js';
 import { formatAccel } from '../lib/keys.js';
 import { tildify } from '../lib/routing.js';
 import { procLabel } from '../lib/meta.js';
-import { IconSidebar, IconFiles, IconGrid, IconReview, IconGear, IconSearch } from './icons.jsx';
+import { IconSidebar, IconGrid, IconGear, IconSearch } from './icons.jsx';
 import { openSettings } from './Sidebar.jsx';
 
 export default function TopBar({ lights }) {
   const bindings = app.use((s) => s.settings.keybindings);
-  const tools = ui.use((s) => s.tools);
-  const review = ui.use((s) => s.review);
   const overlay = ui.use((s) => s.overlay);
   const sid = ui.use((s) => s.focusedSid);
-  const changes = rt.use((s) => s[sid]?.changes);
   const r = rt.use((s) => s[sid]);
   const home = ui.use((s) => s.home);
   const space = app.use((s) => A.activeSpace(s));
@@ -49,18 +46,9 @@ export default function TopBar({ lights }) {
         <kbd>{formatAccel(bindings.commandBar)}</kbd>
       </button>
       <div className="tb-group right">
-        <div className="tb-capsule">
-          <button className={`tb-btn${tools ? ' on' : ''}`} title={`Project explorer${k('toggleFiles')}`} onClick={() => A.togglePanel(tools && tools !== 'files' ? tools : 'files')}>
-            <IconFiles />
-          </button>
-          <button className={`tb-btn${overlay === 'overview' ? ' on' : ''}`} title="All Spaces" onClick={() => ui.set((u) => ({ ...u, overlay: u.overlay === 'overview' ? null : 'overview' }))}>
-            <IconGrid />
-          </button>
-          <button className={`tb-btn${review ? ' on' : ''}`} title={`Code review${k('toggleReview')}`} onClick={A.toggleReview}>
-            <IconReview />
-            {changes > 0 && <span className="tb-count">{changes > 99 ? '99+' : changes}</span>}
-          </button>
-        </div>
+        <button className={`tb-btn round${overlay === 'overview' ? ' on' : ''}`} title={`All Spaces${k('overview')}`} onClick={() => ui.set((u) => ({ ...u, overlay: u.overlay === 'overview' ? null : 'overview' }))}>
+          <IconGrid />
+        </button>
         <button className="tb-btn round" title="Settings" onClick={openSettings}>
           <IconGear />
         </button>

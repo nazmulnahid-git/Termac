@@ -1,13 +1,10 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { app, rt, ui, DEFAULT_SETTINGS } from '../state/model.js';
 import * as A from '../state/actions.js';
 import { useTabView, StatusMark, Chip, FailTip, SpaceGlyph } from './common.jsx';
 import { formatAccel } from '../lib/keys.js';
-import { shortName, sessionName, formatDuration } from '../lib/meta.js';
-import { tildify } from '../lib/routing.js';
-import { highlight } from '../lib/fuzzy.js';
-import { findTabs } from '../lib/tabfind.js';
-import { IconFolder, IconFolderOpen, IconFolderPlus, IconChevron, IconPlus, IconMore, IconSearch, IconClose, IconSidebar, IconGear } from './icons.jsx';
+import { shortName, formatDuration } from '../lib/meta.js';
+import { IconFolder, IconFolderOpen, IconFolderPlus, IconChevron, IconPlus, IconMore, IconSidebar, IconGear } from './icons.jsx';
 import Rail from './SidebarRail.jsx';
 import { TabIcon } from './tabicons.jsx';
 import { SpaceTrack, useSpaceMotion } from './space-motion.jsx';
@@ -20,7 +17,6 @@ const RAIL_WIDTH = 56;
 const HIDE_SLOP = 8; // px past the right edge before a revealed sidebar starts to hide
 const HIDE_DELAY = 150;
 const isPaneDrag = (e) => e.dataTransfer.types.includes(PANE_MIME);
-let findTickSeen = 0; // last ⌘J press the filter answered, so a remount doesn't steal focus
 
 // `phase` is 'opening' or 'closing' while App slides the sidebar in or out.
 export default function Sidebar({ floating, onLeave, phase }) {
@@ -86,14 +82,23 @@ export default function Sidebar({ floating, onLeave, phase }) {
 }
 
 // The panel's title strip: the window's traffic lights sit in its left inset, the toggle
-// right after them, as in a native sidebar. It drags the window like a title bar.
+// right after them, as in a native sidebar. It drags the window like a title bar. With no
+// Favorites yet there is no strip of tiles to drop on, so while a session is dragged the
+// rest of this strip becomes the target for the first one.
 function SidebarHead() {
   const accel = app.use((s) => s.settings.keybindings.toggleSidebar);
+  const favDrop = app.use((s) => !s.favorites.length) && ui.use((s) => s.dragging?.kind === 'tab');
+  const hot = ui.use((s) => s.dragging?.target?.section === 'fav');
   return (
     <div className="sb-head">
       <button className="tb-btn" title={`Hide sidebar${accel ? `  ${formatAccel(accel)}` : ''}`} onClick={A.toggleSidebar}>
         <IconSidebar size={17} />
       </button>
+      {favDrop && (
+        <div className={`fav-drop${hot ? ' drop-into' : ''}`} data-drop-into={destAttr('fav')}>
+          Add to Favorites
+        </div>
+      )}
     </div>
   );
 }
@@ -124,21 +129,6 @@ function Expanded() {
   const favorites = app.use((s) => s.favorites);
   const bindings = app.use((s) => s.settings.keybindings);
   const [paneOver, setPaneOver] = useState(false);
-  const [find, setFind] = useState({ query: '', sel: 0 });
-  const hits = useTabHits(find.query);
-  const finding = !!find.query.trim();
-  const sel = Math.min(find.sel, Math.max(0, hits.length - 1)); // sessions can close mid-search
-  const setQuery = (query) => setFind({ query, sel: 0 });
-  const setSel = (sel) => setFind((f) => ({ ...f, sel }));
-  const open = (hit) => {
-    setQuery('');
-    A.activateTab(hit.tid);
-  };
-  const everywhere = () => {
-    const q = find.query.trim();
-    setQuery('');
-    ui.set((u) => ({ ...u, overlay: 'commandBar', overlayArg: q }));
-  };
 
   // Panes dragged out of a split (HTML5 drag from the card header) land in Today.
   const dropPane = (e) => {
@@ -160,19 +150,10 @@ function Expanded() {
       onDrop={dropPane}
       onDragLeave={(e) => !e.currentTarget.contains(e.relatedTarget) && setPaneOver(false)}
     >
-      <div className="sb-top">
-        <TabFind query={find.query} onQuery={setQuery} hits={hits} sel={sel} onSel={setSel} onOpen={open} onEverywhere={everywhere} accel={bindings.findTab} noFavorites={!favorites.length} />
-      </div>
       <div className="sb-scroll">
-        {finding ? (
-          <FindResults query={find.query} hits={hits} sel={sel} onSel={setSel} onOpen={open} onEverywhere={everywhere} accel={bindings.commandBar} />
-        ) : (
-          <>
-            <Favorites ids={favorites} />
-            <SettingsRow />
-            <SpaceTrack render={(space) => <SpaceBody space={space} bindings={bindings} />} />
-          </>
-        )}
+        <Favorites ids={favorites} />
+        <SettingsRow />
+        <SpaceTrack render={(space) => <SpaceBody space={space} bindings={bindings} />} />
       </div>
       <SidebarCards />
     </div>
@@ -229,169 +210,6 @@ function SpaceBody({ space, bindings }) {
       <div className="sb-fill" data-drop-into={todayEnd} />
     </>
   );
-}
-
-// ---- Find ----------------------------------------------------------------------------
-// Inline session filter: it narrows the sidebar in place rather than opening the command
-// bar (the top bar's search covers files, folders and actions). While a session is being
-// dragged it doubles as the drop target for Favorites.
-function TabFind({ query, onQuery, hits, sel, onSel, onOpen, onEverywhere, accel, noFavorites }) {
-  const ref = useRef(null);
-  const tick = ui.use((s) => s.tabFind);
-  const dragTab = ui.use((s) => s.dragging?.kind === 'tab');
-  const hot = ui.use((s) => s.dragging?.target?.section === 'fav');
-
-  useEffect(() => {
-    if (tick === findTickSeen) return;
-    findTickSeen = tick;
-    ref.current?.focus();
-    ref.current?.select();
-  }, [tick]);
-
-  const backToTerminal = () => {
-    ref.current?.blur();
-    const sid = A.focusedSid();
-    if (sid) A.focusSession(sid);
-  };
-  const onKeyDown = (e) => {
-    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-      e.preventDefault();
-      if (hits.length) onSel((sel + (e.key === 'ArrowDown' ? 1 : -1) + hits.length) % hits.length);
-    } else if (e.key === 'Enter') {
-      e.preventDefault();
-      if (hits[sel]) onOpen(hits[sel]);
-      else if (query.trim()) onEverywhere();
-    } else if (e.key === 'Escape') {
-      e.preventDefault();
-      if (query) onQuery('');
-      else backToTerminal();
-    }
-  };
-
-  return (
-    <label className={`tab-find${query ? ' has-query' : ''}${dragTab ? ' drop-fav' : ''}${hot ? ' drop-into' : ''}`} data-drop-into={dragTab ? destAttr('fav') : undefined}>
-      <IconSearch size={14} className="lead" />
-      {dragTab && noFavorites ? (
-        <span className="hint">Drop here to add to Favorites</span>
-      ) : (
-        <input ref={ref} value={query} placeholder="Search sessions" spellCheck={false} onChange={(e) => onQuery(e.target.value)} onKeyDown={onKeyDown} />
-      )}
-      {query ? (
-        <button
-          className="clear"
-          title="Clear"
-          onMouseDown={(e) => e.preventDefault()}
-          onClick={() => {
-            onQuery('');
-            ref.current?.focus();
-          }}
-        >
-          <IconClose size={11} />
-        </button>
-      ) : (
-        accel && !dragTab && <kbd>{formatAccel(accel)}</kbd>
-      )}
-    </label>
-  );
-}
-
-// Every session in every Space (Favorites first), ranked against the query. Subscribes to
-// the stores only while there is a query, so an idle filter costs nothing.
-function useTabHits(query) {
-  const live = !!query.trim();
-  const s = app.use((st) => (live ? st : null));
-  const r = rt.use((st) => (live ? st : null));
-  const home = ui.use((u) => u.home);
-  return useMemo(() => {
-    if (!s) return [];
-    const items = [];
-    const add = (tid, spaceId) => {
-      const tab = s.tabs[tid];
-      if (!tab) return;
-      const sids = collectSids(tab.layout);
-      const name = tab.name || sids.map((sid) => sessionName(null, r[sid], home)).join(' · ') || '~';
-      const lead = tab.activeSid && sids.includes(tab.activeSid) ? tab.activeSid : sids[0];
-      items.push({ tid, name, path: tildify(r[lead]?.cwd || s.sessions[lead]?.cwd, home) || '', spaceId });
-    };
-    for (const tid of s.favorites) add(tid, null);
-    for (const sp of s.spaces) for (const tid of A.tabsOfSpace(sp)) add(tid, sp.id);
-    return findTabs(query, items, s.activeSpaceId);
-  }, [s, r, home, query]);
-}
-
-function FindResults({ query, hits, sel, onSel, onOpen, onEverywhere, accel }) {
-  const ref = useRef(null);
-  useEffect(() => {
-    ref.current?.querySelector('.find-row.sel')?.scrollIntoView({ block: 'nearest' });
-  }, [sel]);
-
-  if (!hits.length) {
-    return (
-      <div className="find-empty">
-        <div className="t">No sessions match “{query.trim()}”</div>
-        <button className="find-more" onClick={onEverywhere}>
-          <IconSearch size={12} />
-          <span>Search files, folders & actions</span>
-          <kbd>↵</kbd>
-        </button>
-        {accel && <div className="dim">Command bar · {formatAccel(accel)}</div>}
-      </div>
-    );
-  }
-  return (
-    <div className="find-results" ref={ref}>
-      <div className="today-head">
-        {hits.length === 1 ? '1 session' : `${hits.length} sessions`}
-        <span className="rule" />
-      </div>
-      <div className="rows">
-        {hits.map((h, i) => (
-          <FindRow key={h.tid} hit={h} sel={i === sel} onHover={() => onSel(i)} onOpen={() => onOpen(h)} />
-        ))}
-      </div>
-      <div className="find-keys">
-        <span>
-          <kbd>↑</kbd>
-          <kbd>↓</kbd> move
-        </span>
-        <span>
-          <kbd>↵</kbd> open
-        </span>
-        <span>
-          <kbd>esc</kbd> clear
-        </span>
-      </div>
-    </div>
-  );
-}
-
-function FindRow({ hit, sel, onHover, onOpen }) {
-  const v = useTabView(hit.tid);
-  const on = app.use((s) => A.activeTabId(s) === hit.tid);
-  // Sessions parked in another Space say where they live.
-  const elsewhere = app.use((s) => (hit.spaceId && hit.spaceId !== s.activeSpaceId ? s.spaces.find((x) => x.id === hit.spaceId) : null));
-  if (!v) return null;
-  const byPath = hit.on === 'path';
-  return (
-    <div className={`row find-row${on ? ' on' : ''}${sel ? ' sel' : ''}${v.dead ? ' dead' : ''}${v.tab.color ? ' tinted' : ''}`} style={(v.tab.color ? { '--tc': v.tab.color } : undefined)} onMouseMove={sel ? undefined : onHover} onMouseDown={(e) => e.preventDefault()} onClick={onOpen}>
-      <Chip kind={v.active?.kind} icon={v.tab.icon} />
-      <span className="name">{byPath ? hit.name : <Marked text={hit.name} indices={hit.indices} />}</span>
-      {(byPath || elsewhere) && (
-        <span className={`where${byPath ? ' path' : ''}`}>
-          {elsewhere && (
-            <SpaceGlyph space={elsewhere} className="glyph" style={{ color: elsewhere.color }} />
-          )}
-          {byPath ? <span className="txt">&lrm;<Marked text={hit.path} indices={hit.indices} /></span> : <span className="txt">{elsewhere.name}</span>}
-        </span>
-      )}
-      {v.danger && <span className="prod">PROD</span>}
-      <StatusMark status={v.status} bell={v.bell} />
-    </div>
-  );
-}
-
-function Marked({ text, indices }) {
-  return highlight(text, indices).map((p, i) => (p.hit ? <mark key={i}>{p.text}</mark> : <span key={i}>{p.text}</span>));
 }
 
 function SpaceHeader({ space }) {
@@ -738,5 +556,4 @@ export function SidebarCards() {
   );
 }
 
-export const openLibrary = () => ui.set((u) => ({ ...u, view: u.view === 'library' ? 'terminal' : 'library' }));
 export const openSettings = () => A.toggleSettings();

@@ -109,10 +109,7 @@ export const IconChevron = sym('chevron.right', 'medium');
 export const IconPlus = sym('plus');
 export const IconMore = sym('ellipsis');
 export const IconSearch = sym('magnifyingglass');
-export const IconLibrary = sym('books.vertical');
-export const IconActivity = sym('checklist|list.bullet');
 export const IconGear = sym('gearshape');
-export const IconTerminal = sym('terminal');
 export const IconClose = sym('xmark');
 export const IconBranch = sym('arrow.triangle.branch');
 export const IconPullRequest = sym('arrow.triangle.pull');
@@ -122,38 +119,16 @@ export const IconArrowUp = sym('arrow.up');
 export const IconClock = sym('clock');
 export const IconCopy = sym('doc.on.doc');
 export const IconExternal = sym('arrow.up.forward.square|arrow.up.right.square');
-export const IconFiles = sym('list.bullet.indent');
-export const IconFile = sym('doc');
 export const IconGrid = sym('square.grid.2x2');
-export const IconReview = sym('plus.forwardslash.minus');
-export const IconRefresh = sym('arrow.clockwise');
-export const IconUndo = sym('arrow.uturn.backward');
-export const IconMinus = sym('minus');
-export const IconInsert = sym('return');
-export const IconMaximize = sym('arrow.up.left.and.arrow.down.right');
-export const IconMinimize = sym('arrow.down.right.and.arrow.up.left');
-export const IconComment = sym('text.bubble');
-export const IconCommentAdd = sym('plus.bubble');
-export const IconCommit = sym('smallcircle.filled.circle');
-export const IconPR = sym('arrow.triangle.pull');
-export const IconMerge = sym('arrow.triangle.merge');
-export const IconArrowDown = sym('arrow.down');
-export const IconChevronDown = sym('chevron.down', 'medium');
-export const IconSend = sym('paperplane');
-export const IconTrash = sym('trash');
-export const IconPencil = sym('pencil');
-export const IconCollapseAll = sym('rectangle.compress.vertical|arrow.down.right.and.arrow.up.left');
-export const IconExpandAll = sym('rectangle.expand.vertical|arrow.up.left.and.arrow.down.right');
 export const IconCheckCircle = sym('checkmark.circle.fill');
 export const IconXCircle = sym('xmark.circle.fill');
-export const IconDot = sym('circle.dotted|circle');
 export const IconImagePlus = sym('photo.badge.plus|photo');
 export const IconBan = sym('nosign');
 // Spins while a git or gh action runs (.spin in app.css).
 export const IconSpinner = ({ size = 16 }) => <Sym name="arrow.triangle.2.circlepath" size={size} className="spin" />;
 
 // Every chrome symbol, for preloadSymbols().
-export const CHROME_SYMBOLS = ['sidebar.left', 'magnifyingglass', 'gearshape', 'list.bullet.indent', 'square.grid.2x2', 'plus.forwardslash.minus', 'plus', 'xmark', 'terminal', 'books.vertical', 'checklist', 'folder', 'chevron.right', 'ellipsis', 'folder.badge.plus'];
+export const CHROME_SYMBOLS = ['sidebar.left', 'magnifyingglass', 'gearshape', 'square.grid.2x2', 'plus.forwardslash.minus', 'plus', 'xmark', 'folder', 'chevron.right', 'ellipsis', 'folder.badge.plus'];
 
 // App mark: a prompt and cursor, bracketed out to three sessions. Same drawing as build/icon.svg.
 // Mint parts take currentColor; the session tiles stay paper-white on any background.

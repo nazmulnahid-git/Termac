@@ -16,7 +16,6 @@ export default function Card() {
   const tab = app.use((s) => A.activeTab(s));
   const theme = ui.use((s) => s.termTheme);
   const sids = tab ? L.leaves(tab.layout) : [];
-  const sshDanger = rt.use((s) => sids.some((id) => s[id]?.sshEffects?.danger));
   const dragging = ui.use((s) => s.dragging);
   const space = app.use((s) => A.activeSpace(s));
   const look = useMemo(() => terminalLook(space, theme), [space.term, space.color, theme]);
@@ -24,7 +23,7 @@ export default function Card() {
 
   // Never empty for long: actions.js opens a terminal or quits when a Space runs out.
   if (!tab) return null;
-  const danger = !!tab.effects?.danger || sshDanger;
+  const danger = !!tab.effects?.danger;
   // The sidebar drag engine hit-tests the card and reports the nearest edge as its target.
   const canDrop = dragging?.kind === 'tab' && dragging.tabId !== tab.id && sids.length < L.MAX_PANES;
   const edge = dragging?.target?.kind === 'card' ? dragging.target.edge : null;
