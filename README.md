@@ -63,4 +63,4 @@ Set `TERMORC_DATA_DIR=/some/folder` to run a build with its own state and settin
 
 The installer window's background is `build/dmg/background.svg`, rendered to `background.tiff` (1× and 2×); the layout lives in `scripts/dmg-settings.py`.
 
-The icon's source is `build/icon.svg`. After editing it, regenerate the app icons with `npx tauri icon build/icon.svg -o src-tauri/icons`, then delete the non-macOS sizes.
+The icon's artwork is `build/icon-art.png` (the `>_` on a transparent background). On macOS 26 and later the Dock uses `src-tauri/icons/AppIcon.icon`, an Icon Composer document with light, dark, clear and tinted looks; open it in Icon Composer (bundled with Xcode) to edit. Compiling it needs Xcode 26's `actool`, so point the command-line tools at Xcode once with `sudo xcode-select -s /Applications/Xcode.app`; otherwise the build skips it and every macOS version falls back to `icon.icns`. That fallback comes from `build/icon.svg`: after editing it, regenerate with `npx tauri icon build/icon.svg -o src-tauri/icons`, then delete the non-macOS sizes.

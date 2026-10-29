@@ -1,56 +1,31 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1024" height="1024" viewBox="0 0 1024 1024">
   <defs>
     <linearGradient id="tile" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#1c1c22"/>
-      <stop offset="1" stop-color="#09090c"/>
-    </linearGradient>
-    <linearGradient id="rim" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#ffffff" stop-opacity="0.16"/>
-      <stop offset="0.5" stop-color="#ffffff" stop-opacity="0.04"/>
-      <stop offset="1" stop-color="#ffffff" stop-opacity="0.08"/>
-    </linearGradient>
-    <linearGradient id="mint" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#b4f6d4"/>
-      <stop offset="1" stop-color="#92e8bd"/>
-    </linearGradient>
-    <linearGradient id="paper" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0" stop-color="#ffffff"/>
-      <stop offset="1" stop-color="#ecedef"/>
+      <stop offset="1" stop-color="#f3f4f6"/>
     </linearGradient>
     <filter id="drop" color-interpolation-filters="sRGB" x="-20%" y="-20%" width="140%" height="140%">
-      <feGaussianBlur in="SourceAlpha" stdDeviation="14"/>
-      <feOffset dy="12"/>
-      <feComponentTransfer><feFuncA type="linear" slope="0.35"/></feComponentTransfer>
+      <feGaussianBlur in="SourceAlpha" stdDeviation="12"/>
+      <feOffset dy="10"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.22"/></feComponentTransfer>
       <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
     </filter>
-    <filter id="lift" color-interpolation-filters="sRGB" x="-10%" y="-10%" width="120%" height="130%">
-      <feGaussianBlur in="SourceAlpha" stdDeviation="6"/>
-      <feOffset dy="6"/>
-      <feComponentTransfer><feFuncA type="linear" slope="0.45"/></feComponentTransfer>
-      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    <filter id="glow" color-interpolation-filters="sRGB" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="34"/>
+      <feOffset dy="18"/>
+      <feComponentTransfer><feFuncA type="linear" slope="1.6"/></feComponentTransfer>
     </filter>
+    <clipPath id="tileClip">
+      <rect x="100" y="100" width="824" height="824" rx="185"/>
+    </clipPath>
   </defs>
   <!-- macOS icon grid: an 824px tile centred on a 1024 canvas, room left for the shadow -->
   <g filter="url(#drop)">
     <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#tile)"/>
   </g>
-  <rect x="101.5" y="101.5" width="821" height="821" rx="183.5" fill="none" stroke="url(#rim)" stroke-width="3"/>
-  <!-- Prompt, cursor, and a bracket branching to three sessions. Same drawing as LogoMark. -->
-  <g transform="translate(512 512) scale(0.995)" filter="url(#lift)">
-    <g fill="none" stroke="url(#mint)" stroke-linecap="round" stroke-linejoin="round">
-      <path stroke-width="70" d="M-271 -121 L-169 -19 L-271 83"/>
-      <path stroke-width="34" d="M133 -162 H131 A50 50 0 0 0 81 -112 V112 A50 50 0 0 0 131 162 H133 M81 0 H128"/>
-    </g>
-    <rect x="-149" y="46" width="179" height="51" rx="25.5" fill="url(#paper)"/>
-    <g fill="url(#paper)">
-      <rect x="165" y="-219" width="141" height="114" rx="30"/>
-      <rect x="165" y="-57" width="141" height="114" rx="30"/>
-      <rect x="165" y="105" width="141" height="114" rx="30"/>
-    </g>
-    <g fill="url(#mint)">
-      <circle cx="235.5" cy="-162" r="26"/>
-      <circle cx="235.5" cy="0" r="26"/>
-      <circle cx="235.5" cy="162" r="26"/>
-    </g>
+  <!-- Faceted >_ artwork (icon-art.png, transparent), centred on the tile over a blurred copy of itself as glow -->
+  <g clip-path="url(#tileClip)">
+    <image x="48.5" y="100.7" width="921.6" height="921.6" xlink:href="icon-art.png" href="icon-art.png" filter="url(#glow)" opacity="0.85"/>
+    <image x="48.5" y="100.7" width="921.6" height="921.6" xlink:href="icon-art.png" href="icon-art.png"/>
   </g>
 </svg>
