@@ -1199,13 +1199,9 @@ export function setSidebarMode(mode) {
   setSettings({ sidebarMode: mode });
 }
 
-// ⌘S: expanded ↔ compact rail (and back out of focus mode).
-export function toggleSidebar() {
-  const cur = app.get().settings.sidebarMode;
-  setSidebarMode(cur === 'expanded' ? 'compact' : 'expanded');
-}
+// ⌘S and ⌃⌘S: hide completely, like a native sidebar, then restore whichever mode was showing.
+export const toggleSidebar = () => toggleFocusMode();
 
-// ⌃⌘S: hide completely, then restore whichever mode was showing.
 export function toggleFocusMode() {
   const cur = app.get().settings.sidebarMode;
   setSidebarMode(cur === 'hidden' ? lastVisibleMode : 'hidden');

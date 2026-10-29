@@ -4,6 +4,7 @@ import { arrayEq } from '../state/store.js';
 import * as L from '../lib/layout.js';
 import { kindOf, sessionName, timeAgo, formatDuration } from '../lib/meta.js';
 import { TabIcon } from './tabicons.jsx';
+import { Activity, Cog, Container, Database, FlaskConical, GitBranch, Hexagon, Layers, Rabbit, Server, Ship, SquarePen, SquareTerminal } from 'lucide-react';
 
 // Aggregated view of a sidebar row: names, chips and the most urgent status of its panes.
 export function useTabView(tid) {
@@ -48,8 +49,24 @@ export function FailTip({ rt: r }) {
   );
 }
 
-// The gutter before a session's name: its chosen icon, else what it runs (git, npm,
-// ssh…). Plain shells leave it empty.
+// What a session runs, as a sidebar glyph. Anything unrecognised is a plain shell.
+const KIND_ICONS = {
+  '>_': [SquareTerminal, 'Shell'],
+  js: [Hexagon, 'JavaScript'],
+  py: [FlaskConical, 'Python'],
+  db: [Database, 'Database'],
+  git: [GitBranch, 'Git'],
+  ssh: [Server, 'SSH'],
+  tf: [Layers, 'Terraform'],
+  k8: [Ship, 'Kubernetes'],
+  rs: [Cog, 'Rust'],
+  go: [Rabbit, 'Go'],
+  dk: [Container, 'Docker'],
+  ed: [SquarePen, 'Editor'],
+  top: [Activity, 'Monitor'],
+};
+
+// The gutter before a session's name: its chosen icon, else what it runs (git, npm, ssh…).
 export function Chip({ kind, icon }) {
   if (icon)
     return (
@@ -57,7 +74,12 @@ export function Chip({ kind, icon }) {
         <TabIcon name={icon} />
       </span>
     );
-  return <span className="chip">{kind === '>_' ? '' : kind}</span>;
+  const [Glyph, label] = KIND_ICONS[kind] || KIND_ICONS['>_'];
+  return (
+    <span className="chip icon" title={label}>
+      <Glyph size={16} strokeWidth={1.75} aria-hidden="true" />
+    </span>
+  );
 }
 
 export function Switch({ on, onChange, disabled }) {

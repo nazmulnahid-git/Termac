@@ -6,7 +6,7 @@ export const ACTIONS = [
   { id: 'findTab', label: 'Find session in sidebar', def: 'Cmd+J' },
   { id: 'newTerminal', label: 'New terminal in current directory', def: 'Cmd+N' },
   { id: 'quickTerminal', label: 'Quick Terminal (global)', def: 'Alt+Space', global: true },
-  { id: 'toggleSidebar', label: 'Collapse / expand sidebar', def: 'Cmd+S' },
+  { id: 'toggleSidebar', label: 'Show / hide sidebar', def: 'Cmd+S' },
   { id: 'focusMode', label: 'Hide sidebar (focus mode)', def: 'Ctrl+Cmd+S' },
   { id: 'splitRight', label: 'Split right', def: 'Cmd+D' },
   { id: 'splitDown', label: 'Split down', def: 'Shift+Cmd+D' },

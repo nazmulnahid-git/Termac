@@ -7,7 +7,7 @@ import { shortName, sessionName, formatDuration } from '../lib/meta.js';
 import { tildify } from '../lib/routing.js';
 import { highlight } from '../lib/fuzzy.js';
 import { findTabs } from '../lib/tabfind.js';
-import { IconFolder, IconFolderOpen, IconFolderPlus, IconChevron, IconPlus, IconMore, IconSearch, IconClose } from './icons.jsx';
+import { IconFolder, IconFolderOpen, IconFolderPlus, IconChevron, IconPlus, IconMore, IconSearch, IconClose, IconSidebar } from './icons.jsx';
 import { Settings as SettingsIcon } from 'lucide-react';
 import Rail from './SidebarRail.jsx';
 import { TabIcon } from './tabicons.jsx';
@@ -23,7 +23,8 @@ const HIDE_DELAY = 150;
 const isPaneDrag = (e) => e.dataTransfer.types.includes(PANE_MIME);
 let findTickSeen = 0; // last ⌘J press the filter answered, so a remount doesn't steal focus
 
-export default function Sidebar({ floating, onLeave }) {
+// `phase` is 'opening' or 'closing' while App slides the sidebar in or out.
+export default function Sidebar({ floating, onLeave, phase }) {
   const mode = app.use((s) => s.settings.sidebarMode);
   const width = app.use((s) => s.settings.sidebarWidth);
   const [dragW, setDragW] = useState(null);
@@ -57,26 +58,44 @@ export default function Sidebar({ floating, onLeave }) {
     };
   }, [floating]);
 
+  // The panel keeps its width while the slot around it animates, so rows never reflow mid-slide.
+  const w = compact ? `calc(${RAIL_WIDTH}px + 2 * var(--inset))` : `${dragW ?? width}px`;
   return (
     <aside
       ref={ref}
-      className={`sidebar${compact ? ' compact' : ''}${floating ? ' floating' : ''}${dragW != null ? ' resizing' : ''}`}
-      style={{ width: compact ? RAIL_WIDTH : (dragW ?? width) }}
+      className={`sidebar${compact ? ' compact' : ''}${floating ? ' floating' : ''}${dragW != null ? ' resizing' : ''}${phase ? ` ${phase}` : ''}`}
+      style={{ width: w, '--sb-w': w }}
       onWheel={onWheel}
       onMouseLeave={closePeek}
     >
-      {compact ? <Rail /> : <Expanded />}
-      {/* Swiping past the last Space fills this ring; completing it makes a new Space. */}
-      <div className="space-new" ref={loader} aria-hidden="true">
-        <svg className="progress" viewBox="0 0 40 40">
-          <circle className="track" cx="20" cy="20" r="17" />
-          <circle className="ring" cx="20" cy="20" r="17" pathLength="100" />
-        </svg>
-        <IconPlus size={15} />
-        <span className="lbl">New Space</span>
+      <div className="sb-panel">
+        {!compact && <SidebarHead />}
+        {compact ? <Rail /> : <Expanded />}
+        {/* Swiping past the last Space fills this ring; completing it makes a new Space. */}
+        <div className="space-new" ref={loader} aria-hidden="true">
+          <svg className="progress" viewBox="0 0 40 40">
+            <circle className="track" cx="20" cy="20" r="17" />
+            <circle className="ring" cx="20" cy="20" r="17" pathLength="100" />
+          </svg>
+          <IconPlus size={15} />
+          <span className="lbl">New Space</span>
+        </div>
       </div>
       {!compact && !floating && <ResizeHandle width={width} onDrag={setDragW} />}
     </aside>
+  );
+}
+
+// The panel's title strip: the window's traffic lights sit in its left inset, the toggle
+// right after them, as in a native sidebar. It drags the window like a title bar.
+function SidebarHead() {
+  const accel = app.use((s) => s.settings.keybindings.toggleSidebar);
+  return (
+    <div className="sb-head">
+      <button className="tb-btn" title={`Hide sidebar${accel ? `  ${formatAccel(accel)}` : ''}`} onClick={A.toggleSidebar}>
+        <IconSidebar size={17} />
+      </button>
+    </div>
   );
 }
 

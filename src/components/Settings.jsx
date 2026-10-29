@@ -444,7 +444,7 @@ function AppearanceTab() {
 
 function SidebarGroup({ s }) {
   const kb = s.keybindings;
-  const hint = [kb.toggleSidebar && `${formatAccel(kb.toggleSidebar)} collapses to icons`, kb.focusMode && `${formatAccel(kb.focusMode)} hides it (hover the left edge to peek)`].filter(Boolean).join(' · ');
+  const hint = [kb.toggleSidebar && `${formatAccel(kb.toggleSidebar)} shows and hides it`, 'hover the left edge to peek while hidden'].filter(Boolean).join(' · ');
   return (
     <Group title="Sidebar">
       <Row label="Sidebar" hint={hint || null}>

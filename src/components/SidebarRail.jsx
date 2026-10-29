@@ -88,7 +88,7 @@ function RailFolder({ folder: f, spaceId, tipProps, onTip, onTipEnd }) {
         data-spring={f.open ? undefined : f.id}
         onPointerDown={(e) => pressFolder(e, spaceId, f.id)}
         onClick={() => A.updateFolder(spaceId, f.id, { open: !f.open })}
-        onContextMenu={(e) => folderMenu(e, spaceId, f, () => A.toggleSidebar())}
+        onContextMenu={(e) => folderMenu(e, spaceId, f, () => A.setSidebarMode('expanded'))}
         {...tipProps(`${f.name} · ${f.tabs.length}`)}
       >
         {f.open ? <IconFolderOpen /> : <IconFolder />}

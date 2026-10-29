@@ -337,7 +337,7 @@ function buildCandidates() {
     act('notes', 'Notes', () => ui.set((x) => ({ ...x, notesOpen: !x.notesOpen })), { words: 'toggle panel' }),
     act('settings', 'Settings', () => A.openSettings(), { words: 'preferences' }),
     act('settingsFile', 'Edit settings.json', () => A.openSettings('file'), { hint: '', words: 'preferences config json customize' }),
-    act('toggleSidebar', 'Collapse / expand sidebar', () => A.toggleSidebar()),
+    act('toggleSidebar', 'Show / hide sidebar', () => A.toggleSidebar()),
     act('focusMode', 'Focus mode (hide sidebar)', () => A.toggleFocusMode()),
     act('copyLastOutput', 'Copy last output', () => A.copyLastOutput()),
     act('find', 'Find in terminal', () => setUi({ find: true }), { words: 'search' }),

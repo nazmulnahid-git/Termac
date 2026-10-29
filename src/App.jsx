@@ -180,6 +180,9 @@ export default function App() {
   const dark = ui.use((s) => s.dark);
   const mode = app.use((s) => s.settings.sidebarMode);
   const hidden = mode === 'hidden';
+  // The expanded sidebar runs the window's full height and hosts the traffic lights; the
+  // compact rail sits under the top bar, which then hosts them.
+  const side = useSlide(mode === 'expanded');
   const edgeReveal = app.use((s) => s.settings.gestures.edgeReveal);
   const onboarded = app.use((s) => s.onboarded);
   const spaceId = app.use((s) => s.activeSpaceId);
@@ -209,10 +212,14 @@ export default function App() {
     }
   }, [color, term, termTheme, dark]);
 
-  // The top bar always has room for the traffic lights, so they stay visible in every mode.
+  // The sidebar or the top bar always has room for the traffic lights, so they stay visible in every mode.
   useEffect(() => {
     api.app.trafficLights(true);
   }, []);
+
+  useEffect(() => {
+    if (!hidden) setReveal(false);
+  }, [hidden]);
 
   useEffect(() => {
     const onWheel = (e) => {
@@ -265,22 +272,25 @@ export default function App() {
 
   return (
     <div className={`app${hidden ? ' focus-mode' : ''}${view === 'settings' ? ' on-settings' : ''}`}>
-      <TopBar />
-      <div className="app-body">
-        {!hidden && <Sidebar />}
-        {hidden && edgeReveal && !reveal && <div className="edge-reveal" onMouseEnter={() => setReveal(true)} />}
-        {hidden && reveal && <Sidebar floating onLeave={() => setReveal(false)} />}
-        <main className="main">
-          <ToolsPanel />
-          <div className="stage">
-            {view === 'library' ? <Library /> : view === 'settings' ? <Settings /> : <Card />}
-            {view === 'terminal' && <FileViewer />}
-          </div>
-          {notesOpen && <Notes key={spaceId} spaceId={spaceId} onClose={() => setUi({ notesOpen: false })} />}
-          <ReviewPanel />
-        </main>
+      {side && <Sidebar phase={side === 'open' ? null : side} />}
+      <div className="app-col">
+        <TopBar lights={mode !== 'expanded'} />
+        <div className="app-body">
+          {mode === 'compact' && <Sidebar />}
+          <main className="main">
+            <ToolsPanel />
+            <div className="stage">
+              {view === 'library' ? <Library /> : view === 'settings' ? <Settings /> : <Card />}
+              {view === 'terminal' && <FileViewer />}
+            </div>
+            {notesOpen && <Notes key={spaceId} spaceId={spaceId} onClose={() => setUi({ notesOpen: false })} />}
+            <ReviewPanel />
+          </main>
+        </div>
+        <StatusBar />
       </div>
-      <StatusBar />
+      {hidden && edgeReveal && !reveal && <div className="edge-reveal" onMouseEnter={() => setReveal(true)} />}
+      {hidden && reveal && <Sidebar floating onLeave={() => setReveal(false)} />}
       <Peek />
       {overlay && <div className={`backdrop${overlay === 'overview' ? ' dark' : ''}`} onMouseDown={close} />}
       {overlay === 'commandBar' && <CommandBar onClose={close} initial={typeof overlayArg === 'string' ? overlayArg : ''} />}
@@ -300,6 +310,19 @@ export default function App() {
       )}
     </div>
   );
+}
+
+// Keeps the sidebar mounted through its slide-out. Returns null when gone, else 'open',
+// 'opening' or 'closing' (the last two match the CSS transitions in app.css).
+const SLIDE_MS = 260;
+function useSlide(open) {
+  const [phase, setPhase] = useState(open ? 'open' : null);
+  useEffect(() => {
+    setPhase((p) => (open ? (p === 'open' ? p : 'opening') : p ? 'closing' : null));
+    const t = setTimeout(() => setPhase(open ? 'open' : null), SLIDE_MS);
+    return () => clearTimeout(t);
+  }, [open]);
+  return phase;
 }
 
 function Prompt() {

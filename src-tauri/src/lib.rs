@@ -33,9 +33,10 @@ use tokio::sync::oneshot;
 
 const MAIN: &str = "main";
 const QUICK: &str = "quick";
-// Centers the buttons in the 45px top bar (--bar-h). tao grows the title bar container to
-// button height + y and AppKit keeps the buttons near its bottom, so y is measured, not derived.
-const TRAFFIC_LIGHTS: LogicalPosition<f64> = LogicalPosition { x: 18.0, y: 23.5 };
+// Centers the buttons in the 52px top bar (--bar-h), inside the sidebar panel's inset. tao
+// grows the title bar container to button height + y and AppKit keeps the buttons near its
+// bottom, so y is measured, not derived (45px bar ↔ 23.5; the buttons' center tracks y − 1).
+const TRAFFIC_LIGHTS: LogicalPosition<f64> = LogicalPosition { x: 21.0, y: 27.0 };
 
 struct Paths {
     state_file: PathBuf,
@@ -661,7 +662,7 @@ fn build_app_menu(app: &AppHandle, bindings: &HashMap<String, String>) -> tauri:
         "View",
         true,
         &[
-            &item("Collapse Sidebar", "toggleSidebar")?,
+            &item("Toggle Sidebar", "toggleSidebar")?,
             &item("Focus Mode", "focusMode")?,
             &item("Library", "library")?,
             &item("Notes", "notes")?,

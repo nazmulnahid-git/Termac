@@ -38,9 +38,21 @@
   --ui-size: 12.5px;
   --ui-lh: 1.4;
   --zoom: 1.25;
-  /* Like a native title bar, the top bar keeps one height at every zoom, so the traffic
-     lights (placed by the window, which doesn't zoom) stay centered in it. */
-  --bar-h: calc(45px / var(--zoom));
+  /* Like a native toolbar, the top bar keeps one height at every zoom, so the traffic
+     lights (placed by the window, which doesn't zoom) stay centered in it. --inset is the
+     gap around the sidebar panel, also in window points. */
+  --bar-h: calc(52px / var(--zoom));
+  --inset: calc(8px / var(--zoom));
+  /* The sidebar is a panel floating in the window, as in macOS's own apps: a lighter sheet,
+     a hairline rim, a soft shadow. The current row is a solid pill in the Space color. */
+  --sb-bg: color-mix(in oklab, var(--chrome) 35%, #fff);
+  --sb-rim: 0 0 0 0.5px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.05), 0 8px 24px -10px rgba(0, 0, 0, 0.16);
+  --pick: color-mix(in oklab, var(--space) 90%, black);
+  --pick-ink: #fff;
+  /* Toolbar controls: round glass buttons and capsules. */
+  --btn-glass: rgba(255, 255, 255, 0.7);
+  --btn-rim: 0 0 0 0.5px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.06);
+  --btn-hover: rgba(0, 0, 0, 0.05);
   --bold: 600;
   --r: 5px;
   --r-sm: 4px;
@@ -68,6 +80,12 @@
     --shadow-lg: 0 0 0 0.5px rgba(0, 0, 0, 0.8), 0 1px 2px rgba(0, 0, 0, 0.3), 0 10px 24px -6px rgba(0, 0, 0, 0.45), 0 32px 64px -12px rgba(0, 0, 0, 0.6);
     --glass: color-mix(in oklab, var(--panel) 78%, transparent);
     --rim: inset 0 0 0 0.5px rgba(255, 255, 255, 0.11), inset 0 0.5px 0 rgba(255, 255, 255, 0.08);
+    --sb-bg: color-mix(in oklab, var(--chrome) 93%, #fff);
+    --sb-rim: inset 0 0 0 0.5px rgba(255, 255, 255, 0.09), 0 0 0 0.5px rgba(0, 0, 0, 0.7), 0 10px 28px -10px rgba(0, 0, 0, 0.6);
+    --pick: color-mix(in oklab, var(--space) 86%, black);
+    --btn-glass: rgba(255, 255, 255, 0.06);
+    --btn-rim: inset 0 0 0 0.5px rgba(255, 255, 255, 0.13), 0 1px 2px rgba(0, 0, 0, 0.35);
+    --btn-hover: rgba(255, 255, 255, 0.1);
     color-scheme: dark;
   }
 }
@@ -95,13 +113,29 @@ kbd { font: inherit; color: var(--faint); }
 .app { display: flex; height: 100%; background: var(--chrome); transition: background-color 0.25s ease; position: relative; }
 
 /* ---------- Sidebar ---------- */
-.sidebar { flex: none; display: flex; flex-direction: column; position: relative; z-index: 2; min-height: 0; overflow: hidden; border-right: 1px solid var(--line); transition: width 0.22s cubic-bezier(0.2, 0.8, 0.2, 1); }
+/* .sidebar is the slot in the window's layout (its width animates); .sb-panel is the inset
+   sheet inside it, at a fixed width (--sb-w) so its rows never reflow while sliding. */
+.sidebar { --slide: 0.26s cubic-bezier(0.32, 0.72, 0, 1); flex: none; display: flex; position: relative; z-index: 2; min-height: 0; padding: var(--inset); transition: width var(--slide), opacity 0.2s ease, filter 0.2s ease; }
 .sidebar.resizing { transition: none; }
-.sb-expanded { display: flex; flex-direction: column; height: 100%; min-width: 200px; animation: fade 0.18s ease-out; }
-.sb-resize { position: absolute; top: 0; right: -1px; bottom: 0; width: 6px; cursor: col-resize; z-index: 5; }
-.sb-resize::after { content: ''; position: absolute; top: 0; bottom: 0; right: 0; width: 1px; background: transparent; transition: background 0.15s; }
+.sb-panel { flex: none; width: calc(var(--sb-w) - 2 * var(--inset)); min-height: 0; display: flex; flex-direction: column; position: relative; overflow: hidden; border-radius: 12px; background: var(--sb-bg); box-shadow: var(--sb-rim); transition: transform var(--slide), opacity var(--slide); }
+.sidebar.opening, .sidebar.closing { overflow: hidden; }
+.sidebar.opening { animation: sbOpen var(--slide); }
+.sidebar.opening .sb-panel { animation: sbSlide var(--slide); }
+.sidebar.closing { width: 0 !important; pointer-events: none; }
+.sidebar.closing .sb-panel { transform: translateX(-40%); opacity: 0; }
+@keyframes sbOpen { from { width: 0; } }
+@keyframes sbSlide { from { transform: translateX(-40%); opacity: 0; } }
+/* The compact rail sits under the top bar, so it has no top inset of its own. */
+.sidebar.compact { padding-top: 0; }
+.sb-expanded { flex: 1; display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+/* The traffic lights sit in this strip's left inset; it is centered on the top bar's line. */
+.sb-head { flex: none; height: calc(var(--bar-h) - 2 * var(--inset)); display: flex; align-items: center; padding: 0 8px 0 calc(88px / var(--zoom) - var(--inset)); --app-region: drag; }
+.sb-head button { --app-region: no-drag; }
+.sb-resize { position: absolute; top: 0; right: 0; bottom: 0; width: var(--inset); cursor: col-resize; z-index: 5; }
+.sb-resize::after { content: ''; position: absolute; top: 18px; bottom: 18px; left: 50%; width: 2px; margin-left: -1px; border-radius: 1px; background: transparent; transition: background 0.15s; }
 .sb-resize:hover::after, .sidebar.resizing .sb-resize::after { background: var(--accent); }
-.sidebar.floating { transition: none; position: absolute; top: 0; bottom: 0; left: 0; z-index: 30; background: var(--chrome); box-shadow: 12px 0 32px rgba(0, 0, 0, 0.3); animation: slideIn 0.16s ease-out; }
+.sidebar.floating { transition: none; position: absolute; top: 0; bottom: 0; left: 0; z-index: 30; }
+.sidebar.floating .sb-panel { box-shadow: var(--sb-rim), 0 18px 48px -12px rgba(0, 0, 0, 0.45); animation: slideIn 0.18s ease-out; }
 @keyframes slideIn { from { transform: translateX(-24px); opacity: 0; } }
 .edge-reveal { position: absolute; left: 0; top: 0; bottom: 0; width: 8px; z-index: 29; }
 .icon-btn { width: 26px; height: 26px; border-radius: var(--r-sm); display: inline-flex; align-items: center; justify-content: center; color: var(--dim); }
@@ -110,7 +144,7 @@ kbd { font: inherit; color: var(--faint); }
 .icon-btn.sm { width: 22px; height: 22px; }
 
 /* Inline session filter (TabFind in Sidebar.jsx): a `/` search, vim-style. */
-.tab-find { flex: 1; min-width: 0; height: 30px; display: flex; align-items: center; gap: 8px; padding: 0 5px 0 10px; border-radius: 7px; background: var(--field); box-shadow: inset 0 0 0 1px var(--line); color: var(--dim); cursor: text; transition: background-color 0.12s, box-shadow 0.12s, color 0.12s; }
+.tab-find { flex: 1; min-width: 0; height: 30px; display: flex; align-items: center; gap: 8px; padding: 0 5px 0 10px; border-radius: var(--r-lg); background: var(--field); box-shadow: inset 0 0 0 1px var(--line); color: var(--dim); cursor: text; transition: background-color 0.12s, box-shadow 0.12s, color 0.12s; }
 .tab-find:hover { background: var(--hover); }
 .tab-find:focus-within { background: var(--input); color: var(--ink); box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--accent) 70%, transparent), 0 0 0 3px color-mix(in oklab, var(--space) 18%, transparent); }
 .tab-find .lead { flex: none; color: var(--dim); }
@@ -125,7 +159,6 @@ kbd { font: inherit; color: var(--faint); }
 .tab-find .hint { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .find-results { display: flex; flex-direction: column; animation: fade 0.12s ease-out; }
 .find-row.sel:not(.on) { background: var(--hover); }
-.find-row.sel::before { content: ''; position: absolute; left: 0; top: 8px; bottom: 8px; width: 3px; border-radius: 2px; background: var(--faint); }
 .find-row mark { background: none; color: var(--accent); font-weight: var(--bold); }
 .find-row .where { flex: 0 1 auto; max-width: 48%; min-width: 0; display: flex; align-items: center; gap: 6px; color: var(--dim); }
 .find-row .where .glyph { flex: none; }
@@ -160,14 +193,14 @@ kbd { font: inherit; color: var(--faint); }
 .fav .badge { position: absolute; top: -5px; right: -5px; }
 .fav-ph { aspect-ratio: 1; border-radius: var(--r-lg); border: 1px dashed color-mix(in oklab, var(--space) 55%, transparent); background: color-mix(in oklab, var(--space) 8%, transparent); }
 
-/* Section labels: quiet, normal case. */
-.sec-title { display: flex; align-items: center; gap: 8px; height: 34px; padding: 8px 10px 0 16px; font-weight: var(--bold); }
+/* Section labels: quiet, small and dim, as in a native source list. */
+.sec-title { display: flex; align-items: center; gap: 7px; height: 34px; padding: 10px 10px 0 16px; color: var(--dim); font-size: 0.92em; font-weight: var(--bold); }
 .sec-title .glyph { color: var(--space); }
 .sec-actions { display: flex; gap: 2px; opacity: 0; transition: opacity 0.12s; }
 .sec-title:hover .sec-actions, .sec-actions:focus-within { opacity: 1; }
-.today-head { display: flex; align-items: center; gap: 8px; height: 34px; padding: 8px 12px 0 16px; color: var(--dim); }
+.today-head { display: flex; align-items: center; gap: 8px; height: 34px; padding: 10px 12px 0 16px; color: var(--dim); font-size: 0.92em; font-weight: var(--bold); }
 .today-head .rule { flex: 1; }
-.today-head button { color: var(--dim); padding: 0 6px; border-radius: var(--r-sm); opacity: 0; transition: opacity 0.12s; }
+.today-head button { color: var(--dim); padding: 0 6px; border-radius: var(--r-sm); font-weight: 400; opacity: 0; transition: opacity 0.12s; }
 .today-head:hover button { opacity: 1; }
 .today-head button:hover { background: var(--hover); color: var(--ink); }
 .pin-empty { margin: 2px 10px 0; padding: 10px; border-radius: var(--r); border: 1px dashed var(--line); color: var(--dim); text-align: center; }
@@ -175,48 +208,49 @@ kbd { font: inherit; color: var(--faint); }
 .rows { display: flex; flex-direction: column; gap: 2px; }
 .sb-app-tabs { padding: 8px 0 2px; }
 /* While Settings is showing, its row is the selected one; the session it covers only keeps its place. */
-.on-settings .sb-scroll .row.on:not(.sb-app-tabs .row) { background: transparent; }
-.on-settings .sb-scroll .row.on:not(.sb-app-tabs .row)::before { background: var(--faint); }
-.on-settings .sb-scroll .row.on:not(.sb-app-tabs .row) .name { font-weight: inherit; }
-.row { position: relative; isolation: isolate; height: 30px; display: flex; align-items: center; gap: 8px; padding: 0 8px 0 10px; margin: 0 6px; border-radius: var(--r); transition: opacity 0.2s, background-color 0.12s; }
+.on-settings .sb-scroll .row.on:not(.sb-app-tabs .row) { background: var(--sel); }
+.on-settings .sb-scroll .row.on:not(.sb-app-tabs .row) :is(.name, .chip, .status) { color: inherit; }
+.row { position: relative; isolation: isolate; height: 30px; display: flex; align-items: center; gap: 9px; padding: 0 8px 0 9px; margin: 0 8px; border-radius: var(--r-lg); transition: opacity 0.2s, background-color 0.12s; }
 .row:hover { background: var(--hover); }
-.row.on { background: var(--sel); }
-/* The current session gets a cursor-line marker in the Space color. */
-.row.on::before { content: ''; position: absolute; left: 0; top: 8px; bottom: 8px; width: 3px; border-radius: 2px; background: var(--accent); }
-/* A session with its own color: the row carries it as a tint, the marker in full. */
+/* The current session is a solid pill in the Space color, with white type. */
+.row.on { background: var(--pick); color: var(--pick-ink); }
+.row.on :is(.name, .chip, .chip.icon, .status, .close) { color: var(--pick-ink); }
+.row.on .close:hover { background: rgba(255, 255, 255, 0.2); }
+.row.on .prod { color: var(--pick-ink); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.7); }
+/* A session with its own color: the row carries it as a tint, and as the pill when current. */
 .row.tinted { background: color-mix(in oklab, var(--tc) 12%, transparent); }
 .row.tinted:hover { background: color-mix(in oklab, var(--tc) 19%, transparent); }
-.row.tinted.on { background: color-mix(in oklab, var(--tc) 26%, transparent); }
-.row.tinted.on::before { background: var(--tc); }
+.row.tinted.on { background: color-mix(in oklab, var(--tc) 90%, black); }
 .row.tinted .chip { color: var(--tc); }
 .row.split { padding-left: 8px; gap: 8px; }
-.row .name { flex: 1; min-width: 0; color: color-mix(in oklab, var(--ink) 86%, var(--dim)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.row.on .name { color: var(--ink); font-weight: var(--bold); }
+.row .name { flex: 1; min-width: 0; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row.on .name { font-weight: 500; }
 .row.dead .name { color: var(--dim); text-decoration: line-through; text-decoration-color: var(--faint); }
-.row.indent { margin-left: 22px; }
+.row.indent { margin-left: 26px; }
 .row input.rename { flex: 1; min-width: 0; border: 0; outline: 1px solid var(--accent); border-radius: var(--r-sm); background: var(--input); padding: 2px 6px; }
 .row .close { display: none; width: 20px; height: 20px; flex: none; align-items: center; justify-content: center; border-radius: var(--r-sm); color: var(--dim); }
 .row:hover .close { display: inline-flex; }
 .row:hover .close + .status { display: none; }
 .row .close:hover { background: var(--line); color: var(--ink); }
-.row.new { color: var(--dim); width: calc(100% - 12px); margin-top: 4px; text-align: left; }
+.row.new { color: var(--dim); width: calc(100% - 16px); margin-top: 4px; text-align: left; }
 .row.new .name { color: var(--dim); }
 .row.new:hover .name { color: var(--ink); }
 .row.new .chip { color: var(--dim); display: inline-flex; align-items: center; }
-/* The gutter: a session's icon, else what it runs (git, npm, ssh…). Empty for plain shells. */
-.chip { width: 3ch; flex: none; color: var(--faint); font-weight: 600; text-align: left; white-space: nowrap; overflow: hidden; }
-.chip.icon { display: inline-flex; align-items: center; color: var(--dim); overflow: visible; }
-.row.on .chip { color: var(--accent); }
+/* The gutter: a session's icon, else a glyph for what it runs (shell, git, node, ssh…). */
+.chip { width: 18px; flex: none; color: var(--dim); font-weight: 600; text-align: left; white-space: nowrap; overflow: hidden; }
+.chip.icon { display: inline-flex; align-items: center; justify-content: center; color: var(--dim); overflow: visible; }
 /* Split session: its panes side by side on one line. */
 .row .segs { flex: 1; min-width: 0; height: 24px; display: flex; gap: 4px; }
-.tab-seg { flex: 1 1 0; min-width: 0; display: flex; align-items: center; gap: 6px; padding: 0 8px; border-radius: var(--r-sm); box-shadow: inset 0 0 0 1px var(--line); transition: background-color 0.12s, box-shadow 0.12s; }
+.tab-seg { flex: 1 1 0; min-width: 0; display: flex; align-items: center; gap: 6px; padding: 0 8px; border-radius: var(--r); box-shadow: inset 0 0 0 1px var(--line); transition: background-color 0.12s, box-shadow 0.12s; }
 .tab-seg:hover { background: var(--hover); }
 .tab-seg .chip:empty { display: none; }
 .row.split.on { background: transparent; }
+.row.split.on :is(.name, .chip, .chip.icon, .status) { color: var(--ink); }
+.row.split.on .chip { color: var(--dim); }
 .row.split.on.tinted { background: color-mix(in oklab, var(--tc) 12%, transparent); }
-.row.split.on .tab-seg.cur { background: var(--sel); box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--accent) 55%, transparent); }
-.row.split.on .tab-seg.cur .chip { color: var(--accent); }
-.row.split.on .tab-seg.cur .name { font-weight: var(--bold); color: var(--ink); }
+.row.split.on .tab-seg.cur { background: var(--pick); box-shadow: none; }
+.row.split.on .tab-seg.cur :is(.chip, .name, .seg-close) { color: var(--pick-ink); }
+.row.split.on .tab-seg.cur .name { font-weight: 500; }
 /* Each pane of a split closes on its own. */
 .tab-seg .seg-close { display: none; flex: none; width: 18px; height: 18px; margin: 0 -4px 0 auto; align-items: center; justify-content: center; border-radius: var(--r-sm); color: var(--dim); }
 .tab-seg:hover .seg-close { display: inline-flex; }
@@ -228,15 +262,14 @@ kbd { font: inherit; color: var(--faint); }
 @keyframes segOpen { from { flex-grow: 0.001; opacity: 0; padding: 0; } }
 .prod { flex: none; padding: 0 6px; border-radius: var(--r-sm); color: var(--fail); font-weight: var(--bold); box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--fail) 70%, transparent); }
 .folder-wrap { position: relative; }
-.folder { height: 30px; display: flex; align-items: center; gap: 8px; padding: 0 8px 0 10px; margin: 0 6px; color: var(--ink); border-radius: var(--r); }
+.folder { height: 30px; display: flex; align-items: center; gap: 7px; padding: 0 8px 0 4px; margin: 0 8px; color: var(--ink); border-radius: var(--r-lg); }
 .folder:hover { background: var(--hover); }
-.folder .chev { width: 3ch; flex: none; display: inline-flex; justify-content: flex-start; color: var(--dim); }
+.folder .chev { width: 12px; flex: none; display: inline-flex; justify-content: center; color: var(--dim); }
 .folder .chev svg { transition: transform 0.18s ease; }
 .folder .chev.open svg { transform: rotate(90deg); }
-.folder .ficon { display: none; }
+.folder .ficon { flex: none; display: inline-flex; color: var(--accent); }
 /* Folders print like `ls -F`: name/ in the directory color. */
-.folder .fname { flex: 1; min-width: 0; color: var(--accent); font-weight: var(--bold); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.folder .fname::after { content: '/'; color: var(--dim); font-weight: 400; }
+.folder .fname { flex: 1; min-width: 0; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .folder .count { color: var(--faint); min-width: 2ch; text-align: right; }
 .folder-actions { display: flex; opacity: 0; transition: opacity 0.12s; }
 .folder:hover .folder-actions { opacity: 1; }
@@ -244,7 +277,6 @@ kbd { font: inherit; color: var(--faint); }
 .folder-body { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 0.22s cubic-bezier(0.2, 0.8, 0.2, 1); }
 .folder-body.open { grid-template-rows: 1fr; }
 .folder-inner { overflow: hidden; min-height: 0; position: relative; }
-.folder-inner::before { content: ''; position: absolute; left: 25px; top: 0; bottom: 20px; border-left: 1px solid var(--line); }
 .folder-empty { margin: 2px 12px 6px 36px; padding: 8px 12px; border-radius: var(--r); border: 1px dashed var(--line); color: var(--dim); }
 .drop-into { box-shadow: inset 0 0 0 1px var(--accent); }
 .folder.drop-into { background: color-mix(in oklab, var(--space) 12%, transparent); }
@@ -510,8 +542,8 @@ select.field { padding-right: 6px; }
 
 /* ---------- Sidebar drag (sidebar-drag.js) ---------- */
 /* The gap a dragged item will land in; same footprint as the thing it stands in for. */
-.row-ph, .folder-ph { height: 30px; margin: 0 6px; border-radius: var(--r); background: color-mix(in oklab, var(--space) 10%, transparent); box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--space) 30%, transparent); }
-.row-ph.indent { margin-left: 28px; }
+.row-ph, .folder-ph { height: 30px; margin: 0 8px; border-radius: var(--r-lg); background: color-mix(in oklab, var(--space) 10%, transparent); box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--space) 30%, transparent); }
+.row-ph.indent { margin-left: 26px; }
 .drag-ghost.drag-ghost { position: fixed !important; z-index: 1000; margin: 0 !important; pointer-events: none; background: var(--panel) !important; color: var(--ink); border-radius: var(--r); box-shadow: 0 0 0 1px var(--panel-line), 0 2px 6px rgba(0, 0, 0, 0.1); transition: transform 0.16s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.16s, opacity 0.12s; will-change: left, top, transform; }
 .drag-ghost.drag-ghost.lifted { transform: scale(1.03); box-shadow: 0 0 0 1px var(--accent), 0 12px 32px rgba(0, 0, 0, 0.3); }
 .drag-ghost.drag-ghost.over-card { transform: scale(0.94); opacity: 0.85; }
@@ -533,26 +565,39 @@ html.is-dragging .row:hover .close + .status { display: inline-flex; }
 .rail-scroll > .sb-fill { width: 100%; flex: 1 0 24px; }
 
 /* ---------- Title bar (TopBar.jsx) ---------- */
-.app { flex-direction: column; }
+/* The window is a row: the full-height sidebar, then a column with the top bar, the
+   terminal and the status line. */
+.app-col { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .app-body { flex: 1; min-height: 0; display: flex; position: relative; }
-.topbar { height: var(--bar-h); flex: none; display: flex; align-items: center; gap: 12px; padding: 0 8px 0 calc(84px / var(--zoom)); border-bottom: 1px solid var(--line); --app-region: drag; position: relative; z-index: 3; }
+.topbar { height: var(--bar-h); flex: none; display: flex; align-items: center; gap: 12px; padding: 0 10px 0 12px; border-bottom: 1px solid var(--line); --app-region: drag; position: relative; z-index: 3; transition: padding-left 0.26s cubic-bezier(0.32, 0.72, 0, 1); }
+/* No sidebar panel to host them: the traffic lights sit in the bar, the toggle after them. */
+.topbar.lights { padding-left: calc(88px / var(--zoom)); }
 .topbar button { --app-region: no-drag; }
-.tb-group { flex: 1 1 0; min-width: 0; display: flex; align-items: center; gap: 4px; }
+.tb-group { flex: 1 1 0; min-width: 0; display: flex; align-items: center; gap: 8px; }
 .tb-group.right { justify-content: flex-end; }
-.tb-btn { position: relative; min-width: 28px; height: 26px; padding: 0 6px; flex: none; border-radius: var(--r-sm); display: inline-flex; align-items: center; justify-content: center; gap: 6px; color: var(--dim); }
-.tb-btn:hover { background: var(--hover); color: var(--ink); }
+.tb-btn { position: relative; min-width: 28px; height: 28px; padding: 0 6px; flex: none; border-radius: var(--r-lg); display: inline-flex; align-items: center; justify-content: center; gap: 6px; color: var(--dim); transition: background-color 0.12s, color 0.12s; }
+.tb-btn:hover { background: var(--btn-hover); color: var(--ink); }
 .tb-btn.on { color: var(--ink); background: var(--sel); }
 .tb-count { color: var(--bell); font-weight: var(--bold); }
+/* Toolbar title: the Space (or open page) over a quiet count, like a Finder window. */
+.tb-heading { min-width: 0; display: flex; flex-direction: column; justify-content: center; line-height: 1.2; padding-left: 4px; white-space: nowrap; }
+.tb-heading .t { overflow: hidden; text-overflow: ellipsis; font-weight: var(--bold); font-size: 1.08em; color: var(--ink); }
+.tb-heading .s { overflow: hidden; text-overflow: ellipsis; color: var(--dim); font-size: 0.9em; }
+/* Glass controls: buttons grouped in a capsule, or standing alone as a circle. */
+.tb-capsule { flex: none; height: 30px; display: flex; align-items: center; gap: 2px; padding: 0 2px; border-radius: 15px; background: var(--btn-glass); box-shadow: var(--btn-rim); }
+.tb-capsule .tb-btn { height: 26px; min-width: 32px; border-radius: 13px; }
+.tb-btn.round { width: 30px; height: 30px; min-width: 0; padding: 0; border-radius: 50%; background: var(--btn-glass); box-shadow: var(--btn-rim); }
+.tb-btn.round:hover { background: color-mix(in oklab, var(--btn-glass), var(--ink) 8%); }
 /* The window title: where you are and what's running. Click it for the command bar. */
-.tb-title { flex: 0 1 460px; min-width: 220px; height: 26px; display: flex; align-items: center; gap: 8px; padding: 0 4px 0 10px; border-radius: 7px; background: var(--field); box-shadow: inset 0 0 0 1px var(--line); color: var(--dim); white-space: nowrap; transition: background-color 0.12s, box-shadow 0.12s, color 0.12s; }
-.tb-title:hover { background: var(--hover); box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--ink) 16%, transparent); color: var(--ink); }
+.tb-title { flex: 0 1 440px; min-width: 200px; height: 30px; display: flex; align-items: center; gap: 8px; padding: 0 5px 0 12px; border-radius: 15px; background: var(--btn-glass); box-shadow: var(--btn-rim); color: var(--dim); white-space: nowrap; transition: background-color 0.12s, box-shadow 0.12s, color 0.12s; }
+.tb-title:hover { background: color-mix(in oklab, var(--btn-glass), var(--ink) 6%); color: var(--ink); }
 .tb-ic { flex: none; color: var(--dim); }
 .tb-path { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--ink); font-weight: 500; }
 .tb-sep { flex: none; color: var(--faint); }
 .tb-proc { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 /* Shortcut chips at the end of the search fields. */
-.tb-title kbd, .tab-find kbd { flex: none; margin-left: auto; height: 18px; padding: 0 6px; display: inline-flex; align-items: center; border-radius: 4px; background: var(--line); color: var(--dim); font-size: 0.85em; letter-spacing: 0.02em; }
-.sb-top { flex: none; display: flex; align-items: center; padding: 10px 10px 0; }
+.tb-title kbd, .tab-find kbd { flex: none; margin-left: auto; height: 20px; padding: 0 7px; display: inline-flex; align-items: center; border-radius: 10px; background: var(--line); color: var(--dim); font-size: 0.85em; letter-spacing: 0.02em; }
+.sb-top { flex: none; display: flex; align-items: center; padding: 2px 8px 0; }
 
 /* ---------- Status line (StatusBar.jsx) ---------- */
 .statusbar { height: 26px; flex: none; position: relative; z-index: 4; display: flex; align-items: stretch; border-top: 1px solid var(--line); background: color-mix(in oklab, var(--chrome) 92%, var(--ink)); color: var(--dim); white-space: nowrap; }
@@ -907,7 +952,7 @@ mark.wd { color: inherit; border-radius: 3px; padding: 1px 0; }
 .sidebar.compact .space-new { right: 12px; }
 .sidebar.compact .space-new .lbl { display: none; }
 /* Like native windows, the chrome quiets down while another app is in front. */
-.topbar > *, .sidebar, .statusbar { transition: opacity 0.2s ease, filter 0.2s ease; }
+.topbar > *, .statusbar { transition: opacity 0.2s ease, filter 0.2s ease; }
 :root[data-inactive] .topbar > *, :root[data-inactive] .sidebar, :root[data-inactive] .statusbar { opacity: 0.62; filter: saturate(0.3); }
 @media (prefers-reduced-motion: reduce) { .palette, .modal, .toast, .chip-menu, .peek, .activity-pop { animation-duration: 0.01s; } }
 @media (prefers-reduced-motion: reduce) { .tab-seg.incoming { animation: none; } .status.st-run::after { animation: none; } }
