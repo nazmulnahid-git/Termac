@@ -11,20 +11,20 @@ import { highlightLines } from '../lib/highlight.js';
 import { parseSettingsFile } from '../lib/settingsfile.js';
 import { Switch, Seg, useImageUrl, SpaceGlyph } from './common.jsx';
 import { monoStack } from '../lib/fonts.js';
-import { SlidersHorizontal, Palette, SquareTerminal, Keyboard, Hand, Route, FileJson, ExternalLink, X } from 'lucide-react';
+import { Sym, IconExternal, IconClose } from './icons.jsx';
 
 const api = window.termac;
 const RULE_MIME = 'application/x-termac-rule';
 
-// [id, icon, label, tile color]: System Settings' colored icon tiles.
+// [id, SF Symbol, label]
 const TABS = [
-  ['general', SlidersHorizontal, 'General', '#8e8e93'],
-  ['appearance', Palette, 'Appearance', '#0a84ff'],
-  ['profiles', SquareTerminal, 'Profiles', '#3a3a3c'],
-  ['keybindings', Keyboard, 'Keybindings', '#636366'],
-  ['gestures', Hand, 'Gestures', '#ff9500'],
-  ['rules', Route, 'Rules', '#5856d6'],
-  ['file', FileJson, 'settings.json', '#34c759'],
+  ['general', 'gearshape', 'General'],
+  ['appearance', 'paintpalette', 'Appearance'],
+  ['profiles', 'terminal', 'Profiles'],
+  ['keybindings', 'keyboard', 'Keybindings'],
+  ['gestures', 'hand.draw', 'Gestures'],
+  ['rules', 'signpost.right', 'Rules'],
+  ['file', 'curlybraces', 'settings.json'],
 ];
 const ALIASES = { keys: 'keybindings', shortcuts: 'keybindings', routing: 'rules', json: 'file' };
 const tabId = (t) => {
@@ -59,13 +59,11 @@ export default function Settings() {
   return (
     <div className="st-page" aria-label="Settings" tabIndex={-1} ref={page}>
       <nav className="st-nav">
-        {TABS.map(([k, Icon, name, color]) => (
+        {TABS.map(([k, symbol, name]) => (
           <Fragment key={k}>
             {k === 'file' && <div className="st-nav-sep" />}
             <button className={`st-tab${tab === k ? ' on' : ''}`} onClick={() => setTab(k)}>
-              <span className="st-tile" style={{ '--tc': color }}>
-                <Icon size={14} strokeWidth={2} />
-              </span>
+              <Sym name={symbol} size={17} className="st-ic" />
               {name}
               {k === 'file' && file.error && <span className="st-tab-err" title={file.error} />}
             </button>
@@ -73,7 +71,7 @@ export default function Settings() {
         ))}
         <div className="grow" />
         <button className="btn st-file" onClick={A.openSettingsFile} title={file.path}>
-          <ExternalLink size={13} strokeWidth={1.75} />
+          <IconExternal size={14} />
           Open in external editor
         </button>
       </nav>
@@ -81,7 +79,7 @@ export default function Settings() {
         <div className="st-head">
           <span className="st-title">{label}</span>
           <button className="icon-btn" title="Close Settings (Esc)" onClick={A.closeSettings}>
-            <X size={16} strokeWidth={1.75} />
+            <IconClose size={14} />
           </button>
         </div>
         {tab !== 'file' && (file.error || file.warnings.length > 0) && (

@@ -734,6 +734,12 @@ fn create_main_window(app: &AppHandle) -> tauri::Result<WebviewWindow> {
         // which blurs what's behind the window and turns opaque while it's inactive.
         .transparent(true)
         .effects(EffectsBuilder::new().effect(Effect::Sidebar).state(EffectState::FollowsWindowActiveState).build())
+        // For checking the other appearance during development: TERMORC_APPEARANCE=light|dark.
+        .theme(match std::env::var("TERMORC_APPEARANCE").as_deref() {
+            Ok("light") => Some(tauri::Theme::Light),
+            Ok("dark") => Some(tauri::Theme::Dark),
+            _ => None,
+        })
         .disable_drag_drop_handler()
         // Sessions keep streaming while the window is hidden; WebKit mustn't nap the page,
         // or unacked output would pause the shells.
@@ -861,6 +867,36 @@ fn app_focus_main(app: AppHandle) {
 #[tauri::command]
 fn app_traffic_lights(window: WebviewWindow, visible: bool) {
     macos::set_traffic_lights_visible(&window, visible);
+}
+
+#[derive(Deserialize)]
+struct SymbolReq {
+    name: String,
+    size: f64,
+    weight: f64,
+}
+
+// SF Symbols for the page, keyed `name@size@weight`: { src (PNG data URL), w, h } in points,
+// or null for a name this macOS doesn't have. AppKit draws them on the main thread.
+#[tauri::command]
+async fn app_symbols(app: AppHandle, items: Vec<SymbolReq>, scale: f64) -> Map<String, Value> {
+    let (tx, rx) = oneshot::channel();
+    let _ = app.run_on_main_thread(move || {
+        let scale = scale.clamp(1.0, 4.0);
+        let out = items
+            .iter()
+            .map(|r| {
+                let key = format!("{}@{}@{}", r.name, r.size, r.weight);
+                let sym = macos::render_symbol(&r.name, r.size, r.weight, scale).map(|s| {
+                    let src = format!("data:image/png;base64,{}", base64::engine::general_purpose::STANDARD.encode(&s.png));
+                    json!({ "src": src, "w": s.width, "h": s.height })
+                });
+                (key, sym.unwrap_or(Value::Null))
+            })
+            .collect();
+        let _ = tx.send(out);
+    });
+    rx.await.unwrap_or_default()
 }
 
 #[tauri::command]
@@ -1179,6 +1215,7 @@ pub fn run() {
             app_set_hotkey,
             app_focus_main,
             app_traffic_lights,
+            app_symbols,
             app_set_zoom,
             app_titlebar_double_click,
             app_ready,

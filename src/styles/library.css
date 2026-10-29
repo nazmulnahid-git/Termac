@@ -4,20 +4,20 @@
 .lib-head { flex: none; display: flex; flex-direction: column; gap: 12px; padding: 16px 22px 12px; border-bottom: 1px solid var(--line); }
 .lib-titlebar { display: flex; align-items: center; gap: 14px; min-width: 0; }
 .lib-title { font-weight: var(--bold); font-size: 1.16em; }
-.lib-select { height: 24px; padding: 0 12px; border-radius: 12px; background: var(--ctl); box-shadow: var(--ctl-rim); white-space: nowrap; }
+.lib-select { height: var(--ctl-h); padding: 0 10px; border-radius: var(--r); background: var(--ctl); box-shadow: var(--ctl-rim); white-space: nowrap; }
 .lib-select:active { background: var(--ctl-press); }
 
-.lib-search { height: 32px; display: flex; align-items: center; gap: 9px; padding: 0 12px; border-radius: var(--r-lg); background: var(--field); color: var(--dim); }
+.lib-search { height: 28px; display: flex; align-items: center; gap: 8px; padding: 0 10px; border-radius: var(--r-lg); background: var(--field); color: var(--dim); }
 .lib-search:focus-within { background: var(--input); box-shadow: var(--field-rim), var(--ring); }
 .lib-search input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; caret-color: var(--accent); user-select: text; }
 .lib-hint { color: var(--dim); white-space: nowrap; }
 
 .lib-chips { display: flex; gap: 8px; flex-wrap: wrap; }
-.lib-chip { display: inline-flex; align-items: center; gap: 5px; height: 24px; padding: 0 10px; border-radius: 12px; background: var(--field); white-space: nowrap; max-width: 280px; overflow: hidden; text-overflow: ellipsis; }
+.lib-chip { display: inline-flex; align-items: center; gap: 5px; height: var(--ctl-h); padding: 0 9px; border-radius: var(--r); background: var(--field); white-space: nowrap; max-width: 280px; overflow: hidden; text-overflow: ellipsis; }
 .lib-chip:hover { background: var(--sel); }
-.lib-chip.on { background: var(--accent); color: var(--accent-ink); }
+.lib-chip.on { background: var(--sel); color: var(--ink); }
 .lib-chip .mono { }
-.lib-chip.space { background: var(--c); color: #fff; box-shadow: none; font-weight: 500; }
+.lib-chip.space { background: color-mix(in oklab, var(--c) 20%, transparent); color: var(--ink); box-shadow: none; font-weight: 500; }
 .lib-chip.space:hover { filter: brightness(1.05); }
 .lib-chip .x { margin-left: 2px; opacity: 0.85; border-radius: var(--r-sm); padding: 0 2px; }
 .lib-chip .x:hover { opacity: 1; background: rgba(255, 255, 255, 0.2); }
@@ -58,7 +58,7 @@
 .lib-pill { flex: none; padding: 1px 9px; border-radius: 10px; font-weight: 500; font-size: 0.9em; background: var(--field); color: var(--dim); }
 .lib-pill.ok { background: color-mix(in oklab, var(--ok) 16%, var(--panel)); color: var(--ok); }
 .lib-pill.fail { background: color-mix(in oklab, var(--fail) 14%, var(--panel)); color: var(--fail); }
-.lib-btn { height: 28px; padding: 0 16px; border-radius: 14px; }
+.lib-btn { height: var(--ctl-h); padding: 0 14px; border-radius: calc(var(--ctl-h) / 2); }
 .lib-del { color: var(--dim); padding: 4px 8px; border-radius: var(--r); }
 .lib-del:hover { color: var(--fail); background: var(--hover); }
 
@@ -85,7 +85,7 @@
 .lib-none h3 { margin: 4px 0 0; }
 .lib-none p { margin: 0; max-width: 400px; color: var(--dim); }
 .lib-none .btn { margin-top: 6px; }
-.lib-tile { width: 56px; height: 56px; border-radius: 14px; background: linear-gradient(color-mix(in oklab, var(--space) 80%, white), var(--accent)); color: #fff; display: flex; align-items: center; justify-content: center; box-shadow: inset 0 0.5px 0 rgba(255, 255, 255, 0.3), 0 4px 12px -4px rgba(0, 0, 0, 0.3); }
+.lib-tile { width: 52px; height: 52px; border-radius: var(--r-xl); background: var(--field); color: var(--dim); display: flex; align-items: center; justify-content: center; }
 
 @media (max-width: 900px) {
   .lib-hint { display: none; }

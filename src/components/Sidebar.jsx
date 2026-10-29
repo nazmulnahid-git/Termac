@@ -7,8 +7,7 @@ import { shortName, sessionName, formatDuration } from '../lib/meta.js';
 import { tildify } from '../lib/routing.js';
 import { highlight } from '../lib/fuzzy.js';
 import { findTabs } from '../lib/tabfind.js';
-import { IconFolder, IconFolderOpen, IconFolderPlus, IconChevron, IconPlus, IconMore, IconSearch, IconClose, IconSidebar } from './icons.jsx';
-import { Settings as SettingsIcon } from 'lucide-react';
+import { IconFolder, IconFolderOpen, IconFolderPlus, IconChevron, IconPlus, IconMore, IconSearch, IconClose, IconSidebar, IconGear } from './icons.jsx';
 import Rail from './SidebarRail.jsx';
 import { TabIcon } from './tabicons.jsx';
 import { SpaceTrack, useSpaceMotion } from './space-motion.jsx';
@@ -190,7 +189,7 @@ function SettingsRow() {
     <div className="rows sb-app-tabs">
       <div className={`row${on ? ' on' : ''}`} onClick={() => A.openSettings()}>
         <span className="chip icon">
-          <SettingsIcon size={14} strokeWidth={1.75} />
+          <IconGear size={16} />
         </span>
         <span className="name">Settings</span>
         <button className="close" title="Close Settings" onClick={(e) => (e.stopPropagation(), A.closeSettings())}>

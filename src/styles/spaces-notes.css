@@ -42,7 +42,7 @@
 .nt-cb .acts { display: flex; gap: 6px; padding: 0 8px 8px; }
 .nt-cb .acts button { padding: 3px 10px; border-radius: 11px; background: rgba(255, 255, 255, 0.12); color: #fff; }
 .nt-cb .acts button:hover { background: rgba(255, 255, 255, 0.16); }
-.nt-cb .acts button.save { background: var(--accent); color: var(--accent-ink); font-weight: 500; }
+.nt-cb .acts button.save { background: rgba(255, 255, 255, 0.22); color: #fff; font-weight: 500; }
 .nt-cb .acts button.save:hover { filter: brightness(1.05); }
 
 .nt-edit { flex: 1; min-height: 0; width: 100%; resize: none; border: 0; outline: 0; padding: 16px; background: transparent; color: var(--ink); tab-size: 2; user-select: text; }
@@ -58,7 +58,7 @@
 
 /* ---------- Space editor ---------- */
 .se { width: 720px; }
-.se-strip { height: 72px; flex: none; display: flex; align-items: flex-end; gap: 9px; padding: 0 20px 14px; background: linear-gradient(color-mix(in oklab, var(--c) 22%, transparent), color-mix(in oklab, var(--c) 6%, transparent)); border-bottom: 1px solid var(--line); }
+.se-strip { height: 64px; flex: none; display: flex; align-items: flex-end; gap: 9px; padding: 0 20px 12px; border-bottom: 1px solid var(--line); }
 .se-strip .g { color: var(--c); font-size: 1.5em; }
 .se-strip .n { font-weight: var(--bold); font-size: 1.15em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .se-strip .n.ph { color: var(--dim); font-weight: var(--bold); }
@@ -112,7 +112,7 @@
 .ov-card.cur { box-shadow: 0 0 0 1px var(--c), 0 20px 50px rgba(0, 0, 0, 0.4); }
 .ov-card.hl { box-shadow: 0 0 0 1px var(--c), 0 0 0 4px color-mix(in oklab, var(--c) 30%, transparent), 0 20px 50px rgba(0, 0, 0, 0.4); }
 .ov-card.drop { box-shadow: 0 0 0 3px var(--c), 0 0 0 6px color-mix(in oklab, var(--c) 35%, transparent), 0 20px 50px rgba(0, 0, 0, 0.4); }
-.ov-head { flex: none; padding: 12px 12px 10px; background: linear-gradient(color-mix(in oklab, var(--c) 20%, transparent), color-mix(in oklab, var(--c) 6%, transparent)); box-shadow: inset 0 -1px 0 var(--line); }
+.ov-head { flex: none; padding: 12px 12px 10px; box-shadow: inset 0 -1px 0 var(--line); }
 .ov-head .top { display: flex; align-items: center; gap: 8px; font-weight: var(--bold); }
 .ov-head .top .g { color: var(--c); }
 .ov-head .badge { font-weight: var(--bold); font-size: 0.86em; padding: 1px 7px; border-radius: 9px; background: var(--field); color: var(--ink); flex: none; }
@@ -121,8 +121,8 @@
 .ov-group { font-weight: var(--bold); font-size: 0.88em; color: var(--dim); padding: 7px 6px 2px; }
 .ov-row { display: flex; align-items: center; gap: 10px; min-height: 30px; padding: 0 8px; border-radius: var(--r-lg); }
 .ov-row:hover { background: var(--hover); }
-.ov-row.on { background: var(--pick); color: var(--pick-ink); }
-.ov-row.on :is(.chip, .chip.icon, .status) { color: inherit; }
+.ov-row.on { background: var(--pick); }
+.ov-row.on .chip { color: var(--accent); }
 .ov-row.ghost { opacity: 0.35; }
 .ov-row .name { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ov-none { color: var(--dim); padding: 8px 6px; }

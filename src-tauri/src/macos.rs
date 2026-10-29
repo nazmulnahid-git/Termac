@@ -2,8 +2,11 @@
 use objc2::rc::Retained;
 use objc2::runtime::NSObject;
 use objc2::{define_class, msg_send, AllocAnyThread, MainThreadMarker, MainThreadOnly};
-use objc2_app_kit::{NSApplication, NSImage, NSPasteboard, NSPasteboardTypeString, NSUpdateDynamicServices, NSWindow, NSWindowButton, NSWindowCollectionBehavior};
-use objc2_foundation::{NSData, NSString, NSURL, NSUserDefaults};
+use objc2_app_kit::{
+    NSApplication, NSBitmapImageFileType, NSBitmapImageRep, NSDeviceRGBColorSpace, NSGraphicsContext, NSImage, NSImageSymbolConfiguration, NSPasteboard,
+    NSPasteboardTypeString, NSUpdateDynamicServices, NSWindow, NSWindowButton, NSWindowCollectionBehavior,
+};
+use objc2_foundation::{NSData, NSDictionary, NSPoint, NSRect, NSString, NSURL, NSUserDefaults};
 use std::sync::OnceLock;
 use tauri::{Runtime, WebviewWindow};
 
@@ -65,6 +68,49 @@ pub fn set_dock_icon(png: &'static [u8]) {
     if let Some(image) = NSImage::initWithData(NSImage::alloc(), &data) {
         unsafe { NSApplication::sharedApplication(mtm).setApplicationIconImage(Some(&image)) };
     }
+}
+
+// ---- SF Symbols --------------------------------------------------------------------------
+// The chrome's icons are SF Symbols, drawn by AppKit at the screen's scale into PNGs. The
+// page uses them as masks, so they take the color of the text around them.
+pub struct Symbol {
+    pub png: Vec<u8>,
+    pub width: f64,
+    pub height: f64,
+}
+
+// `weight` is an NSFontWeight (regular 0, medium 0.23, semibold 0.3); `scale` is pixels per point.
+pub fn render_symbol(name: &str, size: f64, weight: f64, scale: f64) -> Option<Symbol> {
+    let image = NSImage::imageWithSystemSymbolName_accessibilityDescription(&NSString::from_str(name), None)?;
+    let image = image.imageWithSymbolConfiguration(&NSImageSymbolConfiguration::configurationWithPointSize_weight(size, weight))?;
+    let pt = image.size();
+    let (w, h) = ((pt.width * scale).ceil() as isize, (pt.height * scale).ceil() as isize);
+    // Safety: null planes make AppKit allocate the buffer; a constant AppKit exports.
+    let rep = unsafe {
+        NSBitmapImageRep::initWithBitmapDataPlanes_pixelsWide_pixelsHigh_bitsPerSample_samplesPerPixel_hasAlpha_isPlanar_colorSpaceName_bytesPerRow_bitsPerPixel(
+            NSBitmapImageRep::alloc(),
+            std::ptr::null_mut(),
+            w,
+            h,
+            8,
+            4,
+            true,
+            false,
+            NSDeviceRGBColorSpace,
+            0,
+            0,
+        )
+    }?;
+    rep.setSize(pt);
+    let ctx = NSGraphicsContext::graphicsContextWithBitmapImageRep(&rep)?;
+    NSGraphicsContext::saveGraphicsState_class();
+    NSGraphicsContext::setCurrentContext(Some(&ctx));
+    image.drawInRect(NSRect::new(NSPoint::new(0.0, 0.0), pt));
+    ctx.flushGraphics();
+    NSGraphicsContext::restoreGraphicsState_class();
+    // Safety: an empty properties dictionary.
+    let png = unsafe { rep.representationUsingType_properties(NSBitmapImageFileType::PNG, &NSDictionary::new()) }?;
+    Some(Symbol { png: png.to_vec(), width: pt.width, height: pt.height })
 }
 
 // ---- Finder service ------------------------------------------------------------------------

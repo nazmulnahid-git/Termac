@@ -10,15 +10,14 @@ import { formatAccel } from '../lib/keys.js';
 import { kindOf, sessionName, formatDuration, timeAgo, dayLabel } from '../lib/meta.js';
 import { TabIcon } from './tabicons.jsx';
 import { SpaceGlyph, kindGlyph } from './common.jsx';
-import { IconSearch } from './icons.jsx';
-import { Braces, Columns2, Command, FileText, Folder, Plus, Rows2 } from 'lucide-react';
+import { IconSearch, Sym } from './icons.jsx';
 
 // Results lead with an icon, as in Spotlight: a session's kind, else what the result is.
-const CHIP_ICONS = { '+': Plus, '{ }': Braces, '›': Command, '⇥': Columns2, '⤓': Rows2, '≡': FileText };
+const CHIP_ICONS = { '+': 'plus', '{ }': 'curlybraces', '›': 'command', '⇥': 'rectangle.split.2x1', '⤓': 'rectangle.split.1x2', '≡': 'doc.text' };
 function ChipIcon({ item }) {
   if (typeof item.chip !== 'string') return item.chip ?? null;
-  const [Glyph] = (item.group === 'dir' ? [Folder] : null) || (CHIP_ICONS[item.chip] ? [CHIP_ICONS[item.chip]] : kindGlyph(item.chip) || []);
-  return Glyph ? <Glyph size={16} strokeWidth={1.75} aria-hidden="true" /> : item.chip;
+  const symbol = item.group === 'dir' ? 'folder' : CHIP_ICONS[item.chip] || kindGlyph(item.chip)?.[0];
+  return symbol ? <Sym name={symbol} size={16} /> : item.chip;
 }
 import { promptText } from './Sidebar.jsx';
 import { rootOf } from './project.js';

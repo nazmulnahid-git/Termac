@@ -4,8 +4,8 @@ import { useEffect } from 'react';
 import * as A from '../state/actions.js';
 import { useTabView, Chip } from './common.jsx';
 import { SPACE_COLORS } from '../lib/meta.js';
-import { Ban } from 'lucide-react';
 import { TAB_ICONS } from './tabicons.jsx';
+import { Sym, IconBan } from './icons.jsx';
 
 export default function TabStyle({ tid, onClose }) {
   const v = useTabView(tid);
@@ -31,11 +31,11 @@ export default function TabStyle({ tid, onClose }) {
         <div className="ts-label">Icon</div>
         <div className="ts-icons">
           <button className={`ts-icon none${!icon ? ' on' : ''}`} title="No icon" onClick={() => set({ icon: null })}>
-            <Ban size={18} strokeWidth={1.75} aria-hidden="true" />
+            <IconBan size={18} />
           </button>
-          {Object.entries(TAB_ICONS).map(([id, Icon]) => (
+          {Object.entries(TAB_ICONS).map(([id, symbol]) => (
             <button key={id} className={`ts-icon${icon === id ? ' on' : ''}`} title={id} onClick={() => set({ icon: id })}>
-              <Icon size={18} strokeWidth={1.75} aria-hidden="true" />
+              <Sym name={symbol} size={18} />
             </button>
           ))}
         </div>

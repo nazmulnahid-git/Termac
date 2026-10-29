@@ -5,18 +5,19 @@
 
 .st-nav { width: 210px; flex: none; display: flex; flex-direction: column; gap: 2px; padding: 12px 10px 10px; border-right: 1px solid var(--line); }
 .st-nav-title { padding: 2px 8px 10px; color: var(--dim); font-size: 0.88em; font-weight: var(--bold); }
-.st-tab { height: 30px; display: flex; align-items: center; gap: 9px; padding: 0 6px; border-radius: var(--r-lg); color: var(--ink); text-align: left; }
+.st-tab { height: var(--row-h); display: flex; align-items: center; gap: 8px; padding: 0 8px; border-radius: var(--r-lg); color: var(--ink); text-align: left; }
 /* Each pane's glyph sits on a small colored tile, white on color. */
-.st-tile { width: 22px; height: 22px; flex: none; display: inline-flex; align-items: center; justify-content: center; border-radius: 6px; background: var(--tc); color: #fff; box-shadow: inset 0 0.5px 0 rgba(255, 255, 255, 0.25), 0 0.5px 1px rgba(0, 0, 0, 0.18); }
+.st-ic { color: var(--dim); }
+.st-tab.on .st-ic { color: var(--accent); }
 .st-tab:hover:not(.on) { background: var(--hover); }
-.st-tab.on { background: var(--accent); color: var(--accent-ink); }
+.st-tab.on { background: var(--pick); }
 .st-nav-sep { height: 1px; margin: 8px 8px; background: var(--line); }
 .st-tab-err { width: 7px; height: 7px; margin-left: auto; border-radius: 50%; background: var(--fail); box-shadow: 0 0 0 1.5px var(--chrome); }
 .st-file { margin: 0 2px; }
 
 .st-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.st-head { flex: none; height: 46px; display: flex; align-items: center; justify-content: space-between; padding: 0 10px 0 28px; }
-.st-title { font-weight: var(--bold); font-size: 1.16em; }
+.st-head { flex: none; height: 44px; display: flex; align-items: center; justify-content: space-between; padding: 0 10px 0 28px; }
+.st-title { font-weight: var(--bold); font-size: 1.12em; }
 .st-filebar { flex: none; display: flex; align-items: center; gap: 16px; padding: 8px 16px; background: color-mix(in oklab, var(--fail) 12%, var(--panel)); border-bottom: 1px solid var(--panel-line); }
 .st-filebar b { color: var(--fail); }
 
@@ -29,7 +30,7 @@
    separators inset from both edges. */
 .st-group-title { font-weight: var(--bold); color: var(--ink); margin: 6px 0 -8px 2px; }
 .st-group { border-radius: var(--r-lg); background: var(--group); box-shadow: inset 0 0 0 0.5px var(--line); overflow: hidden; }
-.st-row { position: relative; display: flex; align-items: center; gap: 12px; min-height: 40px; padding: 7px 12px; }
+.st-row { position: relative; display: flex; align-items: center; gap: 12px; min-height: 36px; padding: 6px 12px; }
 .st-row + .st-row::before, .st-keys > div + div::before { content: ''; position: absolute; top: 0; left: 12px; right: 12px; height: 1px; background: var(--line); }
 .st-keys > div + div { position: relative; }
 .st-label { flex: 1; min-width: 0; }
@@ -48,7 +49,7 @@
 .st-h { font-weight: var(--bold); }
 
 /* Shortcut recorder: a rounded field holding the key combination. */
-.st-kbd { display: inline-flex; align-items: center; justify-content: center; min-width: 60px; height: 24px; padding: 0 10px; border-radius: 12px; background: var(--input); box-shadow: var(--field-rim); text-align: center; white-space: nowrap; flex: none; letter-spacing: 0.04em; }
+.st-kbd { display: inline-flex; align-items: center; justify-content: center; min-width: 56px; height: var(--ctl-h); padding: 0 9px; border-radius: var(--r); background: var(--input); box-shadow: var(--field-rim); text-align: center; white-space: nowrap; flex: none; letter-spacing: 0.04em; }
 .st-kbd.none { color: var(--faint); letter-spacing: 0; }
 .st-kbd.rec { color: var(--accent); box-shadow: var(--field-rim), var(--ring); }
 .st-kbd.static { background: var(--field); box-shadow: none; }
@@ -92,7 +93,7 @@
 
 /* Keybindings */
 /* Search field (NSSearchField): a rounded field with a magnifier. */
-.st-search { display: flex; align-items: center; gap: 7px; height: 26px; padding: 0 10px; border-radius: 13px; background: var(--field); color: var(--dim); }
+.st-search { display: flex; align-items: center; gap: 6px; height: 24px; padding: 0 8px; border-radius: var(--r-lg); background: var(--field); color: var(--dim); }
 .st-search:focus-within { background: var(--input); box-shadow: var(--field-rim), var(--ring); }
 .st-search input { border: 0; outline: 0; background: transparent; }
 .st-qaccel { height: 28px; min-width: 0; }

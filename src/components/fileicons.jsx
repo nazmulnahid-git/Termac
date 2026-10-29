@@ -1,30 +1,32 @@
-// IDE-style explorer icons (VS Code / Antigravity): Lucide line icons tinted by language,
-// with dedicated icons for well-known folders and config files.
-import {
-  File,
-  FileArchive,
-  FileAudio,
-  FileCode,
-  FileCog,
-  FileImage,
-  FileJson,
-  FileKey,
-  FileLock,
-  FileSpreadsheet,
-  FileTerminal,
-  FileText,
-  FileVideo,
-  Folder,
-  FolderArchive,
-  FolderCheck,
-  FolderCode,
-  FolderCog,
-  FolderGit2,
-  FolderOpen,
-  FolderOutput,
-  FolderRoot,
-  FolderHeart,
-} from 'lucide-react';
+// Explorer icons: SF Symbols tinted by language, as in Xcode's navigator; folders are
+// filled, colored for the well-known ones.
+import { Sym } from './icons.jsx';
+
+// SF Symbols for each kind of file.
+const File = 'doc';
+const FileArchive = 'doc.zipper';
+const FileAudio = 'music.note';
+const FileCode = 'chevron.left.forwardslash.chevron.right';
+const FileCog = 'gearshape';
+const FileImage = 'photo';
+const FileJson = 'curlybraces';
+const FileKey = 'key';
+const FileLock = 'lock';
+const FileSpreadsheet = 'tablecells';
+const FileTerminal = 'terminal';
+const FileText = 'doc.text';
+const FileVideo = 'film';
+const Folder = 'folder.fill';
+const FolderArchive = 'folder.fill';
+const FolderCheck = 'folder.fill';
+const FolderCode = 'folder.fill';
+const FolderCog = 'folder.fill';
+const FolderGit2 = 'folder.fill';
+const FolderOpen = 'folder.fill';
+const FolderOutput = 'folder.fill';
+const FolderRoot = 'folder.fill';
+const FolderHeart = 'folder.fill';
+
 
 // Language colors, kept mid-tone so they read on light and dark panels alike.
 const C = {
@@ -184,9 +186,9 @@ const FOLDERS = {
   '.vscode': [FolderCog, '#3e8ed0'],
   '.claude': [FolderCog, '#d97757'],
 };
-const FOLDER_COLOR = '#8f99a8';
+const FOLDER_COLOR = '#5aa2e0'; // Finder's folder blue
 
-const draw = (Icon, color, size) => <Icon className="ftype" size={size} strokeWidth={1.75} style={{ color }} aria-hidden="true" />;
+const draw = (symbol, color, size) => <Sym name={symbol} className="ftype" size={size} style={{ color }} />;
 
 export function FileIcon({ name, size = 16 }) {
   const lower = name.toLowerCase();

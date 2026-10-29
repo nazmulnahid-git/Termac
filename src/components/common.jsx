@@ -4,7 +4,7 @@ import { arrayEq } from '../state/store.js';
 import * as L from '../lib/layout.js';
 import { kindOf, sessionName, timeAgo, formatDuration } from '../lib/meta.js';
 import { TabIcon } from './tabicons.jsx';
-import { Activity, Cog, Container, Database, FlaskConical, GitBranch, Hexagon, Layers, Rabbit, Server, Ship, SquarePen, SquareTerminal } from 'lucide-react';
+import { Sym } from './icons.jsx';
 
 // Aggregated view of a sidebar row: names, chips and the most urgent status of its panes.
 export function useTabView(tid) {
@@ -51,19 +51,19 @@ export function FailTip({ rt: r }) {
 
 // What a session runs, as a sidebar glyph. Anything unrecognised is a plain shell.
 const KIND_ICONS = {
-  '>_': [SquareTerminal, 'Shell'],
-  js: [Hexagon, 'JavaScript'],
-  py: [FlaskConical, 'Python'],
-  db: [Database, 'Database'],
-  git: [GitBranch, 'Git'],
-  ssh: [Server, 'SSH'],
-  tf: [Layers, 'Terraform'],
-  k8: [Ship, 'Kubernetes'],
-  rs: [Cog, 'Rust'],
-  go: [Rabbit, 'Go'],
-  dk: [Container, 'Docker'],
-  ed: [SquarePen, 'Editor'],
-  top: [Activity, 'Monitor'],
+  '>_': ['terminal', 'Shell'],
+  js: ['hexagon', 'JavaScript'],
+  py: ['testtube.2', 'Python'],
+  db: ['cylinder.split.1x2', 'Database'],
+  git: ['arrow.triangle.branch', 'Git'],
+  ssh: ['server.rack', 'SSH'],
+  tf: ['square.3.stack.3d', 'Terraform'],
+  k8: ['circle.hexagongrid', 'Kubernetes'],
+  rs: ['gearshape.2', 'Rust'],
+  go: ['hare', 'Go'],
+  dk: ['shippingbox', 'Docker'],
+  ed: ['square.and.pencil', 'Editor'],
+  top: ['waveform.path.ecg', 'Monitor'],
 };
 
 export const kindGlyph = (kind) => KIND_ICONS[kind] || null;
@@ -76,10 +76,10 @@ export function Chip({ kind, icon }) {
         <TabIcon name={icon} />
       </span>
     );
-  const [Glyph, label] = KIND_ICONS[kind] || KIND_ICONS['>_'];
+  const [symbol, label] = KIND_ICONS[kind] || KIND_ICONS['>_'];
   return (
     <span className="chip icon" title={label}>
-      <Glyph size={16} strokeWidth={1.75} aria-hidden="true" />
+      <Sym name={symbol} size={16} />
     </span>
   );
 }
