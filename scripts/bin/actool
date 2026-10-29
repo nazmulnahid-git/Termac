@@ -1,0 +1,5 @@
+#!/bin/sh
+# The Tauri bundler runs actool with stdin closed, which makes actool crash while
+# compiling src-tauri/icons/AppIcon.icon. The start and dist scripts put this folder
+# first on PATH so actool gets an empty stdin instead.
+exec xcrun actool "$@" </dev/null
