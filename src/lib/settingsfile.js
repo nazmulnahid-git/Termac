@@ -7,7 +7,7 @@
 const RETIRED_ACTIONS = new Set(['findTab', 'notes', 'toggleFiles', 'quickOpen', 'toggleReview']);
 
 const FIELDS = [
-  ['appearance.theme', 'termTheme', { values: ['system', 'dark', 'light'], desc: 'Terminal theme for Spaces without a custom background.' }],
+  ['appearance.theme', 'termTheme', { values: ['system', 'dark', 'light'], desc: 'Light or dark for the whole app, or follow the system. Spaces with a custom terminal background keep it.' }],
   ['appearance.zoom_level', 'zoomLevel', { min: 50, max: 200, int: true, desc: 'Zoom for the whole window, in percent.' }],
   ['appearance.ui.font_family', 'uiFontFamily', { desc: 'Font for the interface (sidebar, bars, menus). "system-ui" is SF Pro on macOS.' }],
   ['appearance.ui.font_size', 'uiFontSize', { min: 10, max: 20, desc: 'Interface font size in px.' }],

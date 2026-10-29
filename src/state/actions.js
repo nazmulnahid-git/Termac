@@ -984,6 +984,7 @@ export function applySettings() {
   const s = app.get();
   applyFontVars(s.settings);
   api.app.setZoom(s.settings.zoomLevel);
+  api.app.setTheme(s.settings.termTheme);
   const termTheme = reg.configure(s.settings, ui.get().dark);
   ui.set((u) => (u.termTheme === termTheme ? u : { ...u, termTheme }));
   keymap = buildKeymap(s.settings.keybindings);

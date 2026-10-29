@@ -426,8 +426,8 @@ function AppearanceTab() {
             <Switch on={s.cursorBlink} onChange={setSetting('cursorBlink')} />
           </span>
         </Row>
-        <Row label="Default terminal theme" hint="Used by Spaces without a custom background">
-          <Seg value={s.termTheme} onChange={setSetting('termTheme')} options={[['system', 'Follow system'], ['dark', 'Dark'], ['light', 'Light']]} />
+        <Row label="Appearance" hint="The window, sidebar and terminals. Spaces with a custom background keep it.">
+          <Seg value={s.termTheme} onChange={setSetting('termTheme')} options={[['system', 'Follow system'], ['light', 'Light'], ['dark', 'Dark']]} />
         </Row>
         <Row label="Scrollback lines">
           <Select value={s.scrollback} onChange={setSetting('scrollback')} options={[[1000, '1,000'], [5000, '5,000'], [10000, '10,000'], [50000, '50,000']]} />

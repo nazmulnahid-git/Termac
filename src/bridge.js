@@ -171,6 +171,7 @@ window.termac = {
     // SF Symbols drawn by AppKit: items [{ name, size, weight }], scale in pixels per CSS pixel.
     symbols: (items, scale) => call('app_symbols', { items, scale }),
     setZoom: (percent) => send('app_set_zoom', { percent }),
+    setTheme: (theme) => send('app_set_theme', { theme }),
     quit: () => send('app_quit'),
     quitReady: () => send('app_quit_ready'),
     quitCancel: () => send('app_quit_cancel'),

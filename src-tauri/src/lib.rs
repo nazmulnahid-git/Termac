@@ -806,6 +806,20 @@ fn app_set_zoom(window: WebviewWindow, percent: f64) {
     let _ = window.set_zoom((percent / 100.0).clamp(0.5, 3.0));
 }
 
+// The Appearance setting: light, dark or the system's, for every window (and the vibrancy
+// behind the sidebar). TERMORC_APPEARANCE, when set for development, wins.
+#[tauri::command]
+fn app_set_theme(app: AppHandle, theme: String) {
+    if std::env::var("TERMORC_APPEARANCE").is_ok() {
+        return;
+    }
+    app.set_theme(match theme.as_str() {
+        "light" => Some(tauri::Theme::Light),
+        "dark" => Some(tauri::Theme::Dark),
+        _ => None,
+    });
+}
+
 #[tauri::command]
 fn app_titlebar_double_click(window: WebviewWindow) {
     macos::titlebar_double_click(&window);
@@ -1104,6 +1118,7 @@ pub fn run() {
             app_traffic_lights,
             app_symbols,
             app_set_zoom,
+            app_set_theme,
             app_titlebar_double_click,
             app_ready,
             app_take_folders,
