@@ -2,7 +2,7 @@ import Foundation
 import Testing
 @testable import TermorcCore
 
-// Ported from the web build's tests/*.test.js so both implementations agree.
+// Unit tests for TermorcCore.
 
 private func leaf(_ s: String) -> Layout { .leaf(s) }
 // 1 | 2
@@ -351,8 +351,8 @@ private func grid() -> Layout {
         #expect(((props?["keybindings"] as? [String: Any])?["properties"] as? [String: Any])?.count == Keys.actions.count)
     }
 
-    // The web build's own file must read back and rewrite byte for byte.
-    @Test func matchesWebBuildOutput() throws {
+    // Your own settings.json must read back and rewrite byte for byte.
+    @Test func rewritesSettingsFileUnchanged() throws {
         let url = URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent(".termorc/settings.json")
         guard let text = try? String(contentsOf: url, encoding: .utf8) else { return }
         let r = try SettingsFile.parse(text)

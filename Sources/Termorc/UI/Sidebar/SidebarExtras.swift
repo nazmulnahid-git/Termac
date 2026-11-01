@@ -285,7 +285,7 @@ final class SidebarCards: NSStackView {
     }
 }
 
-// Context menus for rows, folders and Spaces (sidebar-shared.js).
+// Context menus for rows, folders and Spaces.
 @MainActor
 enum SidebarMenus {
     final class Handler: NSObject {

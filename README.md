@@ -29,58 +29,37 @@ A macOS terminal where every session lives in a vertical sidebar, grouped into c
 
 ## How it works
 
-Termorc is a [Tauri](https://tauri.app) app: a Rust core drives the native side, and the UI runs in the system WebKit view. That makes for a ~8 MB app.
+Termorc is a native macOS app in AppKit and SwiftUI, built with Swift Package Manager. Terminals are [SwiftTerm](https://github.com/migueldeicaza/SwiftTerm) views.
 
-| Layer | Notes |
+| Path | Notes |
 | --- | --- |
-| `src-tauri/src/pty.rs` | Owns every PTY (`portable-pty`). Output is coalesced into one channel message per window every ~4 ms. Ack-based flow control parks the reader so runaway processes block. The foreground process is polled every 1.5 s. |
-| `src-tauri/shell-integration/` | Hooks for zsh, bash and fish. They emit OSC 633 marks (prompt, command, exit code, cwd) and still load your own dotfiles. These marks drive the status marks, names, notifications, ⇧⌘C and the Library. |
-| `src-tauri/src/library.rs` | Archived sessions: a JSON index plus one ANSI scrollback file each. Search reads files lazily with a bounded cache. |
-| `src-tauri/src/lib.rs` | Windows, menus, Quick Terminal, global hotkey, dialogs, notifications and the quit flow, exposed as Tauri commands. |
-| `src/bridge.js` | The renderer's only door to the native side: the `window.termac` API, backed by Tauri commands, events and a PTY channel. |
-| `src/term/registry.js` | One xterm.js instance per session. Off-screen terminals are parked, so xterm pauses their rendering. Only visible panes hold a WebGL context. Restored sessions get a shell only when first shown. |
-| `src/state/` | Three small stores (persisted app model, runtime status, UI) with selector subscriptions. All mutations live in `actions.js`. |
+| `Sources/TermorcCore/` | Model, persistence, settings.json, Library, shell launch, command-line helpers. No AppKit, unit-tested. |
+| `Sources/Termorc/` | The app: window, sidebar, cards and panes, command bar, Settings, Library, Quick Terminal, input bar. |
+| `Resources/shell-integration/` | Hooks for zsh, bash and fish. They emit OSC 633 marks (prompt, command, exit code, cwd) and still load your own dotfiles. The app reads the marks from the PTY stream; they drive the status marks, names, command blocks, notifications, ⇧⌘C and the Library. |
+| `Resources/` | Also `Info.plist` (the version lives here), the app icons and the installer background. |
+| `tests/TermorcCoreTests/` | Unit tests for TermorcCore. |
 
 State lives in `~/Library/Application Support/Termorc/`:
 - `state.json`
 - `scrollback/` for live sessions across restarts
 - `library/` for archived sessions
 
-## Native app (in progress)
+Settings live in `~/.termorc/settings.json`.
 
-Termorc is being rebuilt as a native AppKit + SwiftUI app. It lives next to the Tauri app until it reaches parity:
+## Develop
 
-| Path | Notes |
-| --- | --- |
-| `Sources/TermorcCore/` | Model, persistence, settings.json, Library, shell launch, command-line helpers. No AppKit, unit-tested. |
-| `Sources/Termorc/` | The app: window, sidebar, cards and panes, command bar, Settings, Library, Quick Terminal, input bar. |
-| `Resources/` | `Info.plist` and the shell integration scripts bundled into the app. |
-| `tests/TermorcCoreTests/` | Swift tests, ported from the JS and Rust tests. |
-
-Terminals are [SwiftTerm](https://github.com/migueldeicaza/SwiftTerm) views. The app reads the OSC 633 marks from the PTY stream itself, so command blocks, statuses and ⇧⌘C work as before. It uses the same `state.json`, scrollback, Library and `~/.termorc/settings.json`, so sessions carry over. On its first launch it keeps a copy of the existing state as `state.web-backup.json`.
+Needs Xcode (or its command-line tools) for Swift 6.
 
 ```bash
 swift test                          # unit tests
 scripts/build-app.sh                # debug build → .build/Termorc.app
 scripts/build-app.sh release        # release build → .build/release-app/Termorc.app
-TERMORC_DATA_DIR=/tmp/termorc-dev scripts/build-app.sh debug run   # run on throwaway state
+scripts/build-app.sh debug run      # build, then open it
+scripts/make-dmg.sh                 # release build plus a styled .dmg (needs dmgbuild: pip3 install dmgbuild)
 ```
 
-## Develop
+Set `TERMORC_DATA_DIR=/some/folder` to run a build with its own state and settings, apart from your everyday sessions: `TERMORC_DATA_DIR=/tmp/termorc-dev scripts/build-app.sh debug run`.
 
-Needs Node and Rust (`curl https://sh.rustup.rs -sSf | sh`).
+The installer window's background is `Resources/dmg/background.svg`, rendered to `background.tiff` (1× and 2×); the layout lives in `scripts/dmg-settings.py`.
 
-```bash
-npm install
-npm run dev     # Vite + Tauri with hot reload
-npm test        # unit tests for paths, layout, fuzzy, keys, settings
-cargo test --manifest-path src-tauri/Cargo.toml --lib   # PTY, git and Library tests
-npm run dist    # release build: Termorc.app and a styled .dmg in src-tauri/target.noindex/release/bundle
-                # (the .dmg step needs dmgbuild: pip3 install dmgbuild)
-```
-
-Set `TERMORC_DATA_DIR=/some/folder` to run a build with its own state and settings, apart from your everyday sessions.
-
-The installer window's background is `build/dmg/background.svg`, rendered to `background.tiff` (1× and 2×); the layout lives in `scripts/dmg-settings.py`.
-
-The icon's artwork is `build/icon-art.png` (the `>_` on a transparent background). On macOS 26 and later the Dock uses `src-tauri/icons/AppIcon.icon`, an Icon Composer document with light, dark, clear and tinted looks; open it in Icon Composer (bundled with Xcode) to edit. Compiling it needs Xcode 26's `actool`, so point the command-line tools at Xcode once with `sudo xcode-select -s /Applications/Xcode.app`; otherwise the build skips it and every macOS version falls back to `icon.icns`. That fallback comes from `build/icon.svg`: after editing it, regenerate with `npx tauri icon build/icon.svg -o src-tauri/icons`, then delete the non-macOS sizes.
+The icon's artwork is `Resources/icons/icon-art.png` (the `>_` on a transparent background). On macOS 26 and later the Dock uses `Resources/icons/AppIcon.icon`, an Icon Composer document with light, dark, clear and tinted looks; open it in Icon Composer (bundled with Xcode) to edit. Compiling it needs Xcode 26's `actool`, so point the command-line tools at Xcode once with `sudo xcode-select -s /Applications/Xcode.app`; otherwise the build skips it and every macOS version falls back to `icon.icns`. That fallback comes from `Resources/icons/icon.svg`: after editing it, render the sizes into an `.iconset` folder and run `iconutil -c icns`.

@@ -91,7 +91,7 @@ final class PaneView: NSView {
         ])
         procPill.leadingInset = 20
         headerHeight = header.heightAnchor.constraint(equalToConstant: UI.px(Self.headerHeight))
-        // The terminal's inset inside the pane, as in the web build's .term-slot.
+        // The terminal's inset inside the pane.
         termInsets = [
             termHost.topAnchor.constraint(equalTo: header.bottomAnchor, constant: UI.px(10)),
             termHost.leadingAnchor.constraint(equalTo: leadingAnchor, constant: UI.px(14)),

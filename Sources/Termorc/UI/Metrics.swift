@@ -2,8 +2,8 @@ import AppKit
 import TermorcCore
 
 // Sizes and colors shared by Termorc's own views (sidebar rows, panes, the input bar, the
-// command bar). Like the web build, the Zoom setting scales the interface text and the
-// terminals together; native chrome (toolbar, menus, sheets) keeps the system's sizes.
+// command bar). The Zoom setting scales the interface text and the terminals together;
+// native chrome (toolbar, menus, sheets) keeps the system's sizes.
 @MainActor
 enum UI {
     static var settings: Settings { Store.shared.model.settings }
@@ -82,8 +82,8 @@ func keyHints(_ items: [(String, String)], font: NSFont, fg: NSColor, dim: NSCol
     }
 }
 
-// A Space's icon: its glyph in its color, or the image it was given (stored as a PNG data URL,
-// like the web build).
+// A Space's icon: its glyph in its color, or the image it was given (stored as a PNG data
+// URL).
 @MainActor
 enum SpaceIcon {
     private static var cache: [String: NSImage] = [:]

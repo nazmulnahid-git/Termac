@@ -1,7 +1,7 @@
 import Foundation
 
-// The persisted app model (state.json). Field names and shapes match the web build's
-// model.js, so a state file written by either app restores in the other.
+// The persisted app model (state.json). Field names and shapes are kept as earlier
+// versions wrote them, so their state files still restore.
 
 public struct Look: Codable, Equatable, Sendable {
     public var bg: String? // nil = follow the theme, "tint" = Space color, or a hex color
@@ -292,7 +292,7 @@ public struct AppModel: Codable, Equatable, Sendable {
         activity = c.v(.activity, [])
     }
 
-    // Fills in what an older or partial state file is missing (model.js `migrate`).
+    // Fills in what an older or partial state file is missing.
     public static func migrate(_ data: Data?) -> AppModel {
         guard let data, var s = try? JSONDecoder().decode(AppModel.self, from: data), s.version == 2 else { return .initial() }
         if s.spaces.isEmpty { s.spaces = AppModel.initial().spaces }
@@ -314,7 +314,7 @@ struct Lenient<T: Decodable>: Decodable {
 private let uidAlphabet = Array("0123456789abcdefghijklmnopqrstuvwxyz")
 private var uidCounter = 0
 
-// Same shape as the web build's ids: prefix + base-36 time + counter + random tail.
+// Ids: prefix + base-36 time + counter + random tail.
 public func uid(_ prefix: String = "x") -> String {
     uidCounter = (uidCounter + 1) % 1_000_000
     func b36(_ n: Int64) -> String { String(n, radix: 36) }

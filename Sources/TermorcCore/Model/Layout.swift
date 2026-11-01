@@ -2,8 +2,8 @@ import Foundation
 import CoreGraphics
 
 // Split layouts are binary trees: a leaf holds one session id, a split holds two children
-// laid out in a row (side by side) or column (stacked) with a ratio. JSON shape matches the
-// web build: {"sid": …} or {"dir": "row"|"col", "ratio": …, "a": …, "b": …}.
+// laid out in a row (side by side) or column (stacked) with a ratio. In JSON:
+// {"sid": …} or {"dir": "row"|"col", "ratio": …, "a": …, "b": …}.
 public indirect enum Layout: Equatable, Codable, Sendable {
     case leaf(String)
     case split(dir: Dir, ratio: Double, a: Layout, b: Layout)

@@ -195,7 +195,7 @@ struct SpaceEditor: View {
         if p.runModal() == .OK, let u = p.url { form.term.image = u.path }
     }
 
-    // Space icons are stored as small PNG data URLs, like the web build.
+    // Space icons are stored as small PNG data URLs.
     func chooseIcon() {
         let p = NSOpenPanel()
         p.allowedContentTypes = [.png, .jpeg, .webP, .gif, .heic]
@@ -371,7 +371,7 @@ struct SpaceGlyph: View {
     }
 }
 
-// A sheet inside the window, as in the web build: a faint backdrop over the window and a card
+// A sheet inside the window: a faint backdrop over the window and a card
 // centred on it that never grows past the window (its form scrolls instead). A click on the
 // backdrop or Esc closes it.
 @MainActor

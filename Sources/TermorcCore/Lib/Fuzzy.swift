@@ -1,7 +1,7 @@
 import Foundation
 
 // Subsequence fuzzy matcher. Scores contiguous runs and word starts higher and returns the
-// matched character indices for highlighting (fuzzy.js).
+// matched character indices for highlighting.
 public enum Fuzzy {
     public struct Match: Equatable {
         public let score: Double

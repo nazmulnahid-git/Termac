@@ -235,7 +235,7 @@ final class CommandBar: NSObject, NSTextFieldDelegate, NSTableViewDataSource, NS
             run(mode: flags.contains(.command) ? .new : flags.contains(.option) ? .split : .open)
         case #selector(NSResponder.cancelOperation(_:)): close(); store.syncFocus()
         default:
-            // ⌃N / ⌃P move too, as in the web build.
+            // ⌃N / ⌃P move too.
             if flags.contains(.control), let c = NSApp.currentEvent?.charactersIgnoringModifiers {
                 if c == "n" { select(itemIndex: self.sel + 1); return true }
                 if c == "p" { select(itemIndex: self.sel - 1); return true }
@@ -623,7 +623,7 @@ final class OverlayPanel: NSPanel {
 
     init(size: NSSize) {
         let fx = NSVisualEffectView()
-        // Glass like the web build's palette: a blur, tinted with the window background so it
+        // Glass: a blur, tinted with the window background so it
         // reads dark in Dark Mode and light in Light Mode.
         fx.material = .underWindowBackground
         fx.blendingMode = .behindWindow

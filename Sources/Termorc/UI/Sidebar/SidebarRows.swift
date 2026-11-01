@@ -528,7 +528,7 @@ final class SectionHeaderView: NSTableCellView {
 
     required init?(coder: NSCoder) { fatalError() }
 
-    // The header's buttons show on hover, as in the web build.
+    // The header's buttons show on hover.
     override func updateTrackingAreas() {
         super.updateTrackingAreas()
         trackingAreas.forEach(removeTrackingArea)

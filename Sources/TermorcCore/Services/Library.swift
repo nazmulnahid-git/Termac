@@ -1,7 +1,7 @@
 import Foundation
 
-// Archived sessions: a small JSON index plus one ANSI scrollback file per session, in the
-// same layout the web build used (library/index.json, library/<id>.ans). Full-text search
+// Archived sessions: a small JSON index plus one ANSI scrollback file per session
+// (library/index.json, library/<id>.ans). Full-text search
 // reads scrollback lazily and keeps a bounded cache of stripped, lowercased text.
 public struct LibraryEntry: Codable, Equatable, Sendable, Identifiable {
     public struct Cmd: Codable, Equatable, Sendable {

@@ -2,8 +2,9 @@ import Foundation
 
 // ~/.termorc/settings.json: the user-editable mirror of Settings. The file is nested and
 // snake_case (appearance.terminal.font_size); the app keeps flat camelCase keys. `fields`
-// maps one to the other and drives validation and the generated JSON Schema. Same format,
-// key order and indentation as the web build's settingsfile.js.
+// maps one to the other and drives validation and the generated JSON Schema. The format,
+// key order and indentation stay as earlier versions wrote them, so a rewrite doesn't
+// reshuffle a file you've edited.
 public enum SettingsFile {
     enum Kind {
         case choice([String])
@@ -206,7 +207,7 @@ public enum SettingsFile {
     }
 
     // ---- Writing ----------------------------------------------------------------------
-    // A tiny ordered JSON tree, so the file keeps the web build's key order.
+    // A tiny ordered JSON tree, so the file keeps its key order.
     indirect enum Node {
         case object([(String, Node)])
         case value(Value)
@@ -247,7 +248,7 @@ public enum SettingsFile {
         var root: [(String, Node)] = []
         if let schemaUrl, !schemaUrl.isEmpty { root.append(("$schema", .value(.s(schemaUrl)))) }
         for f in fields { insert(&root, f.path[...], f.get(settings)) }
-        // Object.keys order in the web build: the defaults' order, as ACTIONS lists them.
+        // Keybindings in the order Keys.actions lists them.
         let order = Keys.actions.map(\.id)
         let kb = order.compactMap { id in settings.keybindings[id].map { (id, Node.value(.s($0))) } }
         root.append(("keybindings", .object(kb)))

@@ -2,7 +2,7 @@ import AppKit
 import TermorcCore
 
 // The sidebar: Favorites as tiles, then the active Space's list (Pinned, folders, Today).
-// Switching Spaces is a real carousel, as in the web build (and Arc): neighbouring Spaces'
+// Switching Spaces is a real carousel, as in Arc: neighbouring Spaces'
 // lists sit side by side on one track. A two-finger swipe drags the track 1:1 and it springs
 // to the nearest Space on release, carrying the swipe's velocity. Keys, the Spaces bar and
 // menus slide the same track. Swiping past the last Space fills a ＋ ring that makes a new one.

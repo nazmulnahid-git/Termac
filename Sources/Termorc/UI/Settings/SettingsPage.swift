@@ -5,7 +5,7 @@ import TermorcCore
 // SwiftUI has a `Settings` scene too.
 typealias AppSettings = TermorcCore.Settings
 
-// Settings as a page in place of the terminal, as in the web build: its groups down the left,
+// Settings as a page in place of the terminal: its groups down the left,
 // the chosen group's form on the right. While it's open the sidebar shows a Settings row.
 struct SettingsPage: View {
     @EnvironmentObject var store: Store

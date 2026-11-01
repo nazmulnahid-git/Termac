@@ -1,7 +1,7 @@
 import AppKit
 import TermorcCore
 
-// What sessions report back, and the boot / checkpoint / quit flow (actions.js).
+// What sessions report back, and the boot / checkpoint / quit flow.
 extension Store: TermSessionHooks {
     func termInput(_ s: TermSession, _ data: [UInt8]) {
         if s.composerActive, let c = s.composer {

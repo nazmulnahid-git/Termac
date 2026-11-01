@@ -44,7 +44,7 @@ struct UIState {
     var sshHosts: [SSHHost] = []
 }
 
-// The app's state and everything that changes it (the web build's model.js + actions.js).
+// The app's state and everything that changes it.
 // AppKit views subscribe with `observe`; callbacks are coalesced to one per run-loop turn.
 @MainActor
 final class Store: ObservableObject {
@@ -137,7 +137,7 @@ final class Store: ObservableObject {
     // Font, cursor and keyboard options from Settings; colors come from the Space look.
     func configure(_ s: TermSession) {
         let st = model.settings
-        // Zoom scales terminals with the rest of the interface, as in the web build.
+        // Zoom scales terminals with the rest of the interface.
         s.view.font = Fonts.mono(st.fontFamily, size: st.fontSize * st.zoomLevel / 100, weight: st.fontWeight)
         s.view.optionAsMetaKey = st.optionAsMeta
         let blink = st.cursorBlink

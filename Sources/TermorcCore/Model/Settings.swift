@@ -18,8 +18,8 @@ public struct Gestures: Codable, Equatable, Sendable {
     }
 }
 
-// Mirrors DEFAULT_SETTINGS in the web build, key for key, so state.json and
-// ~/.termorc/settings.json stay readable by both.
+// Key names and defaults are part of state.json and ~/.termorc/settings.json, so files
+// written by earlier versions keep loading.
 public struct Settings: Codable, Equatable, Sendable {
     public var onLaunch = "restore" // restore | fresh
     public var newTerminalDir = "current" // current | space | home

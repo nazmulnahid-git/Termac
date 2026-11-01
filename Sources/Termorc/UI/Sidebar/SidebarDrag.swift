@@ -1,7 +1,7 @@
 import AppKit
 import TermorcCore
 
-// Pointer-driven drag for sidebar sessions and folders, modelled on Arc and the web build:
+// Pointer-driven drag for sidebar sessions and folders, modelled on Arc:
 // the row lifts off and follows the pointer, the list opens a gap where it will land, and on
 // release it settles into that gap. Other drops:
 //   the middle of another session, held a moment   → the two merge into one split session

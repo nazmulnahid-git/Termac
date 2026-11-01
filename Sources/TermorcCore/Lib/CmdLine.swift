@@ -1,8 +1,7 @@
 import Foundation
 
 // The input bar's text logic: shell-ish tokens for highlighting, history suggestions and
-// recall, applying a completion, and the shell's own history and completions (cmdline.js and
-// shell.rs in the web build).
+// recall, applying a completion, and the shell's own history and completions.
 public enum CmdLine {
     public enum Kind: String, Sendable { case space, str, op, `var`, assign, cmd, flag, arg }
 

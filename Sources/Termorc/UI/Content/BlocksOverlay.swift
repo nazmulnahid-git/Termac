@@ -6,7 +6,7 @@ import TermorcCore
 // duration and status in a small tab hanging from that hairline on the right. A failed
 // block gets a red edge and a red wash fading out across its output. Restored history ends
 // in a "Restored · time" divider. The overlay reaches `inset` points left of the text, so
-// bands start in the pane's margin as in the web build.
+// bands start in the pane's margin.
 final class BlocksOverlay: NSView {
     weak var session: TermSession?
     var look: TerminalLook? { didSet { needsDisplay = true } }

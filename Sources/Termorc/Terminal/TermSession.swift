@@ -207,6 +207,7 @@ final class TermSession: NSObject {
             pendingCmd = arg.trimmingCharacters(in: .whitespaces)
         case "A":
             atPrompt = true
+            view.syncCaret()
             // The prompt line is where the command will be echoed: the block's header line.
             promptRow = cursorRow()
             if !pendingInitialCommand.isEmpty {
@@ -220,6 +221,7 @@ final class TermSession: NSObject {
             pendingCmd = ""
             promptRow = nil
             atPrompt = false
+            view.syncCaret()
             cmds.append(entry)
             if cmds.count > 200 { cmds.removeFirst(cmds.count - 200) }
             hooks?.termCommandStart(self, entry.cmd)
@@ -303,8 +305,8 @@ final class TermSession: NSObject {
 
     // ---- Saved history ----------------------------------------------------------------
     // Saved scrollback starts with a private OSC listing the blocks (and restore dividers) by
-    // row, so a restored session draws the same block headers as a live one. Same format
-    // as the web build's registry.js, so either app restores the other's files.
+    // row, so a restored session draws the same block headers as a live one. Files saved by
+    // earlier versions use the same format.
     static let legacyBanner = try! NSRegularExpression(pattern: "(?:\\r\\n)?(?:\\u001b\\[[0-9;]*m)*─{4} restored · [^\\r\\n]*?─{4}(?:\\u001b\\[[0-9;]*m)*")
 
     func saveHistory(scrollback: Int = 3000) -> String {
@@ -457,10 +459,11 @@ extension TermSession: TerminalViewDelegate {
 final class TermView: TerminalView {
     weak var session: TermSession?
 
-    // Sessions with Termorc's own prompt hide the cursor while the terminal isn't focused, as
-    // the web build does: commands are typed in the input bar, and an idle cursor would sit
-    // on the blank prompt line. SwiftTerm re-adds its caret view as the cursor moves but
-    // keeps it hidden once hidden.
+    // Sessions with Termorc's own prompt hide the cursor at the prompt, and while the terminal
+    // isn't focused: commands are typed in the input bar, and the cursor
+    // would only sit on the blank prompt line. A running program (an editor, a password
+    // prompt) shows it. SwiftTerm re-adds its caret view as the cursor moves but keeps it
+    // hidden once hidden.
     var hidesIdleCaret = false { didSet { syncCaret() } }
     private weak var caret: NSView?
     private var focused = false
@@ -482,11 +485,11 @@ final class TermView: TerminalView {
         }
     }
 
-    private func syncCaret() { caret?.isHidden = hidesIdleCaret && !focused }
+    func syncCaret() { caret?.isHidden = hidesIdleCaret && (!focused || session?.atPrompt == true) }
 }
 
 // Cells to ANSI text: SGR runs for colors and styles, rows joined with CRLF except where a
-// row soft-wraps into the next. Restores in SwiftTerm and in xterm.js alike.
+// row soft-wraps into the next.
 enum ANSISerializer {
     static func serialize(_ rows: ArraySlice<TerminalContentRowSnapshot>) -> String {
         var out = ""

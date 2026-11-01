@@ -2,7 +2,7 @@ import AppKit
 import TermorcCore
 import UserNotifications
 
-// Everything that changes sessions, tabs and Spaces goes through here (actions.js).
+// Everything that changes sessions, tabs and Spaces goes through here.
 
 struct Dest: Equatable {
     enum Section: String { case fav, pinned, today }

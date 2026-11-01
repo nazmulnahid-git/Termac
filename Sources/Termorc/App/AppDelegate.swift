@@ -39,8 +39,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return true
     }
 
-    // The renderer saved scrollback and asked about running processes before the web build
-    // exited; here the store does the same before AppKit terminates.
+    // Before AppKit terminates, the store asks about running processes and saves scrollback.
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         if store.quitting { return .terminateNow }
         Task {
@@ -90,7 +89,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         run(action)
     }
 
-    // Every shortcut and menu item lands here (App.jsx runAction).
+    // Every shortcut and menu item lands here.
     func run(_ action: String) {
         let sid = store.focusedSid
         if action.hasPrefix("space:") { return store.switchSpace(String(action.dropFirst(6))) }

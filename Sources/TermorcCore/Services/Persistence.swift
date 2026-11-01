@@ -1,7 +1,6 @@
 import Foundation
 
-// Where Termorc keeps its files. The same locations the web build used, so sessions,
-// scrollback, the Library and settings.json carry straight over.
+// Where Termorc keeps its files: sessions, scrollback, the Library and settings.json.
 public struct Paths: Sendable {
     public let dataDir: URL // ~/Library/Application Support/Termorc
     public let stateFile: URL
@@ -61,8 +60,8 @@ public enum Persistence {
 
     public static func loadState(_ paths: Paths = .current) -> AppModel {
         let data = try? Data(contentsOf: paths.stateFile)
-        // Keep one copy of the state as the web build left it, in case this build reads it
-        // differently; it's never overwritten afterwards.
+        // Keep one copy of the state as the earlier web-based Termorc left it, in case this
+        // app reads it differently; it's never overwritten afterwards.
         let backup = paths.dataDir.appendingPathComponent("state.web-backup.json")
         if let data, !FileManager.default.fileExists(atPath: backup.path) {
             try? data.write(to: backup)

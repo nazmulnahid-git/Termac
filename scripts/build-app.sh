@@ -7,8 +7,6 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 config="${1:-debug}"
-version="$(sed -n 's/.*"version": "\(.*\)".*/\1/p' package.json | head -1)"
-version="${version:-2.0.0}"
 
 swift build -c "$config" --product Termorc
 bin="$(swift build -c "$config" --show-bin-path)/Termorc"
@@ -18,16 +16,16 @@ out=".build/Termorc.app"
 rm -rf "$out"
 mkdir -p "$out/Contents/MacOS" "$out/Contents/Resources"
 cp "$bin" "$out/Contents/MacOS/Termorc"
-sed "s/__VERSION__/$version/g" Resources/Info.plist > "$out/Contents/Info.plist"
+cp Resources/Info.plist "$out/Contents/Info.plist"
 cp -R Resources/shell-integration "$out/Contents/Resources/shell-integration"
-cp src-tauri/icons/icon.icns "$out/Contents/Resources/icon.icns"
+cp Resources/icons/icon.icns "$out/Contents/Resources/icon.icns"
 cp Resources/mark.png "$out/Contents/Resources/mark.png"
 
 # macOS 26 draws the Dock icon from the Icon Composer document (light, dark, clear and tinted
 # looks). Compiling it needs Xcode 26's actool; without it every version uses icon.icns.
 if xcrun --find actool >/dev/null 2>&1; then
   tmp="$(mktemp -d)"
-  if xcrun actool src-tauri/icons/AppIcon.icon --compile "$tmp" --app-icon AppIcon --platform macosx \
+  if xcrun actool Resources/icons/AppIcon.icon --compile "$tmp" --app-icon AppIcon --platform macosx \
       --minimum-deployment-target 14.0 --output-partial-info-plist "$tmp/partial.plist" </dev/null >/dev/null 2>&1; then
     cp "$tmp/Assets.car" "$out/Contents/Resources/Assets.car" 2>/dev/null || true
   fi
