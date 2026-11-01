@@ -16,6 +16,7 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/nazmulnahid-git/Termac/releases/latest"><b>Download</b></a> ·
   <a href="docs/FEATURES.md"><b>Tour</b></a> ·
   <a href="#features">Features</a> ·
   <a href="#install">Install</a> ·
@@ -85,7 +86,19 @@ If you keep a dozen terminal tabs open across a few projects, Termorc gives them
 
 ## Install
 
-Termorc isn't distributed as a download yet, so you build it from source. That takes a couple of minutes and needs macOS 14 or later with Xcode 16+ (or its command-line tools).
+**Download:** get **Termorc_2.0.1_arm64.dmg** from the [latest release](https://github.com/nazmulnahid-git/Termac/releases/latest). It needs macOS 14 or later on Apple Silicon.
+
+1. Open the `.dmg` and drag **Termorc** into **Applications**.
+2. Run this once in Terminal:
+
+   ```bash
+   xattr -cr /Applications/Termorc.app
+   ```
+
+   Termorc isn't signed with an Apple Developer ID yet, so without this step macOS refuses to open it, saying it's damaged or can't be opened.
+3. Open Termorc from Applications. It starts with a **Home** Space; ⌃N creates more.
+
+**Build from source** instead (needs Xcode 16+ or its command-line tools):
 
 ```bash
 git clone https://github.com/nazmulnahid-git/Termac.git
@@ -93,8 +106,6 @@ cd Termac
 scripts/build-app.sh release
 cp -R .build/release-app/Termorc.app /Applications/
 ```
-
-Open it from Applications. It starts with a **Home** Space; ⌃N creates more.
 
 For the macOS 26 Dock icon (light, dark, clear and tinted looks), point the command-line tools at Xcode once: `sudo xcode-select -s /Applications/Xcode.app`. Without that, the app uses its standard icon.
 
