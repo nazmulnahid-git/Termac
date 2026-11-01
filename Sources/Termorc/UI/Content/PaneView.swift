@@ -373,14 +373,16 @@ final class Chip: NSButton {
         icon.symbolConfiguration = .init(pointSize: 11, weight: .medium)
         label.font = .systemFont(ofSize: 12)
         label.lineBreakMode = .byTruncatingTail
-        label.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        // Just above the header stacks' hugging (250): tied, Auto Layout could settle with the
+        // text squashed to nothing. Still below required, so a narrow pane truncates it.
+        label.setContentCompressionResistancePriority(.init(251), for: .horizontal)
         let stack = NSStackView(views: [icon, label])
         stack.spacing = 5
         stack.translatesAutoresizingMaskIntoConstraints = false
         addSubview(stack)
         leading = stack.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 8)
         NSLayoutConstraint.activate([leading, stack.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -8), stack.centerYAnchor.constraint(equalTo: centerYAnchor), heightAnchor.constraint(equalToConstant: 22)])
-        setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        setContentCompressionResistancePriority(.init(251), for: .horizontal)
     }
 
     required init?(coder: NSCoder) { fatalError() }

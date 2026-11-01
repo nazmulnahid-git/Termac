@@ -5,7 +5,7 @@
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="screenshots/main-dark.png">
   <source media="(prefers-color-scheme: light)" srcset="screenshots/main-light.png">
-  <img alt="Termorc: the sidebar with Spaces, folders and live session status beside a terminal showing git status and a passing test run" src="screenshots/main-dark.png">
+  <img alt="Termorc: the sidebar with Spaces, folders and live session status beside a terminal showing the branch history and a passing test run" src="screenshots/main-dark.png">
 </picture>
 
 Built in Swift with AppKit and SwiftUI. Light and dark follow the system, and every screen below is the real app.
@@ -56,7 +56,7 @@ You type commands in Termorc's own input bar instead of at a raw prompt:
 - **Completion:** ⇥ completes commands, paths and git branches.
 - **Status chips** above the input show the directory, the git branch and how many files changed. Click one to change directory or switch branch.
 
-Each command's output becomes a **block**: its header shows how long it took and whether it passed (`157ms ✓`, `1.3s ✓`). ⇧⌘C copies the last command's output only.
+Each command's output becomes a **block**: its header shows how long it took and whether it passed (like `1.3s ✓` on the test run above). ⇧⌘C copies the last command's output only.
 
 Prefer your shell's own prompt? **Settings › Terminal › Prompt › Shell**.
 

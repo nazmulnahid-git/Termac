@@ -26,7 +26,7 @@
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/main-dark.png">
   <source media="(prefers-color-scheme: light)" srcset="docs/screenshots/main-light.png">
-  <img alt="Termorc: the sidebar with Spaces, folders and live session status beside a terminal showing git status and a passing test run" src="docs/screenshots/main-dark.png">
+  <img alt="Termorc: the sidebar with Spaces, folders and live session status beside a terminal showing the branch history and a passing test run" src="docs/screenshots/main-dark.png">
 </picture>
 
 ## Why Termorc
