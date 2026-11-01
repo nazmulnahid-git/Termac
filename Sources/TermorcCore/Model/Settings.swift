@@ -29,7 +29,7 @@ public struct Settings: Codable, Equatable, Sendable {
     public var notifyAfterS: Double = 30 // 0 = never
     public var osNotify = "background" // always | background | never
     public var confirmQuit = true
-    public var zoomLevel: Double = 125
+    public var zoomLevel: Double = 100
     public var uiFontFamily = "system-ui"
     public var uiFontSize: Double = 12.5
     public var uiLineHeight: Double = 1.4

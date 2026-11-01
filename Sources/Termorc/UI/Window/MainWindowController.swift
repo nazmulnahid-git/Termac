@@ -2,25 +2,32 @@ import AppKit
 import TermorcCore
 
 // The main window: a full-height sidebar (Spaces and sessions) beside the content column
-// (the terminal card over the Spaces bar), under a unified toolbar. Like a native toolbar it
-// leads with a title (the Space, or the open page) and a quiet subtitle; the centre field
-// reads like a terminal's title (where you are, what's running) and opens the command bar.
+// (the terminal card over the Spaces bar), under a unified toolbar. The sidebar toggle sits in
+// the sidebar's own titlebar while it's open, and beside the window controls once it's hidden.
+// The toolbar leads with the Space (its icon, name and sessions) or the open page; the field
+// after it stretches to the buttons, reads like a terminal's title (where you are, what's
+// running) and opens the command bar.
 @MainActor
 final class MainWindowController: NSWindowController, NSWindowDelegate, NSToolbarDelegate {
     let store = Store.shared
     let split = MainSplitViewController()
     private var token: ObserverToken?
     private let locationButton = LocationButton()
+    private let titleView = ToolbarTitleView()
 
     static let location = NSToolbarItem.Identifier("location")
+    static let title = NSToolbarItem.Identifier("title")
     static let overview = NSToolbarItem.Identifier("overview")
     static let settings = NSToolbarItem.Identifier("settings")
     static let sidebar = NSToolbarItem.Identifier("sidebarToggle")
 
     init() {
         let w = MainWindow(contentRect: NSRect(x: 0, y: 0, width: 1280, height: 800), styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView], backing: .buffered, defer: false)
-        w.minSize = NSSize(width: 720, height: 420)
+        // Wide enough that the open sidebar, the title, the search field and the buttons all fit
+        // in the toolbar; 4:3 at its smallest.
+        w.minSize = NSSize(width: 800, height: 600)
         w.title = "Termorc"
+        w.titleVisibility = .hidden // ToolbarTitleView draws it, with the Space's icon
         w.toolbarStyle = .unified
         w.titlebarSeparatorStyle = .automatic
         w.isReleasedWhenClosed = false
@@ -64,15 +71,15 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSToolba
         switch store.ui.view {
         case .settings:
             w.title = "Settings"
-            w.subtitle = ""
+            titleView.set(icon: .symbol("gearshape"), title: "Settings", subtitle: "")
         case .library:
             w.title = "Library"
-            w.subtitle = ""
+            titleView.set(icon: .symbol("books.vertical"), title: "Library", subtitle: "")
         case .terminal:
             let tids = sp.allTabs
             let running = tids.filter { tid in store.model.tabs[tid]?.layout.leaves.contains { store.rt[$0]?.status == .run } ?? false }.count
             w.title = sp.name
-            w.subtitle = (tids.count == 1 ? "1 session" : "\(tids.count) sessions") + (running > 0 ? " · \(running) running" : "")
+            titleView.set(icon: .space(sp), title: sp.name, subtitle: (tids.count == 1 ? "1 session" : "\(tids.count) sessions") + (running > 0 ? " · \(running) running" : ""))
         }
         let sid = store.ui.focusedSid
         let r = sid.flatMap { store.rt[$0] }
@@ -88,7 +95,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSToolba
 
     // ---- Toolbar ----------------------------------------------------------------------
     func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
-        [Self.sidebar, .sidebarTrackingSeparator, .flexibleSpace, Self.location, .flexibleSpace, Self.overview, Self.settings]
+        [.flexibleSpace, Self.sidebar, .sidebarTrackingSeparator, Self.title, .space, Self.location, .space, Self.overview, Self.settings]
     }
 
     func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
@@ -106,9 +113,17 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSToolba
             item.isBordered = true
         }
         switch id {
+        case .sidebarTrackingSeparator:
+            // Keeps the toggle over the sidebar while it's open; collapsed, it moves beside the
+            // window controls. The toolbar only tracks the divider when handed the split view.
+            return NSTrackingSeparatorToolbarItem(identifier: id, splitView: split.splitView, dividerIndex: 0)
         case Self.sidebar:
+            // Not navigational: macOS would pin it to the content column's leading edge.
             button("sidebar.left", "Sidebar", #selector(toggleSidebar))
-            item.isNavigational = true
+        case Self.title:
+            item.view = titleView
+            item.label = "Space"
+            item.isBordered = false
         case Self.location:
             item.view = locationButton
             item.label = "Command Bar"
@@ -145,47 +160,59 @@ final class MainWindow: NSWindow {
     }
 }
 
-// The centre of the toolbar: "⌕ ~/work/api · npm run dev   ⌘T", styled like a search field.
+// The toolbar's field: "⌕ ~/work/api · npm run dev   ⌘T", styled like a search field. It
+// fills the toolbar between the title and the buttons; a path too long for it scrolls inside
+// (shown from its end, so the folder and process stay in view).
 final class LocationButton: NSButton {
     private let icon = NSImageView()
+    private let scroll = NSScrollView()
     private let label = NSTextField(labelWithString: "")
     private let key = NSTextField(labelWithString: "")
 
     init() {
-        super.init(frame: NSRect(x: 0, y: 0, width: 380, height: 28))
+        super.init(frame: NSRect(x: 0, y: 0, width: 420, height: 28))
         title = ""
         bezelStyle = .texturedRounded
         isBordered = true
         setButtonType(.momentaryPushIn)
         translatesAutoresizingMaskIntoConstraints = false
-        widthAnchor.constraint(greaterThanOrEqualToConstant: 240).isActive = true
-        widthAnchor.constraint(lessThanOrEqualToConstant: 520).isActive = true
-        let w = widthAnchor.constraint(equalToConstant: 420)
-        w.priority = .defaultLow
-        w.isActive = true
+        // At least 220pt; otherwise as wide as the toolbar allows.
+        widthAnchor.constraint(greaterThanOrEqualToConstant: 220).isActive = true
+        let fill = widthAnchor.constraint(equalToConstant: 4000)
+        fill.priority = .defaultLow
+        fill.isActive = true
         icon.image = NSImage(systemSymbolName: "magnifyingglass", accessibilityDescription: nil)
         icon.contentTintColor = .secondaryLabelColor
-        label.lineBreakMode = .byTruncatingMiddle
+        icon.setContentHuggingPriority(.required, for: .horizontal)
         label.font = .systemFont(ofSize: 12.5)
-        label.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        label.lineBreakMode = .byClipping
+        scroll.drawsBackground = false
+        scroll.hasHorizontalScroller = false
+        scroll.hasVerticalScroller = false
+        scroll.horizontalScrollElasticity = .none
+        scroll.verticalScrollElasticity = .none
+        scroll.documentView = label
         key.font = .systemFont(ofSize: 11, weight: .medium)
         key.textColor = .secondaryLabelColor
+        key.setContentHuggingPriority(.required, for: .horizontal)
+        key.setContentCompressionResistancePriority(.required, for: .horizontal)
         // The shortcut in a small capsule at the field's end.
         key.wantsLayer = true
         key.drawsBackground = true
         key.backgroundColor = NSColor.labelColor.withAlphaComponent(0.08)
         key.layer?.cornerRadius = 8
         key.alignment = .center
-        for v in [icon, label, key] as [NSView] {
+        for v in [icon, scroll, key] as [NSView] {
             v.translatesAutoresizingMaskIntoConstraints = false
             addSubview(v)
         }
         NSLayoutConstraint.activate([
             icon.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 9),
             icon.centerYAnchor.constraint(equalTo: centerYAnchor),
-            label.leadingAnchor.constraint(equalTo: icon.trailingAnchor, constant: 6),
-            label.centerYAnchor.constraint(equalTo: centerYAnchor),
-            key.leadingAnchor.constraint(greaterThanOrEqualTo: label.trailingAnchor, constant: 8),
+            scroll.leadingAnchor.constraint(equalTo: icon.trailingAnchor, constant: 6),
+            scroll.trailingAnchor.constraint(equalTo: key.leadingAnchor, constant: -8),
+            scroll.centerYAnchor.constraint(equalTo: centerYAnchor),
+            scroll.heightAnchor.constraint(equalToConstant: 18),
             key.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -10),
             key.centerYAnchor.constraint(equalTo: centerYAnchor),
         ])
@@ -198,10 +225,96 @@ final class LocationButton: NSButton {
         if let proc {
             s.append(NSAttributedString(string: "  ·  " + proc, attributes: [.foregroundColor: NSColor.secondaryLabelColor, .font: NSFont.systemFont(ofSize: 12.5)]))
         }
-        if label.attributedStringValue != s { label.attributedStringValue = s }
         key.stringValue = "  \(shortcut)  "
-        toolTip = "Command bar  \(shortcut)"
+        toolTip = "Command bar  \(shortcut)\n\(s.string)"
+        guard label.attributedStringValue != s else { return }
+        label.attributedStringValue = s
+        needsLayout = true
     }
+
+    override func layout() {
+        super.layout()
+        let h = scroll.contentSize.height
+        label.frame = NSRect(x: 0, y: 0, width: ceil(label.attributedStringValue.size().width) + 4, height: h)
+        scroll.contentView.scroll(to: NSPoint(x: max(0, label.frame.width - scroll.contentSize.width), y: 0))
+        scroll.reflectScrolledClipView(scroll.contentView)
+    }
+
+    // Clicks anywhere open the command bar; a horizontal swipe scrolls the path.
+    override func hitTest(_ point: NSPoint) -> NSView? { super.hitTest(point) == nil ? nil : self }
+    override func scrollWheel(with event: NSEvent) { scroll.scrollWheel(with: event) }
+}
+
+// The toolbar's title: the Space's icon beside its name and session count, or the open page.
+final class ToolbarTitleView: NSView {
+    enum Icon {
+        case space(Space)
+        case symbol(String)
+    }
+
+    private let iconBox = NSView()
+    private let title = NSTextField(labelWithString: "")
+    private let subtitle = NSTextField(labelWithString: "")
+    private var iconKey = ""
+
+    init() {
+        super.init(frame: .zero)
+        title.font = .systemFont(ofSize: 13, weight: .semibold)
+        title.lineBreakMode = .byTruncatingTail
+        subtitle.font = .systemFont(ofSize: 11)
+        subtitle.textColor = .secondaryLabelColor
+        subtitle.lineBreakMode = .byTruncatingTail
+        let text = NSStackView(views: [title, subtitle])
+        text.orientation = .vertical
+        text.alignment = .leading
+        text.spacing = 0
+        let row = NSStackView(views: [iconBox, text])
+        row.spacing = 8
+        row.alignment = .centerY
+        row.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(row)
+        NSLayoutConstraint.activate([
+            iconBox.widthAnchor.constraint(equalToConstant: 20),
+            iconBox.heightAnchor.constraint(equalToConstant: 20),
+            row.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 4),
+            row.trailingAnchor.constraint(equalTo: trailingAnchor),
+            row.centerYAnchor.constraint(equalTo: centerYAnchor),
+            widthAnchor.constraint(lessThanOrEqualToConstant: 200),
+            heightAnchor.constraint(equalToConstant: 32),
+        ])
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    func set(icon: Icon, title t: String, subtitle sub: String) {
+        if title.stringValue != t { title.stringValue = t }
+        if subtitle.stringValue != sub { subtitle.stringValue = sub }
+        subtitle.isHidden = sub.isEmpty
+        let key: String
+        switch icon {
+        case .space(let sp): key = "space|\(sp.glyph)|\(sp.color)|\(sp.iconImage?.hashValue ?? 0)"
+        case .symbol(let name): key = "symbol|\(name)"
+        }
+        guard key != iconKey else { return }
+        iconKey = key
+        iconBox.subviews.forEach { $0.removeFromSuperview() }
+        let v: NSView
+        switch icon {
+        case .space(let sp):
+            v = SpaceIcon.view(sp, size: 16)
+        case .symbol(let name):
+            let img = NSImageView(image: NSImage(systemSymbolName: name, accessibilityDescription: nil) ?? NSImage())
+            img.symbolConfiguration = .init(pointSize: 14, weight: .medium)
+            img.contentTintColor = .secondaryLabelColor
+            v = img
+        }
+        v.translatesAutoresizingMaskIntoConstraints = false
+        iconBox.addSubview(v)
+        NSLayoutConstraint.activate([v.centerXAnchor.constraint(equalTo: iconBox.centerXAnchor), v.centerYAnchor.constraint(equalTo: iconBox.centerYAnchor)])
+    }
+
+    // Purely a label: the toolbar under it still drags the window.
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
 }
 
 // Sidebar beside the content column, as in Finder or Mail.
@@ -212,10 +325,14 @@ final class MainSplitViewController: NSSplitViewController {
     private lazy var sidebarItem = NSSplitViewItem(sidebarWithViewController: sidebar)
     private var lastMode: String?
 
+    // The sidebar is a fixed width, like Mail's; compact mode is the icon rail.
+    static let sidebarWidth: CGFloat = 220
+    static let railWidth: CGFloat = 64
+
     override func viewDidLoad() {
         super.viewDidLoad()
-        sidebarItem.minimumThickness = 220
-        sidebarItem.maximumThickness = 360
+        sidebarItem.minimumThickness = Self.sidebarWidth
+        sidebarItem.maximumThickness = Self.sidebarWidth
         sidebarItem.canCollapse = true
         sidebarItem.allowsFullHeightLayout = true
         sidebarItem.titlebarSeparatorStyle = .none
@@ -223,7 +340,11 @@ final class MainSplitViewController: NSSplitViewController {
         contentItem.titlebarSeparatorStyle = .line
         addSplitViewItem(sidebarItem)
         addSplitViewItem(contentItem)
-        splitView.autosaveName = "TermorcSidebar"
+    }
+
+    // No resize cursor or drag on the divider: the sidebar doesn't resize.
+    override func splitView(_ splitView: NSSplitView, effectiveRect proposedEffectiveRect: NSRect, forDrawnRect drawnRect: NSRect, ofDividerAt dividerIndex: Int) -> NSRect {
+        .zero
     }
 
     func applySidebarMode(_ mode: String) {
@@ -233,8 +354,9 @@ final class MainSplitViewController: NSSplitViewController {
         revealed = false
         let compact = mode == "compact"
         sidebar.compact = compact
-        sidebarItem.minimumThickness = compact ? 64 : 220
-        sidebarItem.maximumThickness = compact ? 64 : 360
+        let width = compact ? Self.railWidth : Self.sidebarWidth
+        sidebarItem.minimumThickness = width
+        sidebarItem.maximumThickness = width
         let collapse = mode == "hidden"
         if sidebarItem.isCollapsed != collapse {
             if first { sidebarItem.isCollapsed = collapse } else { sidebarItem.animator().isCollapsed = collapse }
@@ -257,7 +379,13 @@ final class MainSplitViewController: NSSplitViewController {
         NSLayoutConstraint.activate([edge.leadingAnchor.constraint(equalTo: view.leadingAnchor), edge.topAnchor.constraint(equalTo: view.topAnchor), edge.bottomAnchor.constraint(equalTo: view.bottomAnchor), edge.widthAnchor.constraint(equalToConstant: 5)])
         edge.isHidden = !sidebarItem.isCollapsed
         edge.onEnter = { [weak self] in self?.reveal() }
+        // Collapsing before the window is on screen doesn't stick; start hidden from here.
+        if lastMode == "hidden", !sidebarItem.isCollapsed {
+            sidebarItem.isCollapsed = true
+            edge.isHidden = false
+        }
     }
+
 
     private func reveal() {
         guard Store.shared.model.settings.gestures.edgeReveal, sidebarItem.isCollapsed, !revealed else { return }

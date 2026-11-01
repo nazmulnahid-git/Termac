@@ -13,7 +13,7 @@ export const DEFAULT_SETTINGS = {
   notifyAfterS: 30, // 0 = never
   osNotify: 'background', // always | background | never
   confirmQuit: true,
-  zoomLevel: 125,
+  zoomLevel: 100,
   uiFontFamily: 'system-ui',
   uiFontSize: 12.5,
   uiLineHeight: 1.4,
