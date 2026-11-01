@@ -21,10 +21,9 @@ public enum System {
         DispatchQueue.global(qos: .utility).async { _ = loginPathOnce }
     }
 
-    // Runs a program and returns trimmed stdout, or nil on failure, timeout or non-zero exit
-    // (`anyStatus` keeps the output of tools like lsof that exit 1 on a partial result).
+    // Runs a program and returns trimmed stdout, or nil on failure, timeout or non-zero exit.
     @discardableResult
-    public static func run(_ cmd: String, _ args: [String], timeout: TimeInterval = 3, cwd: String? = nil, usePath: Bool = true, raw: Bool = false, anyStatus: Bool = false) -> String? {
+    public static func run(_ cmd: String, _ args: [String], timeout: TimeInterval = 3, cwd: String? = nil, usePath: Bool = true, raw: Bool = false) -> String? {
         let p = Process()
         if cmd.hasPrefix("/") {
             p.executableURL = URL(fileURLWithPath: cmd)
@@ -57,7 +56,7 @@ public enum System {
             return nil
         }
         p.waitUntilExit()
-        guard p.terminationStatus == 0 || anyStatus else { return nil }
+        guard p.terminationStatus == 0 else { return nil }
         let text = String(decoding: data, as: UTF8.self)
         return raw ? text : text.trimmingCharacters(in: .whitespacesAndNewlines)
     }

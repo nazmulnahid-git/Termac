@@ -20,11 +20,6 @@ A macOS terminal where every session lives in a vertical sidebar, grouped into c
 - **Input bar and blocks.** Type commands in Termorc's own input bar: syntax colors, a suggestion from history (→ accepts), ↑/↓ recall, ⌃R search, ⇥ completion for commands, paths and git branches. Each command's output is a block with its time, duration and exit status. Settings → Terminal → Prompt → Shell brings back your shell's own prompt.
 - **Finder.** Right-click a folder › Services › **New Termorc Tab Here**, or drop a folder on the Dock icon.
 - **Quick Terminal (⌥Space).** A global drop-down panel. It opens in the frontmost Finder folder. "Move to Space" promotes it to a sidebar row with its scrollback intact.
-- **Desktop widgets** (native app). Add them from the macOS widget gallery (right-click the desktop › Edit Widgets › Termorc):
-  - Localhost: running dev servers with their framework, project, uptime and memory. Click the port to open it; the buttons copy the URL, open the project in VS Code, or stop the server (click twice).
-  - System: CPU, memory, disk and battery rings; Wi-Fi with ping, speeds and a 10-minute chart; local and public IPs (click to copy).
-  - Pull Requests: reviews waiting on you and your own open PRs, with CI and review status, via `gh`. New review requests send a notification. Set the organization with `widgets.github_org` in settings.json.
-  - Termorc collects the data, so the widgets update only while it's running. macOS limits how often widgets redraw: stats refresh about once a minute, and the server list whenever it changes.
 - **Extras:**
   - ⇧⌘C copies only the last command's output.
   - A "Jump to bottom" pill appears when you scroll up.
@@ -59,8 +54,7 @@ Termorc is being rebuilt as a native AppKit + SwiftUI app. It lives next to the 
 | --- | --- |
 | `Sources/TermorcCore/` | Model, persistence, settings.json, Library, shell launch, command-line helpers. No AppKit, unit-tested. |
 | `Sources/Termorc/` | The app: window, sidebar, cards and panes, command bar, Settings, Library, Quick Terminal, input bar. |
-| `Sources/TermorcWidgets/` | The desktop widgets, a WidgetKit extension bundled as `Contents/PlugIns/TermorcWidgets.appex`. WidgetKit sandboxes it, so `Sources/Termorc/Widgets/WidgetFeed.swift` runs lsof, ps and `gh` in the app, writes JSON snapshots to `~/Library/Application Support/Termorc/widgets/`, and asks WidgetKit to redraw. Widget buttons are App Intents; the ones that need the app post a distributed notification. |
-| `Resources/` | `Info.plist`, the shell integration scripts and the widget extension's plist, entitlements and images, bundled into the app. |
+| `Resources/` | `Info.plist` and the shell integration scripts bundled into the app. |
 | `tests/TermorcCoreTests/` | Swift tests, ported from the JS and Rust tests. |
 
 Terminals are [SwiftTerm](https://github.com/migueldeicaza/SwiftTerm) views. The app reads the OSC 633 marks from the PTY stream itself, so command blocks, statuses and ⇧⌘C work as before. It uses the same `state.json`, scrollback, Library and `~/.termorc/settings.json`, so sessions carry over. On its first launch it keeps a copy of the existing state as `state.web-backup.json`.

@@ -51,7 +51,6 @@ public struct Settings: Codable, Equatable, Sendable {
     public var clickToMove = true
     public var promptStyle = "termorc" // termorc (input bar + blocks) | shell
     public var terminalWelcome = true
-    public var githubOrg = "" // the Pull Requests widget's organization; empty = all
 
     public init() {}
 
@@ -92,7 +91,6 @@ public struct Settings: Codable, Equatable, Sendable {
         clickToMove = c.v(.clickToMove, d.clickToMove)
         promptStyle = c.v(.promptStyle, d.promptStyle)
         terminalWelcome = c.v(.terminalWelcome, d.terminalWelcome)
-        githubOrg = c.v(.githubOrg, d.githubOrg)
         // An older build stored `sidebarHidden: true`.
         if (try? decoder.container(keyedBy: Legacy.self).decodeIfPresent(Bool.self, forKey: .sidebarHidden)) == true, c.opt(.sidebarMode) as String? == nil {
             sidebarMode = "hidden"
