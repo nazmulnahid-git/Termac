@@ -33,7 +33,10 @@ let package = Package(
             name: "TermorcWidgets",
             dependencies: ["TermorcCore"],
             path: "Sources/TermorcWidgets",
-            swiftSettings: [.swiftLanguageMode(.v5)]
+            swiftSettings: [.swiftLanguageMode(.v5), .unsafeFlags(["-application-extension"])],
+            // Like Xcode: the extension starts in Foundation's NSExtensionMain, which sets up the
+            // connection to WidgetKit and then calls our @main. Started at main itself, it quits.
+            linkerSettings: [.unsafeFlags(["-Xlinker", "-application_extension", "-Xlinker", "-e", "-Xlinker", "_NSExtensionMain"])]
         ),
         .testTarget(
             name: "TermorcCoreTests",
