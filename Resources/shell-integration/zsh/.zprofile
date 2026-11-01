@@ -1,0 +1,5 @@
+if [[ -f "$TERMAC_USER_ZDOTDIR/.zprofile" ]]; then
+  TERMAC_ZDOTDIR="$ZDOTDIR"; ZDOTDIR="$TERMAC_USER_ZDOTDIR"
+  . "$ZDOTDIR/.zprofile"
+  ZDOTDIR="$TERMAC_ZDOTDIR"
+fi

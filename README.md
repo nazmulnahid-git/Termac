@@ -46,6 +46,26 @@ State lives in `~/Library/Application Support/Termorc/`:
 - `scrollback/` for live sessions across restarts
 - `library/` for archived sessions
 
+## Native app (in progress)
+
+Termorc is being rebuilt as a native AppKit + SwiftUI app. It lives next to the Tauri app until it reaches parity:
+
+| Path | Notes |
+| --- | --- |
+| `Sources/TermorcCore/` | Model, persistence, settings.json, Library, shell launch, command-line helpers. No AppKit, unit-tested. |
+| `Sources/Termorc/` | The app: window, sidebar, cards and panes, command bar, Settings, Library, Quick Terminal, input bar. |
+| `Resources/` | `Info.plist` and the shell integration scripts bundled into the app. |
+| `tests/TermorcCoreTests/` | Swift tests, ported from the JS and Rust tests. |
+
+Terminals are [SwiftTerm](https://github.com/migueldeicaza/SwiftTerm) views. The app reads the OSC 633 marks from the PTY stream itself, so command blocks, statuses and ⇧⌘C work as before. It uses the same `state.json`, scrollback, Library and `~/.termorc/settings.json`, so sessions carry over. On its first launch it keeps a copy of the existing state as `state.web-backup.json`.
+
+```bash
+swift test                          # unit tests
+scripts/build-app.sh                # debug build → .build/Termorc.app
+scripts/build-app.sh release        # release build → .build/release-app/Termorc.app
+TERMORC_DATA_DIR=/tmp/termorc-dev scripts/build-app.sh debug run   # run on throwaway state
+```
+
 ## Develop
 
 Needs Node and Rust (`curl https://sh.rustup.rs -sSf | sh`).

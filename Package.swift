@@ -1,0 +1,36 @@
+// swift-tools-version: 6.0
+// Termorc, the native macOS app. `scripts/build-app.sh` wraps the executable in Termorc.app.
+import PackageDescription
+
+let package = Package(
+    name: "Termorc",
+    platforms: [.macOS(.v14)],
+    products: [
+        .executable(name: "Termorc", targets: ["Termorc"]),
+    ],
+    dependencies: [
+        .package(url: "https://github.com/migueldeicaza/SwiftTerm.git", exact: "1.99.1"),
+    ],
+    targets: [
+        // Model, persistence and the pure helpers: no AppKit, so it's unit-testable.
+        .target(
+            name: "TermorcCore",
+            path: "Sources/TermorcCore",
+            swiftSettings: [.swiftLanguageMode(.v5)]
+        ),
+        .executableTarget(
+            name: "Termorc",
+            dependencies: [
+                "TermorcCore",
+                .product(name: "SwiftTerm", package: "SwiftTerm"),
+            ],
+            path: "Sources/Termorc",
+            swiftSettings: [.swiftLanguageMode(.v5)]
+        ),
+        .testTarget(
+            name: "TermorcCoreTests",
+            dependencies: ["TermorcCore"],
+            path: "tests/TermorcCoreTests"
+        ),
+    ]
+)

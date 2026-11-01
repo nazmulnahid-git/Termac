@@ -35,3 +35,6 @@ src-tauri/shell-integration/zsh/.zcompdump*
 # Tauri
 src-tauri/target.noindex/
 src-tauri/gen/
+
+# Swift build output
+.build/
