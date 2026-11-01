@@ -50,15 +50,18 @@ final class WelcomeCard: NSView {
         hide.attributedTitle = NSAttributedString(string: "Don't show again", attributes: [.foregroundColor: dim, .font: UI.font(0.86)])
         stack.arrangedSubviews.forEach { $0.removeFromSuperview() }
 
-        let logo = NSImageView(image: NSApp.applicationIconImage ?? NSImage())
+        // The bare mark, no app-icon square around it (the app icon outside a bundle).
+        let mark = Bundle.main.image(forResource: "mark") ?? NSApp.applicationIconImage ?? NSImage()
+        let logo = NSImageView(image: mark)
         logo.imageScaling = .scaleProportionallyUpOrDown
-        logo.widthAnchor.constraint(equalToConstant: UI.px(36)).isActive = true
-        logo.heightAnchor.constraint(equalToConstant: UI.px(36)).isActive = true
+        let h = UI.px(26) // about the title's cap height plus a little
+        logo.widthAnchor.constraint(equalToConstant: (h * mark.size.width / max(1, mark.size.height)).rounded()).isActive = true
+        logo.heightAnchor.constraint(equalToConstant: h).isActive = true
         let title = NSTextField(labelWithString: "New terminal session")
         title.font = UI.font(1.45, .semibold)
         title.textColor = fg
         let head = NSStackView(views: [logo, title])
-        head.spacing = 12
+        head.spacing = 10
         stack.addArrangedSubview(head)
         stack.setCustomSpacing(12, after: head)
 

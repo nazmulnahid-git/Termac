@@ -21,6 +21,7 @@ cp "$bin" "$out/Contents/MacOS/Termorc"
 sed "s/__VERSION__/$version/g" Resources/Info.plist > "$out/Contents/Info.plist"
 cp -R Resources/shell-integration "$out/Contents/Resources/shell-integration"
 cp src-tauri/icons/icon.icns "$out/Contents/Resources/icon.icns"
+cp Resources/mark.png "$out/Contents/Resources/mark.png"
 
 # macOS 26 draws the Dock icon from the Icon Composer document (light, dark, clear and tinted
 # looks). Compiling it needs Xcode 26's actool; without it every version uses icon.icns.
