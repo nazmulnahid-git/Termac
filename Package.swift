@@ -7,6 +7,7 @@ let package = Package(
     platforms: [.macOS(.v14)],
     products: [
         .executable(name: "Termorc", targets: ["Termorc"]),
+        .executable(name: "TermorcWidgets", targets: ["TermorcWidgets"]),
     ],
     dependencies: [
         .package(url: "https://github.com/migueldeicaza/SwiftTerm.git", exact: "1.99.1"),
@@ -25,6 +26,13 @@ let package = Package(
                 .product(name: "SwiftTerm", package: "SwiftTerm"),
             ],
             path: "Sources/Termorc",
+            swiftSettings: [.swiftLanguageMode(.v5)]
+        ),
+        // The desktop widgets (WidgetKit); `scripts/build-app.sh` wraps them in TermorcWidgets.appex.
+        .executableTarget(
+            name: "TermorcWidgets",
+            dependencies: ["TermorcCore"],
+            path: "Sources/TermorcWidgets",
             swiftSettings: [.swiftLanguageMode(.v5)]
         ),
         .testTarget(

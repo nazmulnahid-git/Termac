@@ -10,6 +10,7 @@ public enum SettingsFile {
         case bool
         case number(min: Double, max: Double, int: Bool)
         case string
+        case text // a string that may be empty
     }
 
     enum Value: Equatable {
@@ -74,6 +75,7 @@ public enum SettingsFile {
         b("gestures.pinch", \.gestures.pinch, "Pinch opens the overview of all Spaces."),
         b("gestures.edge_reveal", \.gestures.edgeReveal, "Hovering the left edge reveals a hidden sidebar."),
         b("gestures.peek", \.gestures.peek, "Hovering a session previews it."),
+        s("widgets.github_org", \.githubOrg, .text, "GitHub organization for the Pull Requests desktop widget. Empty lists pull requests from every repository."),
     ]
 
     // Strips // and /* */ comments and trailing commas, leaving strings alone.
@@ -180,6 +182,9 @@ public enum SettingsFile {
         case .string:
             if let s = raw as? String, !s.trimmingCharacters(in: .whitespaces).isEmpty { return (.s(s.trimmingCharacters(in: .whitespaces)), nil) }
             return (def, "\(name): expected a non-empty string")
+        case .text:
+            if let s = raw as? String { return (.s(s.trimmingCharacters(in: .whitespaces)), nil) }
+            return (def, "\(name): expected a string")
         }
     }
 
@@ -283,7 +288,7 @@ public enum SettingsFile {
                 leaf["type"] = int ? "integer" : "number"
                 leaf["minimum"] = min
                 leaf["maximum"] = max
-            case .string: leaf["type"] = "string"
+            case .string, .text: leaf["type"] = "string"
             }
             place(f.path[...], leaf, into: &props)
         }

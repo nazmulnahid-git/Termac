@@ -25,6 +25,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         QuickTerminal.shared.registerHotkey()
         // Notifications need a real bundle; `swift run` has none.
         if Bundle.main.bundleURL.pathExtension == "app" { UNUserNotificationCenter.current().delegate = self }
+        WidgetFeed.shared.start()
         NSApp.servicesProvider = self
         DistributedNotificationCenter.default().addObserver(self, selector: #selector(appearanceChanged), name: Notification.Name("AppleInterfaceThemeChangedNotification"), object: nil)
         store.syncFocus()
@@ -55,6 +56,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        WidgetFeed.shared.stop()
         if !store.quitting {
             store.quitting = true
             store.saveNow()
@@ -205,8 +207,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 }
 
 extension AppDelegate: UNUserNotificationCenterDelegate {
-    // Clicking a "finished" notification jumps to the session.
+    // Clicking a "finished" notification jumps to the session; a review request opens the PR.
     nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse, withCompletionHandler completionHandler: @escaping () -> Void) {
+        if let url = (response.notification.request.content.userInfo["url"] as? String).flatMap(URL.init(string:)) {
+            NSWorkspace.shared.open(url)
+            return completionHandler()
+        }
         let sid = response.notification.request.content.userInfo["sid"] as? String
         DispatchQueue.main.async {
             MainActor.assumeIsolated {
