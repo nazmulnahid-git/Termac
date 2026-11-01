@@ -6,7 +6,9 @@ import TermorcCore
 // between Spaces the neighbours' lists sit beside it on the same track.
 @MainActor
 final class SpaceList: NSObject, NSOutlineViewDataSource, NSOutlineViewDelegate, NSMenuDelegate {
-    static var dragTid: String? // the session being dragged in any list
+    static var dragTid: String? // a session dragged from the compact rail (an AppKit drag)
+    private static let registry = NSHashTable<SpaceList>.weakObjects()
+    static var all: [SpaceList] { registry.allObjects }
 
     let spaceId: String
     let store = Store.shared
@@ -18,9 +20,25 @@ final class SpaceList: NSObject, NSOutlineViewDataSource, NSOutlineViewDelegate,
     private var renaming: String?
     private var boxes: [String: SidebarItemBox] = [:]
 
+    // While a session or folder is dragged (see SidebarDrag): what's lifted out of the list,
+    // where the gap is, and which row a drop would merge into or fill.
+    private struct DragView: Equatable {
+        var tab: String?
+        var folder: String?
+        var gap: Dest?
+        var folderGap: Int?
+        var height: CGFloat
+        var merge: String?
+        var ready = false
+        var into: String?
+    }
+    private var dragView: DragView?
+
     init(spaceId: String) {
         self.spaceId = spaceId
         super.init()
+        Self.registry.add(self)
+        outline.list = self
         outline.headerView = nil
         outline.style = .sourceList
         // Picking a row focuses its terminal; the list itself never holds the keyboard.
@@ -58,29 +76,39 @@ final class SpaceList: NSObject, NSOutlineViewDataSource, NSOutlineViewDelegate,
     var isActive: Bool { spaceId == store.model.activeSpaceId }
 
     // ---- Data -----------------------------------------------------------------------------
-    func refresh() {
+    func refresh(animated: Bool = false) {
         let sp = space
+        let dv = dragView
+        // A list's rows, without the session being dragged and with the gap where it would land.
+        func rows(_ ids: [String], _ list: Dest) -> [SidebarItem] {
+            var out: [SidebarItem] = ids.filter { $0 != dv?.tab }.map { .tab($0) }
+            if let g = dv?.gap, g.spaceId == sp.id, g.folderId == list.folderId, list.folderId != nil || g.section == list.section {
+                out.insert(.placeholder, at: g.index < 0 ? out.count : min(g.index, out.count))
+            }
+            return out
+        }
         var top: [SidebarItem] = []
         var kids: [String: [SidebarItem]] = [:]
         if store.ui.settingsOpen && isActive { top.append(.settings) }
         top.append(.spaceHeader(sp.id))
-        top += sp.pinned.map { .tab($0) }
-        for f in sp.folders {
-            top.append(.folder(sp.id, f.id))
-            kids[f.id] = f.tabs.map { .tab($0) }
+        let pinned = rows(sp.pinned, Dest(section: .pinned, spaceId: sp.id))
+        top += pinned
+        var folders: [SidebarItem] = []
+        for f in sp.folders where f.id != dv?.folder {
+            folders.append(.folder(sp.id, f.id))
+            kids[f.id] = rows(f.tabs, Dest(section: .pinned, spaceId: sp.id, folderId: f.id))
         }
-        if sp.pinned.isEmpty && sp.folders.isEmpty { top.append(.pinEmpty(sp.id)) }
+        if dv?.folder != nil, let i = dv?.folderGap { folders.insert(.placeholder, at: max(0, min(i, folders.count))) }
+        top += folders
+        if pinned.isEmpty && folders.isEmpty { top.append(.pinEmpty(sp.id)) }
         top.append(.todayHeader(sp.id))
-        top += sp.today.map { .tab($0) }
+        top += rows(sp.today, Dest(section: .today, spaceId: sp.id))
         top.append(.newTerminal)
 
         let key = top.map(\.key).joined(separator: "|") + "#" + kids.map { "\($0.key):\($0.value.map(\.key).joined(separator: ","))" }.sorted().joined(separator: ";") + "#" + sp.folders.map { "\($0.id)\($0.open)" }.joined() + "#\(UI.scale)\(store.model.settings.uiFontSize)"
         if key != structureKey {
             structureKey = key
-            items = top
-            folderRows = kids
-            outline.reloadData()
-            for f in sp.folders where f.open { outline.expandItem(outline.item(atRow: rowOf(.folder(sp.id, f.id)) ?? -1)) }
+            apply(top, kids, animated: animated)
         } else {
             // Same rows: update them in place, so hover and editing survive.
             for row in 0..<outline.numberOfRows {
@@ -88,7 +116,162 @@ final class SpaceList: NSObject, NSOutlineViewDataSource, NSOutlineViewDelegate,
                 configure(cell, item.item)
             }
         }
+        syncDropHighlights()
         syncSelection()
+    }
+
+    private func apply(_ top: [SidebarItem], _ kids: [String: [SidebarItem]], animated: Bool) {
+        if animated, let (from, to) = gapMove(top, kids) {
+            items = top
+            folderRows = kids
+            let parent = { (f: String?) in f.map { self.box(.folder(self.spaceId, $0)) } }
+            outline.moveItem(at: from.1, inParent: parent(from.0), to: to.1, inParent: parent(to.0))
+            return
+        }
+        items = top
+        folderRows = kids
+        outline.reloadData()
+        for f in space.folders where f.open { outline.expandItem(outline.item(atRow: rowOf(.folder(spaceId, f.id)) ?? -1)) }
+    }
+
+    // When the only change is the gap moving, its old and new places as (folder or nil for the
+    // top level, index), so the rows between can slide instead of the list reloading.
+    private func gapMove(_ top: [SidebarItem], _ kids: [String: [SidebarItem]]) -> ((String?, Int), (String?, Int))? {
+        func find(_ t: [SidebarItem], _ k: [String: [SidebarItem]]) -> (String?, Int)? {
+            if let i = t.firstIndex(of: .placeholder) { return (nil, i) }
+            for (f, list) in k { if let i = list.firstIndex(of: .placeholder) { return (f, i) } }
+            return nil
+        }
+        func strip(_ t: [SidebarItem]) -> [SidebarItem] { t.filter { $0 != .placeholder } }
+        guard let a = find(items, folderRows), let b = find(top, kids), a != b,
+              strip(items) == strip(top), Set(folderRows.keys) == Set(kids.keys),
+              folderRows.allSatisfy({ strip($0.value) == strip(kids[$0.key] ?? []) }) else { return nil }
+        // A folder with no rows shows "Drop sessions here" instead; filling or emptying one
+        // isn't a plain move.
+        if let f = a.0, folderRows[f]?.count == 1 { return nil }
+        if let f = b.0, kids[f]?.count == 1 { return nil }
+        return (a, b)
+    }
+
+    // ---- Dragging (SidebarDrag) ---------------------------------------------------------------
+    func showDrag(_ d: SidebarDrag?) {
+        var v: DragView?
+        if let d {
+            var dv = DragView(height: UI.px(28))
+            dv.tab = d.tid
+            if case .folder(let s, let f) = d.item, s == spaceId {
+                dv.folder = f
+                dv.folderGap = d.folderGap
+                dv.height = UI.px(30)
+            }
+            if let g = d.gap, g.section != .fav, g.spaceId == spaceId { dv.gap = g }
+            switch d.target {
+            case .arming(let t, _): dv.merge = t
+            case .merge(let t, _): dv.merge = t; dv.ready = true
+            case .list(let g, let f?) where g.spaceId == spaceId: dv.into = f
+            default: break
+            }
+            v = dv
+        }
+        guard v != dragView else { return }
+        dragView = v
+        refresh(animated: v != nil)
+    }
+
+    // Rows a drop would merge into or fill light up.
+    private func syncDropHighlights() {
+        for row in 0..<outline.numberOfRows {
+            guard let rv = outline.rowView(atRow: row, makeIfNecessary: false) as? SidebarRowBackground else { continue }
+            rv.drop = dropStyle((outline.item(atRow: row) as? SidebarItemBox)?.item)
+        }
+    }
+
+    private func dropStyle(_ i: SidebarItem?) -> SidebarRowBackground.Drop {
+        guard let dv = dragView else { return .none }
+        switch i {
+        case .tab(let t) where t == dv.merge: return dv.ready ? .ready : .soft
+        case .folder(_, let f) where f == dv.into: return .ready
+        default: return .none
+        }
+    }
+
+    // What a drop at `p` (window coordinates) over this list would do.
+    func dropTarget(at p: NSPoint, for d: SidebarDrag) -> SidebarDrag.Target? {
+        let current = d.target
+        let lp = outline.convert(p, from: nil)
+        let row = outline.row(at: lp)
+        guard row >= 0, let it = (outline.item(atRow: row) as? SidebarItemBox)?.item else { return current }
+        let sp = space
+        if case .folder(let fs, let dragged) = d.item {
+            guard fs == spaceId else { return current }
+            // Folders reorder among themselves: count the other folders' headers above the pointer.
+            let above = (0..<outline.numberOfRows).filter { r in
+                guard case .folder(_, let f) = (outline.item(atRow: r) as? SidebarItemBox)?.item, f != dragged else { return false }
+                return outline.rect(ofRow: r).midY < lp.y
+            }
+            return .folders(above.count)
+        }
+        guard let tid = d.tid else { return current }
+        let r = outline.rect(ofRow: row)
+        let rel = (lp.y - r.minY) / max(1, r.height) // the outline is flipped: 0 at the row's top
+        switch it {
+        case .tab(let t):
+            guard t != tid, var dest = store.locate(t), dest.section != .fav else { return current }
+            // The middle of another session merges the two into one split.
+            if rel > 0.28, rel < 0.72, SidebarDrag.canMerge(tid, into: t) {
+                switch current {
+                case .arming(let x, _) where x == t, .merge(let x, _) where x == t: return current
+                default: return .arming(t, hold: current?.hold)
+                }
+            }
+            let ids = SidebarDrag.list(dest, store.model).filter { $0 != tid }
+            dest.index = (ids.firstIndex(of: t) ?? ids.count) + (rel > 0.5 ? 1 : 0)
+            return .list(dest, spring: nil)
+        case .placeholder:
+            return current
+        case .folder(let s, let f):
+            let n = (sp.folders.first { $0.id == f }?.tabs ?? []).filter { $0 != tid }.count
+            return .list(Dest(section: .pinned, spaceId: s, folderId: f, index: n), spring: f)
+        case .folderEmpty(let s, let f):
+            return .list(Dest(section: .pinned, spaceId: s, folderId: f, index: 0), spring: nil)
+        case .spaceHeader, .pinEmpty:
+            return .list(Dest(section: .pinned, spaceId: sp.id, index: 0), spring: nil)
+        case .todayHeader:
+            return .list(Dest(section: .today, spaceId: sp.id, index: 0), spring: nil)
+        case .newTerminal:
+            return .list(Dest(section: .today, spaceId: sp.id, index: sp.today.filter { $0 != tid }.count), spring: nil)
+        default:
+            return current
+        }
+    }
+
+    // What a row press would drag, if anything.
+    func dragItem(atRow row: Int) -> SidebarDrag.Item? {
+        guard renaming == nil, row >= 0 else { return nil }
+        switch (outline.item(atRow: row) as? SidebarItemBox)?.item {
+        case .tab(let t): return .tab(t)
+        case .folder(let s, let f): return .folder(spaceId: s, folderId: f)
+        default: return nil
+        }
+    }
+
+    func windowRect(ofTab tid: String) -> NSRect? {
+        visibleRect(rowOf(.tab(tid)))
+    }
+
+    // The gap, or the closed folder it's hidden in.
+    func windowRectOfGap() -> NSRect? {
+        if let r = rowOf(.placeholder) { return visibleRect(r) }
+        guard let g = dragView?.gap, let f = g.folderId else { return nil }
+        return visibleRect(rowOf(.folder(spaceId, f)))
+    }
+
+    private func visibleRect(_ row: Int?) -> NSRect? {
+        guard let row, row >= 0, outline.window != nil, scroll.superview != nil else { return nil }
+        let r = outline.convert(outline.rect(ofRow: row), to: nil)
+        // Only the list in the sidebar's viewport, not a neighbour waiting off to the side.
+        let shown = scroll.convert(scroll.bounds, to: nil)
+        return shown.intersects(r) ? r : nil
     }
 
     private func rowOf(_ item: SidebarItem) -> Int? {
@@ -143,6 +326,7 @@ final class SpaceList: NSObject, NSOutlineViewDataSource, NSOutlineViewDelegate,
         case .spaceHeader, .todayHeader: return UI.px(34)
         case .pinEmpty: return UI.px(64)
         case .folderEmpty, .folder: return UI.px(30)
+        case .placeholder: return dragView?.height ?? UI.px(28)
         default: return UI.px(28)
         }
     }
@@ -161,6 +345,7 @@ final class SpaceList: NSObject, NSOutlineViewDataSource, NSOutlineViewDelegate,
         case .tab: cell = outlineView.makeView(withIdentifier: SessionRowView.id, owner: self) ?? SessionRowView()
         case .spaceHeader, .todayHeader: cell = outlineView.makeView(withIdentifier: SectionHeaderView.id, owner: self) ?? SectionHeaderView()
         case .folder: cell = outlineView.makeView(withIdentifier: FolderRowView.id, owner: self) ?? FolderRowView()
+        case .placeholder: return NSTableCellView() // the gap
         default: cell = outlineView.makeView(withIdentifier: PlainRowView.id, owner: self) ?? PlainRowView()
         }
         configure(cell, i)
@@ -170,6 +355,7 @@ final class SpaceList: NSObject, NSOutlineViewDataSource, NSOutlineViewDelegate,
     func outlineView(_ outlineView: NSOutlineView, rowViewForItem item: Any) -> NSTableRowView? {
         let rv = SidebarRowBackground()
         if case .tab(let tid) = (item as? SidebarItemBox)?.item { rv.tint = store.model.tabs[tid]?.color.map { NSColor(hex: $0) } }
+        rv.drop = dropStyle((item as? SidebarItemBox)?.item)
         return rv
     }
 
@@ -296,22 +482,7 @@ final class SpaceList: NSObject, NSOutlineViewDataSource, NSOutlineViewDelegate,
     }
 
     // ---- Drag and drop ----------------------------------------------------------------------
-    func outlineView(_ outlineView: NSOutlineView, pasteboardWriterForItem item: Any) -> NSPasteboardWriting? {
-        guard case .tab(let tid) = (item as? SidebarItemBox)?.item, renaming == nil else { return nil }
-        let p = NSPasteboardItem()
-        p.setString(tid, forType: .termorcTab)
-        return p
-    }
-
-    func outlineView(_ outlineView: NSOutlineView, draggingSession session: NSDraggingSession, willBeginAt screenPoint: NSPoint, forItems draggedItems: [Any]) {
-        if case .tab(let tid) = (draggedItems.first as? SidebarItemBox)?.item { Self.dragTid = tid }
-        Peek.shared.close()
-    }
-
-    func outlineView(_ outlineView: NSOutlineView, draggingSession session: NSDraggingSession, endedAt screenPoint: NSPoint, operation: NSDragOperation) {
-        Self.dragTid = nil
-    }
-
+    // Rows are dragged by SidebarDrag; AppKit drags from the compact rail land here.
     // Where a drop lands: between rows of Pinned / a folder / Today, into a folder, or onto
     // another session (they merge into one split, Arc-style).
     func outlineView(_ outlineView: NSOutlineView, validateDrop info: NSDraggingInfo, proposedItem item: Any?, proposedChildIndex index: Int) -> NSDragOperation {
@@ -368,6 +539,7 @@ extension NSPasteboard.PasteboardType {
 // What a sidebar row shows.
 enum SidebarItem: Equatable {
     case settings
+    case placeholder // the gap a dragged row would land in
     case spaceHeader(String)
     case tab(String)
     case folder(String, String)
@@ -379,6 +551,7 @@ enum SidebarItem: Equatable {
     var key: String {
         switch self {
         case .settings: return "settings"
+        case .placeholder: return "ph"
         case .spaceHeader(let s): return "sh:\(s)"
         case .tab(let t): return "t:\(t)"
         case .folder(_, let f): return "f:\(f)"
@@ -403,16 +576,45 @@ final class SidebarScrollView: NSScrollView {
 }
 
 final class SidebarOutlineView: NSOutlineView {
+    weak var list: SpaceList?
+
     // Folder rows draw their own chevron.
     override func frameOfOutlineCell(atRow row: Int) -> NSRect { .zero }
+
+    // Pressing a session or folder may start a drag; if the button comes up first it's a click.
+    override func mouseDown(with event: NSEvent) {
+        let row = self.row(at: convert(event.locationInWindow, from: nil))
+        if event.clickCount == 1, event.modifierFlags.intersection([.shift, .command, .control, .option]).isEmpty,
+           let item = list?.dragItem(atRow: row),
+           SidebarDrag.track(item, source: rowView(atRow: row, makeIfNecessary: false) ?? self, event: event) {
+            return
+        }
+        super.mouseDown(with: event)
+    }
 }
 
 // Tinted rows (Icon & Color…) get a wash of their color under the content.
 final class SidebarRowBackground: NSTableRowView {
     var tint: NSColor?
+    // During a drag: the session a drop would merge with (soft while arming, ringed once
+    // ready), or the folder it would go into.
+    enum Drop { case none, soft, ready }
+    var drop = Drop.none { didSet { if drop != oldValue { needsDisplay = true } } }
 
     override func drawBackground(in dirtyRect: NSRect) {
         super.drawBackground(in: dirtyRect)
+        if drop != .none {
+            let path = NSBezierPath(roundedRect: bounds.insetBy(dx: 10, dy: 1), xRadius: 7, yRadius: 7)
+            let accent = MainActor.assumeIsolated { UI.accent() }
+            (drop == .ready ? accent.withAlphaComponent(0.16) : NSColor.labelColor.withAlphaComponent(0.07)).setFill()
+            path.fill()
+            if drop == .ready {
+                accent.setStroke()
+                path.lineWidth = 1
+                path.stroke()
+            }
+            return
+        }
         guard let tint, !isSelected else { return }
         tint.withAlphaComponent(0.16).setFill()
         NSBezierPath(roundedRect: bounds.insetBy(dx: 10, dy: 1), xRadius: 6, yRadius: 6).fill()

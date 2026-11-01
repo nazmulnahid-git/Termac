@@ -51,6 +51,7 @@ final class SpaceTab: NSView {
     let spaceId: String
     private let active: Bool
     private var hot = false { didSet { needsDisplay = true } }
+    var dropHot: Bool { get { hot } set { hot = newValue } } // a sidebar drag is over this Space
     private var hover = false { didSet { needsDisplay = true } }
     private let color: NSColor
 

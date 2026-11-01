@@ -4,7 +4,9 @@ import TermorcCore
 // Favorites: always-on sessions shared by every Space, as a grid of square tiles.
 @MainActor
 final class FavoritesStrip: NSView {
+    static weak var current: FavoritesStrip?
     private let grid = NSView()
+    private let dropZone = NSTextField(labelWithString: "Drop here to make it a Favorite")
     private var tiles: [String: FavoriteTile] = [:]
     private var height: NSLayoutConstraint!
     private var order: [String] = []
@@ -15,6 +17,12 @@ final class FavoritesStrip: NSView {
         height = heightAnchor.constraint(equalToConstant: 0)
         height.isActive = true
         registerForDraggedTypes([.termorcTab])
+        Self.current = self
+        dropZone.alignment = .center
+        dropZone.textColor = .secondaryLabelColor
+        dropZone.wantsLayer = true
+        dropZone.isHidden = true
+        addSubview(dropZone)
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -34,10 +42,30 @@ final class FavoritesStrip: NSView {
             needsLayout = true
         }
         for (tid, t) in tiles { t.update(TabView.make(tid), active: store.activeTabId == tid) }
-        // While a session is dragged with no Favorites yet, offer a target to make the first.
-        let dragging = SpaceList.dragTid != nil
+        // While a session is dragged with no Favorites yet, offer a target to make the first;
+        // over it (or the tiles) the strip lights up.
+        let drag = SidebarDrag.current
+        let dragging = SpaceList.dragTid != nil || drag?.tid != nil
+        var hot = false
+        if case .list(let d, _)? = drag?.target, d.section == .fav { hot = true }
         isHidden = ids.isEmpty && !dragging
+        dropZone.isHidden = !(ids.isEmpty && dragging)
+        dropZone.font = UI.font(0.92)
+        wantsLayer = true
+        let accent = UI.accent()
+        dropZone.layer?.cornerRadius = 8
+        dropZone.layer?.borderWidth = 1
+        dropZone.layer?.borderColor = (hot ? accent : NSColor.separatorColor).cgColor
+        dropZone.layer?.backgroundColor = hot ? accent.withAlphaComponent(0.14).cgColor : nil
+        layer?.cornerRadius = 10
+        layer?.backgroundColor = hot && !ids.isEmpty ? accent.withAlphaComponent(0.10).cgColor : nil
         layoutTiles()
+    }
+
+    // Where a drop at `p` (window coordinates) lands among the tiles.
+    func dropIndex(at p: NSPoint) -> Int {
+        let loc = convert(p, from: nil)
+        return order.filter { $0 != SidebarDrag.current?.tid }.firstIndex { (tiles[$0]?.frame.midX ?? 0) > loc.x && (tiles[$0]?.frame.minY ?? 0) <= loc.y } ?? order.count
     }
 
     override func layout() {
@@ -55,7 +83,11 @@ final class FavoritesStrip: NSView {
             tiles[tid]?.frame = NSRect(x: pad + CGFloat(c) * (side + gap), y: bounds.height - 10 - side - CGFloat(r) * (side + gap), width: side, height: side)
         }
         let rows = order.isEmpty ? 0 : (order.count + cols - 1) / cols
-        let h = order.isEmpty ? 0 : 14 + CGFloat(rows) * side + CGFloat(rows - 1) * gap
+        var h = order.isEmpty ? 0 : 14 + CGFloat(rows) * side + CGFloat(rows - 1) * gap
+        if !dropZone.isHidden {
+            h = 56
+            dropZone.frame = NSRect(x: pad, y: 8, width: width, height: 40)
+        }
         if height.constant != h { height.constant = h }
     }
 
@@ -147,25 +179,11 @@ final class FavoriteTile: NSView {
         layer?.borderColor = (active ? (tint ?? .controlAccentColor) : NSColor.separatorColor).cgColor
     }
 
+    // A press drags the tile (SidebarDrag); one that comes up in place activates it.
     override func mouseDown(with event: NSEvent) {
-        if event.clickCount == 1, !event.modifierFlags.contains(.shift) { Store.shared.activateTab(tid) }
-    }
-
-    override func mouseDragged(with event: NSEvent) {
-        let item = NSPasteboardItem()
-        item.setString(tid, forType: .termorcTab)
-        let d = NSDraggingItem(pasteboardWriter: item)
-        d.setDraggingFrame(bounds, contents: snapshot())
-        beginDraggingSession(with: [d], event: event, source: self)
-    }
-
-    private func snapshot() -> NSImage {
-        let img = NSImage(size: bounds.size)
-        if let rep = bitmapImageRepForCachingDisplay(in: bounds) {
-            cacheDisplay(in: bounds, to: rep)
-            img.addRepresentation(rep)
-        }
-        return img
+        guard event.clickCount == 1, !event.modifierFlags.contains(.shift) else { return }
+        if SidebarDrag.track(.tab(tid), source: self, event: event) { return }
+        Store.shared.activateTab(tid)
     }
 
     override func menu(for event: NSEvent) -> NSMenu? {
@@ -175,9 +193,6 @@ final class FavoriteTile: NSView {
     }
 }
 
-extension FavoriteTile: NSDraggingSource {
-    func draggingSession(_ session: NSDraggingSession, sourceOperationMaskFor context: NSDraggingContext) -> NSDragOperation { .move }
-}
 
 // Cards at the foot of the sidebar: a long job that finished elsewhere, and toasts.
 @MainActor

@@ -37,6 +37,7 @@ final class PaneView: NSView {
         self.sid = sid
         super.init(frame: .zero)
         wantsLayer = true
+        layer?.masksToBounds = true // a narrow split pane never spills into its neighbour
         header.wantsLayer = true
         headerLine.wantsLayer = true
         termHost.translatesAutoresizingMaskIntoConstraints = false
@@ -141,6 +142,19 @@ final class PaneView: NSView {
 
     required init?(coder: NSCoder) { fatalError() }
 
+    // The welcome card needs room: a narrow split drops it rather than squeezing it.
+    private var wantsWelcome = false
+
+    private func fitWelcome() {
+        welcome.isHidden = !wantsWelcome || bounds.width < UI.px(380)
+        welcome.compact = bounds.width < UI.px(600)
+    }
+
+    override func layout() {
+        super.layout()
+        fitWelcome()
+    }
+
     // Puts the session's terminal view into this pane.
     func attach() {
         let s = store.termSession(sid)
@@ -234,7 +248,8 @@ final class PaneView: NSView {
         }
         if showComposer { composer.update(r, focused: focused) }
         let session = store.sessions[sid]
-        welcome.isHidden = !(showComposer && store.model.settings.terminalWelcome && composer.mode != .running && (session?.cmds.isEmpty ?? true) && (session?.isBlank ?? false))
+        wantsWelcome = showComposer && store.model.settings.terminalWelcome && composer.mode != .running && (session?.cmds.isEmpty ?? true) && (session?.isBlank ?? false)
+        fitWelcome()
         blocks.needsDisplay = true
 
         jumpPill.isHidden = !r.scrolledUp

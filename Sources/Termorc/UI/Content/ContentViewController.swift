@@ -230,7 +230,7 @@ final class CardView: NSView {
     private var dropEdge: Layout.Edge?
     private let dropHighlight = NSView()
 
-    private func edge(for p: NSPoint) -> Layout.Edge {
+    func edge(for p: NSPoint) -> Layout.Edge {
         let x = p.x / max(1, bounds.width), y = 1 - p.y / max(1, bounds.height)
         let d = [(Layout.Edge.left, x), (.right, 1 - x), (.top, y), (.bottom, 1 - y)]
         return d.min { $0.1 < $1.1 }!.0
@@ -258,13 +258,50 @@ final class CardView: NSView {
         return true
     }
 
+    // A sidebar drag (SidebarDrag) over the card: the half it would take, and what it does.
+    private let dropLabel = NSTextField(labelWithString: "")
+    private let dropPill = NSView()
+
+    func showDrop(_ e: Layout.Edge, tid: String) {
+        let name = TabView.make(tid)?.name ?? "session"
+        let verb = [Layout.Edge.left: "Split left", .right: "Split right", .top: "Split up", .bottom: "Split down"][e] ?? ""
+        showDropHighlight(e)
+        if dropPill.superview == nil {
+            dropPill.wantsLayer = true
+            dropPill.shadow = { let s = NSShadow(); s.shadowBlurRadius = 14; s.shadowOffset = NSSize(width: 0, height: -4); s.shadowColor = NSColor.black.withAlphaComponent(0.35); return s }()
+            dropLabel.translatesAutoresizingMaskIntoConstraints = false
+            dropPill.translatesAutoresizingMaskIntoConstraints = false
+            dropPill.addSubview(dropLabel)
+            addSubview(dropPill)
+            NSLayoutConstraint.activate([
+                dropLabel.leadingAnchor.constraint(equalTo: dropPill.leadingAnchor, constant: 14), dropLabel.trailingAnchor.constraint(equalTo: dropPill.trailingAnchor, constant: -14),
+                dropLabel.topAnchor.constraint(equalTo: dropPill.topAnchor, constant: 6), dropLabel.bottomAnchor.constraint(equalTo: dropPill.bottomAnchor, constant: -6),
+                dropPill.centerXAnchor.constraint(equalTo: centerXAnchor), dropPill.centerYAnchor.constraint(equalTo: centerYAnchor),
+            ])
+        }
+        let accent = UI.accent()
+        dropPill.layer?.backgroundColor = accent.cgColor
+        dropPill.layer?.cornerRadius = 15
+        dropLabel.font = UI.font(1, .medium)
+        dropLabel.textColor = accent.brightnessComponentSafe > 0.75 ? .black : .white
+        dropLabel.stringValue = "\(verb) · \(name)"
+    }
+
+    func hideDrop() {
+        hideDropHighlight()
+        dropPill.removeFromSuperview()
+    }
+
     private func showDropHighlight(_ e: Layout.Edge) {
+        let accent = UI.accent()
         dropHighlight.wantsLayer = true
-        dropHighlight.layer?.backgroundColor = NSColor.controlAccentColor.withAlphaComponent(0.18).cgColor
-        dropHighlight.layer?.borderColor = NSColor.controlAccentColor.cgColor
-        dropHighlight.layer?.borderWidth = 1.5
+        dropHighlight.layer?.backgroundColor = accent.withAlphaComponent(0.22).cgColor
+        dropHighlight.layer?.borderColor = accent.cgColor
+        dropHighlight.layer?.borderWidth = 1
         dropHighlight.layer?.cornerRadius = 6
-        if dropHighlight.superview == nil { addSubview(dropHighlight) }
+        if dropHighlight.superview == nil {
+            addSubview(dropHighlight, positioned: .below, relativeTo: dropPill.superview == nil ? nil : dropPill)
+        }
         let b = bounds.insetBy(dx: 6, dy: 6)
         let f: NSRect
         switch e {

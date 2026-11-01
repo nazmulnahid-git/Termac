@@ -165,18 +165,50 @@ final class ComposerView: NSView, NSTextViewDelegate {
         let font = UI.font(0.86)
         let fill = fg.withAlphaComponent(look.dark ? 0.08 : 0.06), stroke = fg.withAlphaComponent(0.08)
         foot.arrangedSubviews.forEach { $0.removeFromSuperview() }
+        hints = []
         if m == .running {
             let l = NSTextField(labelWithString: "Keys go to the running program")
             l.font = font
             l.textColor = dim
             foot.addArrangedSubview(l)
         } else {
-            keyHints([("⏎", "run"), ("⇧⏎", "new line"), ("↑", "history"), ("⇥", "complete"), ("⌃R", "search")], font: font, fg: fg, dim: dim, fill: fill, stroke: stroke).forEach(foot.addArrangedSubview)
+            let views = keyHints([("⏎", "run"), ("⇧⏎", "new line"), ("↑", "history"), ("⇥", "complete"), ("⌃R", "search")], font: font, fg: fg, dim: dim, fill: fill, stroke: stroke)
+            for (h, rank) in zip(views, [6, 2, 4, 3, 1]) {
+                foot.addArrangedSubview(h)
+                hints.append((h, rank))
+            }
         }
         let spacer = NSView()
         spacer.setContentHuggingPriority(.init(1), for: .horizontal)
         foot.addArrangedSubview(spacer)
-        keyHints([(k, "commands")], font: font, fg: fg, dim: dim, fill: fill, stroke: stroke).forEach(foot.addArrangedSubview)
+        for h in keyHints([(k, "commands")], font: font, fg: fg, dim: dim, fill: fill, stroke: stroke) {
+            foot.addArrangedSubview(h)
+            hints.append((h, 5))
+        }
+        fitHints()
+    }
+
+    // In a narrow pane the least useful hints drop out whole rather than being squeezed.
+    private var hints: [(view: NSView, rank: Int)] = []
+
+    override func layout() {
+        super.layout()
+        fitHints()
+    }
+
+    private func fitHints() {
+        let avail = foot.bounds.width
+        guard avail > 0 else { return }
+        var used = hints.reduce(CGFloat(0)) { $0 + $1.view.fittingSize.width + foot.spacing }
+        var drop = Set<ObjectIdentifier>()
+        for h in hints.sorted(by: { $0.rank < $1.rank }) where used > avail {
+            drop.insert(ObjectIdentifier(h.view))
+            used -= h.view.fittingSize.width + foot.spacing
+        }
+        for h in hints {
+            let hide = drop.contains(ObjectIdentifier(h.view))
+            if h.view.isHidden != hide { h.view.isHidden = hide }
+        }
     }
 
     // ---- State ----------------------------------------------------------------------------

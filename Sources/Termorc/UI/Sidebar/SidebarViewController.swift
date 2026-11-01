@@ -48,6 +48,7 @@ final class SidebarViewController: NSViewController {
     static let create: CGFloat = 200 // pt past the last Space that creates a new one
 
     var dragTid: String? { SpaceList.dragTid }
+    static let rootId = NSUserInterfaceItemIdentifier("sidebar")
 
     // Compact mode shows the rail of icon tiles instead of the full list.
     var compact = false {
@@ -60,6 +61,7 @@ final class SidebarViewController: NSViewController {
 
     override func loadView() {
         let root = NSView()
+        root.identifier = Self.rootId
         rail.translatesAutoresizingMaskIntoConstraints = false
         rail.isHidden = true
         root.addSubview(rail)

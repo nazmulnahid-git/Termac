@@ -7,6 +7,7 @@ import TermorcCore
 final class WelcomeCard: NSView {
     private let stack = NSStackView()
     private let hide = NSButton(title: "Don't show again", target: nil, action: nil)
+    var compact = false { didSet { hide.isHidden = compact } } // too narrow for the link beside the hints
     private let line = NSView()
     private var key = ""
 

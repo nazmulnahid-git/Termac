@@ -44,6 +44,7 @@ final class KeyCap: NSView {
         label.font = font
         label.textColor = fg
         label.alignment = .center
+        label.setContentCompressionResistancePriority(.required, for: .horizontal) // a key cap never squeezes
         label.translatesAutoresizingMaskIntoConstraints = false
         addSubview(label)
         setContentHuggingPriority(.required, for: .horizontal)
@@ -72,8 +73,11 @@ func keyHints(_ items: [(String, String)], font: NSFont, fg: NSColor, dim: NSCol
         let l = NSTextField(labelWithString: text)
         l.font = font
         l.textColor = dim
+        // Whole or not at all: a stack that runs short drops hints rather than squeezing them.
+        l.setContentCompressionResistancePriority(.required, for: .horizontal)
         let s = NSStackView(views: [KeyCap(key, font: font, fg: fg, fill: fill, stroke: stroke), l])
         s.spacing = 5
+        s.setContentCompressionResistancePriority(.required, for: .horizontal)
         return s
     }
 }

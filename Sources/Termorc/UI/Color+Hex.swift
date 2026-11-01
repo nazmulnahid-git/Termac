@@ -24,3 +24,11 @@ extension NSStackView {
         setHuggingPriority(.defaultLow, for: .vertical)
     }
 }
+
+extension NSColor {
+    // Brightness in sRGB, for picking text that reads on this color.
+    var brightnessComponentSafe: CGFloat {
+        guard let c = usingColorSpace(.sRGB) else { return 0.5 }
+        return 0.299 * c.redComponent + 0.587 * c.greenComponent + 0.114 * c.blueComponent
+    }
+}

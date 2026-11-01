@@ -254,8 +254,16 @@ extension Store {
         alert.alertStyle = .warning
         alert.addButton(withTitle: ok)
         alert.addButton(withTitle: "Cancel")
-        if let window, window.isVisible, window.attachedSheet == nil {
-            return await alert.beginSheetModal(for: window) == .alertFirstButtonReturn
+        // Always on the main window, brought forward first. With the window closed (hidden) or
+        // Termorc in the background, the alert ended up shrunk in a corner of the screen, and
+        // a quit waiting on it looked like Termorc wouldn't quit.
+        NSApp.activate(ignoringOtherApps: true)
+        if let window {
+            if window.isMiniaturized { window.deminiaturize(nil) }
+            window.makeKeyAndOrderFront(nil)
+            if window.attachedSheet == nil {
+                return await alert.beginSheetModal(for: window) == .alertFirstButtonReturn
+            }
         }
         return alert.runModal() == .alertFirstButtonReturn
     }

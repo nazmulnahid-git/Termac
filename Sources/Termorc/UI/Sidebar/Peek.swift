@@ -18,7 +18,7 @@ final class Peek: NSObject, NSPopoverDelegate {
     func hover(_ tid: String, from view: NSView) {
         let store = Store.shared
         timer?.invalidate()
-        guard store.model.settings.gestures.peek, store.ui.overlay == nil, store.activeTabId != tid else { return }
+        guard store.model.settings.gestures.peek, store.ui.overlay == nil, !SidebarDrag.active, store.activeTabId != tid else { return }
         if popover?.isShown == true {
             show(tid, from: view, pinned: pinned)
             return
