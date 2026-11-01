@@ -2,6 +2,14 @@
 
 A macOS terminal where every session lives in a vertical sidebar, grouped into colored **Spaces**.
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/main-dark.png">
+  <source media="(prefers-color-scheme: light)" srcset="docs/screenshots/main-light.png">
+  <img alt="Termorc: the sidebar with Spaces, folders and live session status beside a terminal" src="docs/screenshots/main-dark.png">
+</picture>
+
+**[See every screen and feature →](docs/FEATURES.md)**
+
 ## What it does
 
 - **Spaces.** Each Space has its own color, pinned sessions, folders, start directory and shell profile. Switch with ⌃1–9, ⌃←/→, a two-finger swipe on the sidebar, or the All Spaces overview (⌃↑ or pinch).
