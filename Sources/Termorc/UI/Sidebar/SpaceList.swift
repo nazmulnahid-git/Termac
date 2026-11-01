@@ -182,14 +182,22 @@ final class SpaceList: NSObject, NSOutlineViewDataSource, NSOutlineViewDelegate,
     private func syncDropHighlights() {
         for row in 0..<outline.numberOfRows {
             guard let rv = outline.rowView(atRow: row, makeIfNecessary: false) as? SidebarRowBackground else { continue }
-            rv.drop = dropStyle((outline.item(atRow: row) as? SidebarItemBox)?.item)
+            let item = (outline.item(atRow: row) as? SidebarItemBox)?.item
+            rv.drop = dropStyle(item)
+            rv.split = isSplit(item)
         }
+    }
+
+    // Split rows show the focused pane's segment filled instead of the whole row selected.
+    private func isSplit(_ i: SidebarItem?) -> Bool {
+        guard case .tab(let t) = i else { return false }
+        return (store.model.tabs[t]?.layout.leaves.count ?? 0) > 1 || dragView?.merge == t
     }
 
     private func dropStyle(_ i: SidebarItem?) -> SidebarRowBackground.Drop {
         guard let dv = dragView else { return .none }
         switch i {
-        case .tab(let t) where t == dv.merge: return dv.ready ? .ready : .soft
+        case .tab(let t) where t == dv.merge: return .soft // the incoming segment shows the rest
         case .folder(_, let f) where f == dv.into: return .ready
         default: return .none
         }
@@ -356,17 +364,21 @@ final class SpaceList: NSObject, NSOutlineViewDataSource, NSOutlineViewDelegate,
         let rv = SidebarRowBackground()
         if case .tab(let tid) = (item as? SidebarItemBox)?.item { rv.tint = store.model.tabs[tid]?.color.map { NSColor(hex: $0) } }
         rv.drop = dropStyle((item as? SidebarItemBox)?.item)
+        rv.split = isSplit((item as? SidebarItemBox)?.item)
         return rv
     }
 
     private func configure(_ cell: NSView, _ i: SidebarItem) {
         switch (i, cell) {
         case (.tab(let tid), let c as SessionRowView):
-            c.configure(tid: tid, view: TabView.make(tid), active: store.activeTabId == tid, renaming: renaming == tid) { [weak self] name in
+            let pinned = store.locate(tid)?.section == .pinned
+            let merging = dragView?.merge == tid ? dragView?.tab.flatMap(TabView.make) : nil
+            c.configure(tid: tid, view: TabView.make(tid), active: store.activeTabId == tid, renaming: renaming == tid, pinned: pinned, incoming: merging, ready: dragView?.ready ?? false) { [weak self] name in
                 self?.renaming = nil
                 if let name { self?.store.renameTab(tid, name) }
             }
-            c.onClose = { [weak self] in self?.store.closeTab(tid) }
+            // Pinned rows unload (Arc's −); the rest close.
+            c.onClose = { [weak self] in pinned ? self?.store.unloadTab(tid) : self?.store.closeTab(tid) }
         case (.spaceHeader(let sid), let c as SectionHeaderView):
             guard let sp = store.space(sid) else { return }
             c.configure(title: sp.name, glyph: sp.glyph, icon: SpaceIcon.image(sp), color: NSColor(hex: sp.color), actions: [
@@ -600,6 +612,11 @@ final class SidebarRowBackground: NSTableRowView {
     // ready), or the folder it would go into.
     enum Drop { case none, soft, ready }
     var drop = Drop.none { didSet { if drop != oldValue { needsDisplay = true } } }
+    var split = false { didSet { if split != oldValue { needsDisplay = true } } }
+
+    override func drawSelection(in dirtyRect: NSRect) {
+        if !split { super.drawSelection(in: dirtyRect) }
+    }
 
     override func drawBackground(in dirtyRect: NSRect) {
         super.drawBackground(in: dirtyRect)

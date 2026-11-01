@@ -1,6 +1,6 @@
 // Split layouts are binary trees: a leaf holds one session id, a split holds two
 // children laid out in a row (side by side) or column (stacked) with a ratio.
-export const MAX_PANES = 4;
+export const MAX_PANES = 3;
 
 export const leaf = (sid) => ({ sid });
 

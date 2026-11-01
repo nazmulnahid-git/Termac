@@ -36,7 +36,8 @@ private func grid() -> Layout {
 
     @Test func insertRoot() {
         let t = leaf("a").inserting("b", nextTo: "a")
-        #expect(t.insertingRoot(leaf("c"), edge: .right) == .split(dir: .row, ratio: 0.5, a: t, b: leaf("c")))
+        // Beside two panes in a row, the newcomer takes a third; above them, half.
+        #expect(t.insertingRoot(leaf("c"), edge: .right) == .split(dir: .row, ratio: 2.0 / 3, a: t, b: leaf("c")))
         #expect(t.insertingRoot(leaf("c"), edge: .top) == .split(dir: .col, ratio: 0.5, a: leaf("c"), b: t))
         #expect(grid().insertingRoot(leaf("5")) == grid())
     }

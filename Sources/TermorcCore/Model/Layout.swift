@@ -13,7 +13,7 @@ public indirect enum Layout: Equatable, Codable, Sendable {
     public enum Direction: String, Sendable { case left, right, up, down }
     public enum Step: String, Codable, Sendable { case a, b }
 
-    public static let maxPanes = 4
+    public static let maxPanes = 3 // more and the panes get too narrow to use
 
     private enum K: String, CodingKey { case sid, dir, ratio, a, b }
 
@@ -73,7 +73,17 @@ public indirect enum Layout: Equatable, Codable, Sendable {
         guard leaves.count + sub.leaves.count <= Layout.maxPanes else { return self }
         let dir: Dir = edge == .left || edge == .right ? .row : .col
         let first = edge == .left || edge == .top
-        return first ? .split(dir: dir, ratio: 0.5, a: sub, b: self) : .split(dir: dir, ratio: 0.5, a: self, b: sub)
+        // Space shared by pane count along the split, so merged panes come out even.
+        let mine = Double(span(dir)), theirs = Double(sub.span(dir))
+        return first ? .split(dir: dir, ratio: theirs / (mine + theirs), a: sub, b: self) : .split(dir: dir, ratio: mine / (mine + theirs), a: self, b: sub)
+    }
+
+    // How many panes sit side by side along `dir`.
+    func span(_ dir: Dir) -> Int {
+        switch self {
+        case .leaf: return 1
+        case let .split(d, _, a, b): return d == dir ? a.span(dir) + b.span(dir) : max(a.span(dir), b.span(dir))
+        }
     }
 
     public func removing(_ sid: String) -> Layout? {

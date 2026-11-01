@@ -281,6 +281,30 @@ extension Store {
         }
     }
 
+    // Arc's − on a pinned session: stop its shells but keep the row, dimmed, to start fresh
+    // with a click. The view moves to another session first, as closing would.
+    func unloadTab(_ tid: String) {
+        guard let tab = model.tabs[tid] else { return }
+        let live = tab.layout.leaves.filter { sessions[$0]?.alive == true }
+        guard !live.isEmpty else { return }
+        Task {
+            let busy = live.filter { rt[$0]?.status == .run }
+            if !busy.isEmpty {
+                let r = rt[busy[0]]
+                let what = busy.count > 1 ? "\(busy.count) running processes" : (r?.command.isEmpty == false ? r!.command : (r?.proc.isEmpty == false ? r!.proc : "A process"))
+                let name = TabView.make(tid)?.name ?? "this session"
+                guard await confirm("Close “\(name)”?", detail: "\(what) \(busy.count > 1 ? "will" : "is still running and will") be stopped. It stays pinned: click it to start a fresh shell.", ok: "Close") else { return }
+            }
+            if activeTabId == tid, let other = (activeSpace.allTabs + model.favorites).first(where: { $0 != tid && model.tabs[$0]?.layout.leaves.contains { sessions[$0]?.alive == true } == true }) {
+                activateTab(other)
+            }
+            for sid in live {
+                unloading.insert(sid)
+                sessions[sid]?.kill()
+            }
+        }
+    }
+
     func closeTab(_ tid: String) {
         guard let tab = model.tabs[tid] else { return }
         Task {
@@ -333,10 +357,12 @@ extension Store {
         guard !quitting else { return }
         let tab = tabOfSession(sid)
         let loc = tab.flatMap { locate($0.id) }
-        let keep = (loc?.section == .pinned || loc?.section == .fav) && tab?.layout.leaves.count == 1
+        let unloaded = unloading.remove(sid) != nil
+        let keep = unloaded || (loc?.section == .pinned || loc?.section == .fav) && tab?.layout.leaves.count == 1
         if keep {
             let suffix = (code ?? 0) != 0 ? " with code \(code!)" : ""
-            sessions[sid]?.view.feed(text: "\r\n\u{1b}[2m[process exited\(suffix) — click to restart]\u{1b}[0m\r\n")
+            let note = unloaded ? "session closed — click to start it again" : "process exited\(suffix) — click to restart"
+            sessions[sid]?.view.feed(text: "\r\n\u{1b}[2m[\(note)]\u{1b}[0m\r\n")
             patchRt(sid) { $0.alive = false; $0.status = .idle }
         } else {
             removeSessionFromTab(sid)

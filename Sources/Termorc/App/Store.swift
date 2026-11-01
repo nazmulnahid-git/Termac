@@ -60,6 +60,7 @@ final class Store: ObservableObject {
     let home = System.home
     let library: Library
     var sessions: [String: TermSession] = [:] // the terminal registry
+    var unloading = Set<String>() // pinned sessions being put to sleep (their exit keeps the row)
     private let writer: DebouncedWriter
 
     var loaded = false

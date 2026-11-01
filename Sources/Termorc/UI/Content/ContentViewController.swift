@@ -216,6 +216,7 @@ final class CardView: NSView {
             let p = trees.values.lazy.compactMap { $0.panes[sid] }.first ?? PaneView(sid: sid)
             made[sid] = p
             p.removeFromSuperview()
+            p.isHidden = false // a one-pane tab's pane is its tree's root, hidden with it
             p.apply(look)
             p.attach()
             return p

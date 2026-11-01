@@ -45,7 +45,7 @@ final class FavoritesStrip: NSView {
         // While a session is dragged with no Favorites yet, offer a target to make the first;
         // over it (or the tiles) the strip lights up.
         let drag = SidebarDrag.current
-        let dragging = SpaceList.dragTid != nil || drag?.tid != nil
+        let dragging = SpaceList.dragTid != nil || drag?.nearFavorites == true
         var hot = false
         if case .list(let d, _)? = drag?.target, d.section == .fav { hot = true }
         isHidden = ids.isEmpty && !dragging

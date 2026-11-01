@@ -54,6 +54,9 @@ final class SidebarDrag {
     private weak var card: CardView?
     private weak var hotTab: SpaceTab?
     private var pointer = NSPoint.zero // window coordinates
+    // With no Favorites yet, their drop zone opens only when the pointer heads for the top of
+    // the sidebar, so starting a drag never shifts the list under it.
+    private(set) var nearFavorites = false
 
     var tid: String? { if case .tab(let t) = item { return t } else { return nil } }
 
@@ -130,6 +133,14 @@ final class SidebarDrag {
     private func update(_ p: NSPoint) {
         pointer = p
         ghost.move(to: p)
+        if let strip = FavoritesStrip.current, tid != nil {
+            let r = strip.convert(strip.bounds, to: nil)
+            let near = p.x >= r.minX && p.x <= r.maxX && p.y >= r.minY - 36
+            if near != nearFavorites {
+                nearFavorites = near
+                strip.update()
+            }
+        }
         let t = hit(p)
         ghost.style = { () -> DragGhost.Style in
             switch t {
