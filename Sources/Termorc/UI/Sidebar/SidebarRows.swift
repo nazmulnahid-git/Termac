@@ -544,7 +544,7 @@ final class SectionHeaderView: NSTableCellView {
         title.textColor = .secondaryLabelColor
         title.lineBreakMode = .byTruncatingTail
         title.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-        buttons.spacing = 2
+        buttons.spacing = 4
         buttons.alphaValue = 0
         let spacer = NSView()
         spacer.setContentHuggingPriority(.init(1), for: .horizontal)
@@ -596,7 +596,7 @@ final class SectionHeaderView: NSTableCellView {
         for (i, a) in acts.enumerated() {
             let b = NSButton(image: NSImage(systemSymbolName: a.0, accessibilityDescription: a.1)!, target: self, action: #selector(tap(_:)))
             b.isBordered = false
-            b.symbolConfiguration = .init(pointSize: UI.font(0.95).pointSize, weight: .regular)
+            b.symbolConfiguration = .init(pointSize: UI.font(1.15).pointSize, weight: .regular)
             b.contentTintColor = .secondaryLabelColor
             b.toolTip = a.1
             b.tag = i

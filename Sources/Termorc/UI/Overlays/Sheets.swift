@@ -178,11 +178,14 @@ struct SpaceEditor: View {
         .padding(12)
         .background {
             ZStack {
+                c(look.bg)
                 if let path = look.image, let img = NSImage(contentsOfFile: path) {
-                    Image(nsImage: img).resizable().scaledToFill().blur(radius: look.blur)
+                    // Filling, the image takes its own size; in an overlay of a view that
+                    // has the box's size, and clipped, it can't spill over the rows above.
+                    Color.clear
+                        .overlay { Image(nsImage: img).resizable().scaledToFill().blur(radius: look.blur) }
+                        .clipped()
                     c(look.bg).opacity(look.dim)
-                } else {
-                    c(look.bg)
                 }
             }
             .clipShape(RoundedRectangle(cornerRadius: 8))
