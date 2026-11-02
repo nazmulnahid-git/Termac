@@ -32,6 +32,7 @@ public enum System {
     // Runs a program and returns trimmed stdout, or nil on failure, timeout or non-zero exit.
     @discardableResult
     public static func run(_ cmd: String, _ args: [String], timeout: TimeInterval = 3, cwd: String? = nil, usePath: Bool = true, raw: Bool = false) -> String? {
+        if cmd == "git", !gitUsable { return nil }
         let p = Process()
         if cmd.hasPrefix("/") {
             p.executableURL = URL(fileURLWithPath: cmd)
@@ -75,6 +76,23 @@ public enum System {
     }
 
     // ---- Git ----------------------------------------------------------------------------
+    // Until Apple's command line tools are installed, /usr/bin/git is a stub that pops up
+    // their installer each time it runs, and Termorc runs git after every command in a repo.
+    // Checked once (a git from Homebrew works without them); the main thread doesn't wait for
+    // the login PATH, so an answer found without it isn't kept.
+    nonisolated(unsafe) private static var gitUsableValue: Bool?
+    private static let gitLock = NSLock()
+
+    public static var gitUsable: Bool {
+        if let known = gitLock.withLock({ gitUsableValue }) { return known }
+        let path = Thread.isMainThread ? loginPathIfReady : loginPath
+        let dirs = (path ?? ProcessInfo.processInfo.environment["PATH"] ?? "").split(separator: ":")
+        let git = dirs.map { "\($0)/git" }.first { FileManager.default.isExecutableFile(atPath: $0) }
+        let usable = git.map { $0 != "/usr/bin/git" || run("/usr/bin/xcode-select", ["-p"], usePath: false) != nil } ?? false
+        if path != nil { gitLock.withLock { gitUsableValue = usable } }
+        return usable
+    }
+
     nonisolated(unsafe) private static var branchCache: [String: (Date, String?)] = [:]
     private static let branchLock = NSLock()
 

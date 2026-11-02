@@ -65,7 +65,6 @@ final class Store: ObservableObject {
 
     var loaded = false
     var quitting = false // past the quit confirmation: the saved state is final
-    var quitRequested = false
     var ensureQueued = false
     private var listeners: [UUID: () -> Void] = [:]
     private var notifyScheduled = false

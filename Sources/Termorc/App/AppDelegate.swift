@@ -44,10 +44,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if store.quitting { return .terminateNow }
         Task {
             let ok = await store.prepareQuit()
-            if !ok {
-                store.quitRequested = false
-                store.ensureSession()
-            }
+            if !ok { store.ensureSession() }
             NSApp.reply(toApplicationShouldTerminate: ok)
         }
         return .terminateLater

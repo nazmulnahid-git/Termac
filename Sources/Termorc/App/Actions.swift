@@ -317,9 +317,9 @@ extension Store {
     // ---- Always a session -------------------------------------------------------------
     // The active Space always shows a session: another of its own, or a fresh terminal.
     // Closing the last one in a Space moves to the nearest Space that has sessions, and
-    // closing the very last session quits.
+    // closing the very last session opens a fresh terminal (⌘Q quits, as in Terminal).
     func ensureSession(closed: Bool = false) {
-        guard loaded, !quitting, !quitRequested else { return }
+        guard loaded, !quitting else { return }
         let sp = activeSpace
         if let t = sp.activeTabId, model.tabs[t] != nil { return }
         if let fallback = (sp.allTabs + model.favorites).first(where: { model.tabs[$0] != nil }) {
@@ -333,9 +333,6 @@ extension Store {
                 .filter { $0.element.id != sp.id && $0.element.allTabs.contains { model.tabs[$0] != nil } }
                 .min { abs($0.offset - at) < abs($1.offset - at) }
             if let near { return switchSpace(near.element.id) }
-            quitRequested = true
-            NSApp.terminate(nil)
-            return
         }
         openTerminal(OpenOptions(spaceId: sp.id))
     }

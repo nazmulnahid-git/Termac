@@ -178,14 +178,22 @@ struct SpaceEditor: View {
         .padding(12)
         .background {
             ZStack {
-                c(look.bg)
                 if let path = look.image, let img = NSImage(contentsOfFile: path) {
-                    // Filling, the image takes its own size; in an overlay of a view that
-                    // has the box's size, and clipped, it can't be seen over the rows above.
-                    Color.clear
-                        .overlay { Image(nsImage: img).resizable().scaledToFill().blur(radius: look.blur) }
-                        .clipped()
-                    c(look.bg).opacity(look.dim)
+                    // As the terminal shows it (CardView): the whole image, centered, black
+                    // where it doesn't reach, dimmed. The blur is in points at the image's
+                    // size on screen, so it's scaled to the smaller copy here.
+                    GeometryReader { g in
+                        let screen = NSScreen.main?.frame.size ?? g.size
+                        let fit = { (box: CGSize) in min(box.width / max(1, img.size.width), box.height / max(1, img.size.height)) }
+                        Image(nsImage: img).resizable().scaledToFit()
+                            .blur(radius: look.blur * fit(g.size) / max(0.0001, fit(screen)))
+                            .overlay(c(look.bg).opacity(look.dim))
+                            .frame(width: g.size.width, height: g.size.height)
+                    }
+                    .background(Color.black)
+                    .clipped()
+                } else {
+                    c(look.bg)
                 }
             }
             .clipShape(RoundedRectangle(cornerRadius: 8))

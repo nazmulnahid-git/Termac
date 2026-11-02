@@ -188,7 +188,7 @@ extension Store: TermSessionHooks {
 
     func prepareQuit() async -> Bool {
         let running = runningCount
-        if model.settings.confirmQuit, running > 0, !quitRequested {
+        if model.settings.confirmQuit, running > 0 {
             let ok = await confirm("Quit Termorc with \(running) running process\(running > 1 ? "es" : "")?", detail: "Running commands will be stopped. Sessions and scrollback are restored next launch.", ok: "Quit")
             if !ok { return false }
         }

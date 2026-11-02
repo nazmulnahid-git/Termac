@@ -472,14 +472,15 @@ final class RowButton: NSView {
 
     override var wantsUpdateLayer: Bool { true }
 
-    init(symbol: String, tip: String, size: CGFloat = 20) {
+    // `glyph` is the symbol's point size: half the button's unless given.
+    init(symbol: String, tip: String, size: CGFloat = 20, glyph: CGFloat? = nil, weight: NSFont.Weight = .medium) {
         self.symbol = symbol
         super.init(frame: .zero)
         toolTip = tip
         wantsLayer = true
         layer?.cornerRadius = size / 4
         image.image = NSImage(systemSymbolName: symbol, accessibilityDescription: tip)
-        image.symbolConfiguration = .init(pointSize: size * 0.5, weight: .medium)
+        image.symbolConfiguration = .init(pointSize: glyph ?? size * 0.5, weight: weight)
         image.translatesAutoresizingMaskIntoConstraints = false
         addSubview(image)
         translatesAutoresizingMaskIntoConstraints = false
@@ -519,6 +520,15 @@ final class RowButton: NSView {
     override func viewDidUnhide() {
         super.viewDidUnhide()
         if let window { hover = bounds.contains(convert(window.mouseLocationOutsideOfEventStream, from: nil)) }
+    }
+
+    // A button to VoiceOver, named by its tooltip ("Close", "Close (stays pinned)", …).
+    override func isAccessibilityElement() -> Bool { true }
+    override func accessibilityRole() -> NSAccessibility.Role? { .button }
+    override func accessibilityLabel() -> String? { toolTip }
+    override func accessibilityPerformPress() -> Bool {
+        action?()
+        return true
     }
 
     override func mouseUp(with event: NSEvent) {
@@ -578,8 +588,6 @@ final class SectionHeaderView: NSTableCellView {
     override func mouseEntered(with event: NSEvent) { buttons.animator().alphaValue = 1 }
     override func mouseExited(with event: NSEvent) { buttons.animator().alphaValue = 0 }
 
-    private var actions: [() -> Void] = []
-
     func configure(title t: String, glyph g: String?, icon: NSImage? = nil, color: NSColor?, actions acts: [(String, String, () -> Void)]) {
         title.stringValue = t
         title.font = UI.font(0.92, .semibold)
@@ -592,19 +600,14 @@ final class SectionHeaderView: NSTableCellView {
         imageSize.constant = (UI.font(1.05).pointSize * 1.3).rounded()
         image.layer?.cornerRadius = (imageSize.constant * 0.24).rounded()
         buttons.arrangedSubviews.forEach { $0.removeFromSuperview() }
-        actions = acts.map(\.2)
-        for (i, a) in acts.enumerated() {
-            let b = NSButton(image: NSImage(systemSymbolName: a.0, accessibilityDescription: a.1)!, target: self, action: #selector(tap(_:)))
-            b.isBordered = false
-            b.symbolConfiguration = .init(pointSize: UI.font(1.15).pointSize, weight: .regular)
-            b.contentTintColor = .secondaryLabelColor
-            b.toolTip = a.1
-            b.tag = i
+        // The rows' button, so these light up under the pointer like a row's ✕.
+        let glyph = UI.font(1.15).pointSize
+        for a in acts {
+            let b = RowButton(symbol: a.0, tip: a.1, size: (glyph * 1.75).rounded(), glyph: glyph, weight: .regular)
+            b.action = a.2
             buttons.addArrangedSubview(b)
         }
     }
-
-    @objc private func tap(_ b: NSButton) { actions[b.tag]() }
 }
 
 final class FolderRowView: NSTableCellView, NSTextFieldDelegate {
