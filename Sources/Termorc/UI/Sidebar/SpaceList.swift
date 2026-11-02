@@ -613,6 +613,7 @@ final class SidebarRowBackground: NSTableRowView {
     enum Drop { case none, soft, ready }
     var drop = Drop.none { didSet { if drop != oldValue { needsDisplay = true } } }
     var split = false { didSet { if split != oldValue { needsDisplay = true } } }
+    var hovered = false { didSet { if hovered != oldValue { needsDisplay = true } } } // set by its SessionRowView
 
     override func drawSelection(in dirtyRect: NSRect) {
         if !split { super.drawSelection(in: dirtyRect) }
@@ -632,8 +633,16 @@ final class SidebarRowBackground: NSTableRowView {
             }
             return
         }
-        guard let tint, !isSelected else { return }
-        tint.withAlphaComponent(0.16).setFill()
-        NSBezierPath(roundedRect: bounds.insetBy(dx: 10, dy: 1), xRadius: 6, yRadius: 6).fill()
+        guard !isSelected else { return }
+        let path = NSBezierPath(roundedRect: bounds.insetBy(dx: 10, dy: 1), xRadius: 6, yRadius: 6)
+        if let tint {
+            tint.withAlphaComponent(0.16).setFill()
+            path.fill()
+        }
+        // Under the pointer, like Arc: a softer version of the selected row's fill.
+        if hovered {
+            NSColor.labelColor.withAlphaComponent(0.06).setFill()
+            path.fill()
+        }
     }
 }

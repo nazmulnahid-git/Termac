@@ -95,13 +95,17 @@ final class CardView: NSView {
     static let keepTrees = 8
     private var shownLook: TerminalLook?
     private let frameLayer = CALayer()
-    private let bgImage = NSImageView()
+    // A plain layer, not an NSImageView: an image view asks for its image's size, and Auto
+    // Layout grew the window to fit a large background. Fills like the Space editor's preview.
+    private let bgImage = NSView()
     private let bgDim = NSView()
 
     override init(frame: NSRect) {
         super.init(frame: frame)
         wantsLayer = true
-        bgImage.imageScaling = .scaleProportionallyUpOrDown
+        bgImage.wantsLayer = true
+        bgImage.layer?.contentsGravity = .resizeAspectFill
+        bgImage.layer?.masksToBounds = true
         bgImage.translatesAutoresizingMaskIntoConstraints = false
         bgDim.wantsLayer = true
         bgDim.translatesAutoresizingMaskIntoConstraints = false
@@ -133,7 +137,7 @@ final class CardView: NSView {
         if look != shownLook {
             shownLook = look
             layer?.backgroundColor = NSColor(hex: look.bg).cgColor
-            bgImage.image = look.image.flatMap { NSImage(contentsOfFile: $0) }
+            bgImage.layer?.contents = look.image.flatMap { NSImage(contentsOfFile: $0) }
             bgImage.isHidden = look.image == nil
             bgDim.isHidden = look.image == nil
             bgDim.layer?.backgroundColor = NSColor(hex: look.bg, alpha: look.dim).cgColor

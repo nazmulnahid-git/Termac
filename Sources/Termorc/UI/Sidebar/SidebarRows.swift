@@ -146,9 +146,9 @@ final class StatusMarkView: NSView {
 }
 
 // One session row, or for a split session an Arc-style row with a segment per pane. Under
-// the pointer it shows ✕ at its start, in the icon's place, to close it (every pane of a split
-// row), or − on a pinned row: that stops its shells but keeps the row, dimmed, to start again
-// with a click.
+// the pointer it shows ✕ at its end, as Arc does, to close it (every pane of a split row), or
+// − on a pinned row: that stops its shells but keeps the row, dimmed, to start again with a
+// click.
 final class SessionRowView: NSTableCellView, NSTextFieldDelegate {
     static let id = NSUserInterfaceItemIdentifier("session")
     private let icon = NSImageView()
@@ -157,14 +157,13 @@ final class SessionRowView: NSTableCellView, NSTextFieldDelegate {
     private let segs = NSStackView()
     private let prod = NSTextField(labelWithString: "PROD")
     private let status = StatusMarkView()
-    private let close = RowButton(symbol: "xmark", tip: "Close", size: 18)
+    private let close = RowButton(symbol: "xmark", tip: "Close", size: 24) // Arc-sized
     private var tracking: NSTrackingArea?
     private var hover = false { didSet { updateHover() } }
     private var onRename: ((String?) -> Void)?
     private var split = false
     private var closable = true
-    private var hasIcon = false
-    private var hasGlyph = false
+    private var current: TabView.Status = .idle
     var onClose: (() -> Void)?
 
     init() {
@@ -176,6 +175,7 @@ final class SessionRowView: NSTableCellView, NSTextFieldDelegate {
         name.lineBreakMode = .byTruncatingTail
         name.font = .systemFont(ofSize: 13)
         name.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        name.setContentHuggingPriority(.init(1), for: .horizontal) // takes the slack: ✕ and status sit at the row's end
         name.delegate = self
         prod.font = .systemFont(ofSize: 9.5, weight: .bold)
         prod.textColor = .systemRed
@@ -191,7 +191,7 @@ final class SessionRowView: NSTableCellView, NSTextFieldDelegate {
         segs.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         segs.setContentHuggingPriority(.init(1), for: .horizontal) // the segments share the row's width
         // Not the cell's textField / imageView: AppKit would recolor them on selection.
-        let stack = NSStackView(views: [close, icon, glyph, name, segs, prod, status])
+        let stack = NSStackView(views: [icon, glyph, name, segs, prod, close, status])
         stack.loosen()
         stack.spacing = 7
         stack.translatesAutoresizingMaskIntoConstraints = false
@@ -223,9 +223,9 @@ final class SessionRowView: NSTableCellView, NSTextFieldDelegate {
         // A split row shows the session's own icon only if it was given one.
         let (img, text) = split ? (v.tab.icon.flatMap { KindIcons.image(kind: ">_", icon: $0).0 }, nil) : KindIcons.image(kind: v.active?.kind ?? ">_", icon: v.tab.icon)
         icon.image = img
-        hasIcon = img != nil
+        icon.isHidden = img == nil
         glyph.stringValue = text ?? ""
-        hasGlyph = text != nil
+        glyph.isHidden = text == nil
         icon.contentTintColor = tint ?? (active ? accent : nil) ?? .secondaryLabelColor
         name.isHidden = split
         segs.isHidden = !split
@@ -263,6 +263,7 @@ final class SessionRowView: NSTableCellView, NSTextFieldDelegate {
         close.toolTip = pinned ? "Close (stays pinned)" : "Close"
         // On a split row it closes every pane; each segment's own ✕ closes just that one.
         closable = !(pinned && v.panes.allSatisfy { !$0.rt.alive })
+        current = v.status
         status.set(v.status, bell: v.bell, accent: .controlAccentColor)
         if v.status == .fail, let f = v.fail, let r = store.rt[f] {
             status.toolTip = "exit \(r.exitCode ?? 1) · failed \(r.endedAt.map { Meta.timeAgo($0) } ?? "") · \(Meta.formatDuration(r.duration))"
@@ -275,8 +276,9 @@ final class SessionRowView: NSTableCellView, NSTextFieldDelegate {
     private func updateHover() {
         let show = hover && !name.isEditable && closable && !SidebarDrag.active
         close.isHidden = !show
-        icon.isHidden = !hasIcon || show
-        glyph.isHidden = !hasGlyph || show
+        (superview as? SidebarRowBackground)?.hovered = hover && !SidebarDrag.active
+        // The ✕ takes the status mark's place, unless that's a bell or a running command.
+        status.isHidden = show && current != .bell && current != .run
     }
 
     // Rows are reused as the list reloads (closing a row shifts the next one under the
@@ -292,6 +294,17 @@ final class SessionRowView: NSTableCellView, NSTextFieldDelegate {
         tracking = NSTrackingArea(rect: bounds, options: [.mouseEnteredAndExited, .activeInActiveApp, .inVisibleRect], owner: self)
         addTrackingArea(tracking!)
         syncHover()
+    }
+
+    // A reused cell leaves its old row: that row mustn't stay lit.
+    override func viewWillMove(toSuperview newSuperview: NSView?) {
+        (superview as? SidebarRowBackground)?.hovered = false
+        super.viewWillMove(toSuperview: newSuperview)
+    }
+
+    override func viewDidMoveToSuperview() {
+        super.viewDidMoveToSuperview()
+        updateHover()
     }
 
     override func mouseEntered(with event: NSEvent) {
@@ -464,9 +477,9 @@ final class RowButton: NSView {
         super.init(frame: .zero)
         toolTip = tip
         wantsLayer = true
-        layer?.cornerRadius = 5
+        layer?.cornerRadius = size / 4
         image.image = NSImage(systemSymbolName: symbol, accessibilityDescription: tip)
-        image.symbolConfiguration = .init(pointSize: size * 0.5, weight: .semibold)
+        image.symbolConfiguration = .init(pointSize: size * 0.5, weight: .medium)
         image.translatesAutoresizingMaskIntoConstraints = false
         addSubview(image)
         translatesAutoresizingMaskIntoConstraints = false
@@ -485,6 +498,10 @@ final class RowButton: NSView {
         layer?.backgroundColor = hover ? NSColor.labelColor.withAlphaComponent(pressed ? 0.18 : 0.1).cgColor : nil
         image.contentTintColor = hover ? .labelColor : .secondaryLabelColor
     }
+
+    // The whole square is the button: the glyph's image view would otherwise take the
+    // clicks that land on it, leaving only the margin around it clickable.
+    override func hitTest(_ point: NSPoint) -> NSView? { !isHidden && frame.contains(point) ? self : nil }
 
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
     override func mouseEntered(with event: NSEvent) { hover = true }
