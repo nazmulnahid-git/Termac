@@ -51,7 +51,9 @@ final class RailView: NSView {
             store.model.favorites.forEach { stack.addArrangedSubview(RailTile(tid: $0)) }
             stack.addArrangedSubview(separator())
         }
-        let g = SpaceIcon.view(sp, size: 15)
+        // The size of the session tiles below it: an image fills a tile (its corners match
+        // theirs), a glyph is drawn about as large as a tile's content.
+        let g = SpaceIcon.image(sp) == nil ? SpaceIcon.view(sp, size: 22) : SpaceIcon.view(sp, size: 38)
         g.toolTip = sp.name
         stack.addArrangedSubview(g)
         sp.pinned.forEach { stack.addArrangedSubview(RailTile(tid: $0)) }

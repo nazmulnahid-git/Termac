@@ -95,25 +95,38 @@ final class CardView: NSView {
     static let keepTrees = 8
     private var shownLook: TerminalLook?
     private let frameLayer = CALayer()
-    // A plain layer, not an NSImageView: an image view asks for its image's size, and Auto
-    // Layout grew the window to fit a large background. Fills like the Space editor's preview.
+    // The Space's background image is sized once to fit the screen, like a wallpaper, and
+    // centered: resizing the window shows more or less of it instead of zooming it, and what
+    // it doesn't cover is black. A plain layer, not an NSImageView: an image view asks for its
+    // image's size, and Auto Layout grew the window to fit a large background.
+    private let bgClip = NSView()
     private let bgImage = NSView()
     private let bgDim = NSView()
+    private var bgPixels: CGSize?
+    private lazy var bgWidth = bgImage.widthAnchor.constraint(equalToConstant: 0)
+    private lazy var bgHeight = bgImage.heightAnchor.constraint(equalToConstant: 0)
 
     override init(frame: NSRect) {
         super.init(frame: frame)
         wantsLayer = true
+        bgClip.wantsLayer = true
+        bgClip.layer?.masksToBounds = true
+        bgClip.layer?.backgroundColor = NSColor.black.cgColor
         bgImage.wantsLayer = true
-        bgImage.layer?.contentsGravity = .resizeAspectFill
-        bgImage.layer?.masksToBounds = true
-        bgImage.translatesAutoresizingMaskIntoConstraints = false
+        bgImage.layer?.contentsGravity = .resize // its frame has the image's proportions
         bgDim.wantsLayer = true
-        bgDim.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(bgImage)
-        addSubview(bgDim)
-        for v in [bgImage, bgDim] {
-            NSLayoutConstraint.activate([v.topAnchor.constraint(equalTo: topAnchor), v.bottomAnchor.constraint(equalTo: bottomAnchor), v.leadingAnchor.constraint(equalTo: leadingAnchor), v.trailingAnchor.constraint(equalTo: trailingAnchor)])
-        }
+        for v in [bgClip, bgImage, bgDim] { v.translatesAutoresizingMaskIntoConstraints = false }
+        addSubview(bgClip)
+        bgClip.addSubview(bgImage)
+        bgClip.addSubview(bgDim)
+        NSLayoutConstraint.activate([
+            bgClip.topAnchor.constraint(equalTo: topAnchor), bgClip.bottomAnchor.constraint(equalTo: bottomAnchor),
+            bgClip.leadingAnchor.constraint(equalTo: leadingAnchor), bgClip.trailingAnchor.constraint(equalTo: trailingAnchor),
+            bgImage.centerXAnchor.constraint(equalTo: bgClip.centerXAnchor), bgImage.centerYAnchor.constraint(equalTo: bgClip.centerYAnchor),
+            bgWidth, bgHeight,
+            bgDim.topAnchor.constraint(equalTo: bgImage.topAnchor), bgDim.bottomAnchor.constraint(equalTo: bgImage.bottomAnchor),
+            bgDim.leadingAnchor.constraint(equalTo: bgImage.leadingAnchor), bgDim.trailingAnchor.constraint(equalTo: bgImage.trailingAnchor),
+        ])
         frameLayer.borderColor = NSColor.systemRed.cgColor
         frameLayer.borderWidth = 2
         frameLayer.zPosition = 100
@@ -125,7 +138,58 @@ final class CardView: NSView {
 
     override func layout() {
         super.layout()
+        fitBackground() // the window may have moved to another screen
         frameLayer.frame = bounds
+    }
+
+    // The Space's background image, blurred as it asks. Decoding and blurring a large photo
+    // takes a moment, so it's done off the main thread; the previous image stays meanwhile.
+    private func loadBackground(_ look: TerminalLook) {
+        guard let path = look.image else {
+            bgImage.layer?.contents = nil
+            bgPixels = nil
+            return
+        }
+        let screen = screenSize
+        DispatchQueue.global(qos: .userInitiated).async {
+            let image = Self.background(path, blur: look.blur, screen: screen)
+            DispatchQueue.main.async { [weak self] in
+                guard let self, self.shownLook == look else { return }
+                self.bgImage.layer?.contents = image
+                self.bgPixels = image.map { CGSize(width: $0.width, height: $0.height) }
+                self.fitBackground()
+            }
+        }
+    }
+
+    private var screenSize: CGSize { (window?.screen ?? NSScreen.main)?.frame.size ?? bounds.size }
+
+    // How big the image is drawn: as large as fits the screen, whatever the window's size.
+    nonisolated private static func fit(_ pixels: CGSize, _ screen: CGSize) -> CGSize {
+        guard pixels.width > 0, pixels.height > 0, screen.width > 0, screen.height > 0 else { return .zero }
+        let s = min(screen.width / pixels.width, screen.height / pixels.height)
+        return CGSize(width: (pixels.width * s).rounded(), height: (pixels.height * s).rounded())
+    }
+
+    private func fitBackground() {
+        let size = bgPixels.map { Self.fit($0, screenSize) } ?? .zero
+        if bgWidth.constant != size.width { bgWidth.constant = size.width }
+        if bgHeight.constant != size.height { bgHeight.constant = size.height }
+    }
+
+    // The blur radius is in points on screen, as in the Space editor's preview, so it's
+    // scaled to the image's pixels by how much fitting the screen shrinks or grows the image.
+    nonisolated static func background(_ path: String, blur: Double, screen: CGSize) -> CGImage? {
+        guard let src = CIImage(contentsOf: URL(fileURLWithPath: path), options: [.applyOrientationProperty: true]),
+              src.extent.width > 0, src.extent.height > 0 else { return nil }
+        var out = src
+        if blur > 0 {
+            let shown = fit(src.extent.size, screen)
+            let scale = shown.width > 0 ? shown.width / src.extent.width : 1
+            // Clamped first, so the edges don't fade to transparent.
+            out = src.clampedToExtent().applyingGaussianBlur(sigma: blur / scale).cropped(to: src.extent)
+        }
+        return CIContext().createCGImage(out, from: src.extent)
     }
 
     func update() {
@@ -137,9 +201,8 @@ final class CardView: NSView {
         if look != shownLook {
             shownLook = look
             layer?.backgroundColor = NSColor(hex: look.bg).cgColor
-            bgImage.layer?.contents = look.image.flatMap { NSImage(contentsOfFile: $0) }
-            bgImage.isHidden = look.image == nil
-            bgDim.isHidden = look.image == nil
+            loadBackground(look)
+            bgClip.isHidden = look.image == nil
             bgDim.layer?.backgroundColor = NSColor(hex: look.bg, alpha: look.dim).cgColor
         }
         frameLayer.isHidden = !tab.has("danger")
@@ -188,7 +251,7 @@ final class CardView: NSView {
             old.root.removeFromSuperview()
         }
         view.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(view, positioned: .above, relativeTo: bgDim)
+        addSubview(view, positioned: .above, relativeTo: bgClip)
         NSLayoutConstraint.activate([view.topAnchor.constraint(equalTo: topAnchor), view.bottomAnchor.constraint(equalTo: bottomAnchor), view.leadingAnchor.constraint(equalTo: leadingAnchor), view.trailingAnchor.constraint(equalTo: trailingAnchor)])
         trees[tab.id] = Tree(root: view, layout: tab.layout, panes: made, look: look, used: tick)
         shownTid = tab.id

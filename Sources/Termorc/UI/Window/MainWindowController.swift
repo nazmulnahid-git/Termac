@@ -325,9 +325,11 @@ final class MainSplitViewController: NSSplitViewController {
     private lazy var sidebarItem = NSSplitViewItem(sidebarWithViewController: sidebar)
     private var lastMode: String?
 
-    // The sidebar is a fixed width, like Mail's; compact mode is the icon rail.
+    // The sidebar is a fixed width, like Mail's; compact mode is the icon rail. The window's
+    // traffic lights sit over the sidebar and reach about 80pt in, so the rail is wider than
+    // its tiles need: at 64 the zoom button hung over the edge of macOS 26's floating sidebar.
     static let sidebarWidth: CGFloat = 220
-    static let railWidth: CGFloat = 64
+    static let railWidth: CGFloat = 84
 
     override func viewDidLoad() {
         super.viewDidLoad()

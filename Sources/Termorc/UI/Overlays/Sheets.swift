@@ -181,7 +181,7 @@ struct SpaceEditor: View {
                 c(look.bg)
                 if let path = look.image, let img = NSImage(contentsOfFile: path) {
                     // Filling, the image takes its own size; in an overlay of a view that
-                    // has the box's size, and clipped, it can't spill over the rows above.
+                    // has the box's size, and clipped, it can't be seen over the rows above.
                     Color.clear
                         .overlay { Image(nsImage: img).resizable().scaledToFill().blur(radius: look.blur) }
                         .clipped()
@@ -189,6 +189,9 @@ struct SpaceEditor: View {
                 }
             }
             .clipShape(RoundedRectangle(cornerRadius: 8))
+            // Clipping only hides the overflow: a large image still took every click in the
+            // sheet. The preview is decoration, so it takes none.
+            .allowsHitTesting(false)
         }
     }
 
