@@ -111,12 +111,14 @@ final class FavoriteTile: NSView {
     private let badge = NSTextField(labelWithString: "")
     private var active = false
     private var tint: NSColor?
+    private var hover = false { didSet { if hover != oldValue { needsDisplay = true } } }
 
     init(tid: String) {
         self.tid = tid
         super.init(frame: .zero)
         wantsLayer = true
         layer?.cornerRadius = 9
+        addTrackingArea(NSTrackingArea(rect: .zero, options: [.mouseEnteredAndExited, .activeInActiveApp, .inVisibleRect], owner: self))
         label.font = .systemFont(ofSize: 12, weight: .semibold)
         label.alignment = .center
         label.lineBreakMode = .byClipping
@@ -174,10 +176,14 @@ final class FavoriteTile: NSView {
 
     override func updateLayer() {
         let base = tint ?? NSColor.labelColor
-        layer?.backgroundColor = base.withAlphaComponent(tint != nil ? (active ? 0.30 : 0.18) : (active ? 0.10 : 0.05)).cgColor
+        let fill = tint != nil ? (active ? 0.30 : 0.18) : (active ? 0.10 : 0.05)
+        layer?.backgroundColor = base.withAlphaComponent(fill + (hover && !active ? 0.06 : 0)).cgColor
         layer?.borderWidth = active ? 1.5 : 0.5
         layer?.borderColor = (active ? (tint ?? .controlAccentColor) : NSColor.separatorColor).cgColor
     }
+
+    override func mouseEntered(with event: NSEvent) { hover = true }
+    override func mouseExited(with event: NSEvent) { hover = false }
 
     // A press drags the tile (SidebarDrag); one that comes up in place activates it.
     override func mouseDown(with event: NSEvent) {
@@ -188,8 +194,17 @@ final class FavoriteTile: NSView {
 
     override func menu(for event: NSEvent) -> NSMenu? {
         let m = NSMenu()
-        SidebarMenus.row(m, tid: tid, rename: nil, newFolder: nil)
+        SidebarMenus.row(m, tid: tid, rename: { [tid] in SidebarMenus.promptRename(tid) }, newFolder: nil)
         return m
+    }
+
+    // A button to VoiceOver, named like its tooltip.
+    override func isAccessibilityElement() -> Bool { true }
+    override func accessibilityRole() -> NSAccessibility.Role? { .button }
+    override func accessibilityLabel() -> String? { toolTip }
+    override func accessibilityPerformPress() -> Bool {
+        Store.shared.activateTab(tid)
+        return true
     }
 }
 
@@ -220,10 +235,10 @@ final class SidebarCards: NSStackView {
             addArrangedSubview(Card(icon: n.exit != 0 ? "exclamationmark.circle.fill" : "checkmark.circle.fill", iconColor: n.exit != 0 ? .systemRed : .systemGreen,
                                     title: n.command, mono: true,
                                     detail: "\(n.exit != 0 ? "Failed (exit \(n.exit))" : "Finished") in \(where_) · \(Meta.formatDuration(n.dur))",
-                                    action: ("Jump", { store.jumpTo(n.sid); store.ui.notify = nil })))
+                                    action: ("Jump", { store.jumpTo(n.sid); store.ui.notify = nil }), dismiss: { store.ui.notify = nil }))
         }
         if let t = store.ui.toast {
-            addArrangedSubview(Card(icon: nil, iconColor: nil, title: t.title, mono: false, detail: t.detail, action: t.action))
+            addArrangedSubview(Card(icon: nil, iconColor: nil, title: t.title, mono: false, detail: t.detail, action: t.action, dismiss: { store.ui.toast = nil }))
         }
         for v in arrangedSubviews { v.widthAnchor.constraint(equalTo: widthAnchor, constant: -16).isActive = true }
     }
@@ -231,7 +246,8 @@ final class SidebarCards: NSStackView {
     final class Card: NSVisualEffectView {
         private var run: (() -> Void)?
 
-        init(icon: String?, iconColor: NSColor?, title: String, mono: Bool, detail: String?, action: (label: String, run: () -> Void)?) {
+        // Sizes follow Settings › Zoom; ✕ dismisses the card before its time is up.
+        init(icon: String?, iconColor: NSColor?, title: String, mono: Bool, detail: String?, action: (label: String, run: () -> Void)?, dismiss: @escaping () -> Void) {
             super.init(frame: .zero)
             material = .popover
             blendingMode = .withinWindow
@@ -242,10 +258,10 @@ final class SidebarCards: NSStackView {
             layer?.borderColor = NSColor.separatorColor.cgColor
             run = action?.run
             let t = NSTextField(labelWithString: title)
-            t.font = mono ? .monospacedSystemFont(ofSize: 11.5, weight: .medium) : .systemFont(ofSize: 12.5, weight: .semibold)
+            t.font = mono ? .monospacedSystemFont(ofSize: UI.font(0.92).pointSize, weight: .medium) : UI.font(1, .semibold)
             t.lineBreakMode = .byTruncatingTail
             let d = NSTextField(wrappingLabelWithString: detail ?? "")
-            d.font = .systemFont(ofSize: 11.5)
+            d.font = UI.font(0.92)
             d.textColor = .secondaryLabelColor
             d.isHidden = detail == nil
             let texts = NSStackView(views: [t, d])
@@ -257,7 +273,7 @@ final class SidebarCards: NSStackView {
             if let icon {
                 let iv = NSImageView(image: NSImage(systemSymbolName: icon, accessibilityDescription: nil)!)
                 iv.contentTintColor = iconColor
-                iv.symbolConfiguration = .init(pointSize: 15, weight: .regular)
+                iv.symbolConfiguration = .init(pointSize: UI.font(1.2).pointSize, weight: .regular)
                 views.append(iv)
             }
             views.append(texts)
@@ -267,6 +283,9 @@ final class SidebarCards: NSStackView {
                 b.controlSize = .small
                 views.append(b)
             }
+            let close = RowButton(symbol: "xmark", tip: "Dismiss", size: 18)
+            close.action = dismiss
+            views.append(close)
             let row = NSStackView(views: views)
             row.loosen()
             row.spacing = 10
@@ -313,6 +332,13 @@ enum SidebarMenus {
         let host = NSMenuItem(title: title, action: nil, keyEquivalent: "")
         host.submenu = m
         menu.addItem(host)
+    }
+
+    // Rename from a place with no editable name (a Favorite or a rail tile).
+    static func promptRename(_ tid: String) {
+        let store = Store.shared
+        guard let tab = store.model.tabs[tid], let name = Prompt.text("Rename session", value: tab.name ?? TabView.make(tid)?.name ?? "") else { return }
+        store.renameTab(tid, name)
     }
 
     static func row(_ menu: NSMenu, tid: String, rename: (() -> Void)?, newFolder: (() -> Void)?) {

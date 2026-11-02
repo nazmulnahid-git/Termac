@@ -53,6 +53,7 @@ enum MainMenu {
         _ = submenu("Shell", [
             item("New Terminal", "newTerminal"),
             item("Command Bar", "commandBar"),
+            item("Quick Terminal", "quickTerminal"),
             .separator(),
             item("Split Right", "splitRight"),
             item("Split Down", "splitDown"),

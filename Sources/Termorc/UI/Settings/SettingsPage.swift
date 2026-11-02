@@ -177,7 +177,7 @@ struct AppearanceSettings: View {
                     ForEach([80.0, 90, 100, 110, 125, 150], id: \.self) { Text("\(Int($0))%").tag($0) }
                 } label: {
                     Text("Zoom")
-                    Hint(text: "Text size of the sidebar and bars.")
+                    Hint(text: "Scales the sidebar, bars and terminal text together. ⌘0 resets it.")
                 }
             }
             Section("Terminal") {
@@ -424,7 +424,7 @@ struct KeybindingSettings: View {
             Section {
                 Toggle(isOn: setting(\.shellPriority)) {
                     Text("Shell takes priority")
-                    Hint(text: "Shortcuts that conflict with your shell (e.g. ⌃R) are passed through unless “Shell takes priority” is on.")
+                    Hint(text: "When on, ⌃ and ⌥ shortcuts go to the shell while a terminal has focus, even ones Termorc also uses.")
                 }
             }
             HStack {
@@ -541,7 +541,7 @@ struct GestureSettings: View {
         Form {
             Section {
                 gestureRow("Switch Space", "Two-finger swipe on sidebar", "hand.draw", \.gestures.swipeSpaces)
-                gestureRow("All Spaces", "Pinch out · pinch in to return", "arrow.up.left.and.arrow.down.right", \.gestures.pinch)
+                gestureRow("All Spaces", "Pinch in · pinch out to return", "arrow.up.left.and.arrow.down.right", \.gestures.pinch)
                 LabeledContent {
                     Text("Always on").foregroundStyle(.secondary)
                 } label: {
@@ -579,7 +579,10 @@ struct FileSettings: View {
                 Text(Routing.tildify(store.paths.settingsFile.path, home: store.home)).font(.callout.monospaced()).foregroundStyle(.secondary)
                 Spacer()
                 Button("Open in Editor") { sync.openFile() }
-                Button("Save") { sync.save(text: text); dirty = false }.keyboardShortcut("s").disabled(!dirty)
+                Button("Save") { sync.save(text: text); dirty = false }.disabled(!dirty)
+                    // ⌘S on this page always means Save: bound to the disabled button, it fell
+                    // through to the menu's ⌘S and hid the sidebar while there was nothing to save.
+                    .background(Button("") { if dirty { sync.save(text: text); dirty = false } }.keyboardShortcut("s").opacity(0))
             }
             if let e = sync.status.error {
                 Label(e, systemImage: "exclamationmark.triangle.fill").foregroundStyle(.red).font(.callout)

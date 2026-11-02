@@ -404,6 +404,7 @@ final class CommandBar: NSObject, NSTextFieldDelegate, NSTableViewDataSource, NS
             act("copyLastOutput", "Copy last output") { d?.run("copyLastOutput") },
             act("find", "Find in terminal", words: "search") { d?.run("find") },
             act("clear", "Clear scrollback") { d?.run("clear") },
+            act("quickTerminal", "Quick Terminal", words: "drop down dropdown") { d?.run("quickTerminal") },
             act("rename", "Rename session…", hint: "") { [store] in
                 guard let tid = store.activeTabId, let tab = store.model.tabs[tid] else { return }
                 if let name = Prompt.text("Rename session", value: tab.name ?? "") { store.renameTab(tid, name) }
@@ -547,14 +548,17 @@ final class CommandRow: NSView {
         icon.image = it.image ?? it.symbol.flatMap { NSImage(systemSymbolName: $0, accessibilityDescription: nil) }
         icon.isHidden = it.glyph != nil
         glyph.isHidden = it.glyph == nil
-        if let (g, c) = it.glyph { glyph.stringValue = g; glyph.textColor = selected ? .white : c; glyph.font = UI.font(1.1) }
-        let ink: NSColor = selected ? .white : .labelColor
-        let dim: NSColor = selected ? NSColor.white.withAlphaComponent(0.8) : .secondaryLabelColor
-        let hit: NSColor = selected ? .white : UI.accent()
+        // On the Space's color: dark text on a light one (gold, a pale custom color), as the
+        // card's drop highlight does.
+        let onAccent: NSColor = UI.accent().brightnessComponentSafe > 0.75 ? .black : .white
+        if let (g, c) = it.glyph { glyph.stringValue = g; glyph.textColor = selected ? onAccent : c; glyph.font = UI.font(1.1) }
+        let ink: NSColor = selected ? onAccent : .labelColor
+        let dim: NSColor = selected ? onAccent.withAlphaComponent(0.8) : .secondaryLabelColor
+        let hit: NSColor = selected ? onAccent : UI.accent()
         label.attributedStringValue = Self.highlighted(it.label, it.hl, mono: it.mono, size: UI.font().pointSize, color: ink, hit: hit)
         sub.attributedStringValue = Self.highlighted(it.sub, it.subHl, mono: it.subMono, size: UI.font().pointSize, color: dim, hit: hit)
-        icon.contentTintColor = selected ? .white : .secondaryLabelColor
-        hint.textColor = selected ? NSColor.white.withAlphaComponent(0.8) : .tertiaryLabelColor
+        icon.contentTintColor = selected ? onAccent : .secondaryLabelColor
+        hint.textColor = selected ? onAccent.withAlphaComponent(0.8) : .tertiaryLabelColor
         sub.isHidden = it.sub.isEmpty
         updateHint()
     }

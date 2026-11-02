@@ -142,8 +142,22 @@ struct LibraryView: View {
             if m.results.count >= 500 { Text("Showing the first 500 — refine the search to see more.").font(.caption).foregroundStyle(.secondary) }
         }
         .listStyle(.inset)
-        .contextMenu(forSelectionType: String.self) { _ in } primaryAction: { ids in
+        .contextMenu(forSelectionType: String.self) { ids in
+            if let id = ids.first, let e = m.results.first(where: { $0.id == id }) {
+                Button("Restore") { store.restoreFromLibrary(e); store.ui.view = .terminal }
+                Button("Delete…", role: .destructive) { delete(e) }
+            }
+        } primaryAction: { ids in
             if let id = ids.first, let e = m.results.first(where: { $0.id == id }) { store.restoreFromLibrary(e); store.ui.view = .terminal }
+        }
+    }
+
+    func delete(_ e: LibraryEntry) {
+        Task {
+            guard await store.confirm("Delete “\(e.name)” from the Library?", detail: "Its scrollback and command history are removed. This can't be undone.", ok: "Delete") else { return }
+            store.library.remove(e.id)
+            if m.selId == e.id { m.selId = nil }
+            m.search(debounce: false)
         }
     }
 
@@ -253,7 +267,7 @@ struct LibraryDetail: View {
                 }
                 .frame(maxHeight: 120)
             }
-            ScrollbackPreview(content: store.library.content(e.id), look: store.look(for: store.space(e.spaceId)))
+            ScrollbackPreview(id: e.id, look: store.look(for: store.space(e.spaceId)))
                 .clipShape(RoundedRectangle(cornerRadius: 8))
         }
         .padding(16)
@@ -307,9 +321,11 @@ struct LibraryDetail: View {
     }
 }
 
-// A read-only terminal showing an archived session's scrollback in its Space's colors.
+// A read-only terminal showing an archived session's scrollback in its Space's colors. Keyed by
+// the entry: its file (up to several MB) is read when the selection changes, not on every
+// redraw of the Library.
 struct ScrollbackPreview: NSViewRepresentable {
-    let content: String
+    let id: String
     let look: TerminalLook
 
     func makeNSView(context: Context) -> TerminalView {
@@ -319,8 +335,9 @@ struct ScrollbackPreview: NSViewRepresentable {
     }
 
     func updateNSView(_ v: TerminalView, context: Context) {
-        guard context.coordinator.shown != content else { return }
-        context.coordinator.shown = content
+        guard context.coordinator.shown != id else { return }
+        context.coordinator.shown = id
+        let content = Store.shared.library.content(id)
         v.installColors(look.palette.ansi.map { SwiftTerm.Color(hex: $0) })
         v.nativeBackgroundColor = NSColor(hex: look.bg)
         v.nativeForegroundColor = NSColor(hex: look.palette.foreground)

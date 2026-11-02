@@ -37,7 +37,7 @@ final class RailView: NSView {
 
     func update() {
         let sp = store.activeSpace
-        let k = [store.model.favorites.joined(), sp.id, sp.allTabs.joined(), sp.folders.map { "\($0.id)\($0.open)" }.joined()].joined(separator: "|")
+        let k = [store.model.favorites.joined(), sp.id, sp.allTabs.joined(), sp.folders.map { "\($0.id)\($0.open)" }.joined(), "\(UI.scale)"].joined(separator: "|")
         if k != key {
             key = k
             rebuild(sp)
@@ -53,7 +53,7 @@ final class RailView: NSView {
         }
         // The size of the session tiles below it: an image fills a tile (its corners match
         // theirs), a glyph is drawn about as large as a tile's content.
-        let g = SpaceIcon.image(sp) == nil ? SpaceIcon.view(sp, size: 22) : SpaceIcon.view(sp, size: 38)
+        let g = SpaceIcon.image(sp) == nil ? SpaceIcon.view(sp, size: UI.px(22)) : SpaceIcon.view(sp, size: UI.px(38))
         g.toolTip = sp.name
         stack.addArrangedSubview(g)
         sp.pinned.forEach { stack.addArrangedSubview(RailTile(tid: $0)) }
@@ -90,14 +90,14 @@ final class RailButton: NSButton {
         self.fn = fn
         super.init(frame: .zero)
         image = NSImage(systemSymbolName: symbol, accessibilityDescription: tip)
-        symbolConfiguration = .init(pointSize: 14, weight: .regular)
+        symbolConfiguration = .init(pointSize: UI.font(1.12).pointSize, weight: .regular)
         isBordered = false
         contentTintColor = .secondaryLabelColor
         toolTip = tip
         target = self
         action = #selector(tap)
-        widthAnchor.constraint(equalToConstant: 40).isActive = true
-        heightAnchor.constraint(equalToConstant: 32).isActive = true
+        widthAnchor.constraint(equalToConstant: UI.px(40)).isActive = true
+        heightAnchor.constraint(equalToConstant: UI.px(32)).isActive = true
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -120,7 +120,7 @@ final class RailTile: NSView {
         super.init(frame: .zero)
         wantsLayer = true
         layer?.cornerRadius = 9
-        icon.symbolConfiguration = .init(pointSize: 15, weight: .regular)
+        icon.symbolConfiguration = .init(pointSize: UI.font(1.2).pointSize, weight: .regular)
         dot.wantsLayer = true
         dot.layer?.cornerRadius = 3
         for v in [icon, glyph, dot] as [NSView] {
@@ -128,7 +128,7 @@ final class RailTile: NSView {
             addSubview(v)
         }
         NSLayoutConstraint.activate([
-            widthAnchor.constraint(equalToConstant: 40), heightAnchor.constraint(equalToConstant: 40),
+            widthAnchor.constraint(equalToConstant: UI.px(40)), heightAnchor.constraint(equalToConstant: UI.px(40)),
             icon.centerXAnchor.constraint(equalTo: centerXAnchor), icon.centerYAnchor.constraint(equalTo: centerYAnchor),
             glyph.centerXAnchor.constraint(equalTo: centerXAnchor), glyph.centerYAnchor.constraint(equalTo: centerYAnchor),
             dot.widthAnchor.constraint(equalToConstant: 6), dot.heightAnchor.constraint(equalToConstant: 6),
@@ -155,12 +155,21 @@ final class RailTile: NSView {
         let c: NSColor? = [.run: .controlAccentColor, .ok: .systemGreen, .fail: .systemRed, .bell: .systemOrange][v.status]
         dot.isHidden = c == nil
         dot.layer?.backgroundColor = c?.cgColor
-        layer?.backgroundColor = (tint ?? .labelColor).withAlphaComponent(active ? 0.14 : (tint != nil ? 0.12 : 0)).cgColor
+        layer?.backgroundColor = (tint ?? .labelColor).withAlphaComponent(active ? 0.14 : (tint != nil ? 0.12 : 0) + (hover ? 0.07 : 0)).cgColor
         alphaValue = v.dead ? 0.5 : 1
     }
 
-    override func mouseEntered(with event: NSEvent) { Peek.shared.hover(tid, from: self) }
-    override func mouseExited(with event: NSEvent) { Peek.shared.leave() }
+    private var hover = false { didSet { if hover != oldValue { refresh() } } }
+
+    override func mouseEntered(with event: NSEvent) {
+        hover = true
+        Peek.shared.hover(tid, from: self)
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        hover = false
+        Peek.shared.leave()
+    }
 
     override func mouseDown(with event: NSEvent) {
         if event.modifierFlags.contains(.shift) { Peek.shared.togglePin(tid, from: self); return }
@@ -179,8 +188,17 @@ final class RailTile: NSView {
 
     override func menu(for event: NSEvent) -> NSMenu? {
         let m = NSMenu()
-        SidebarMenus.row(m, tid: tid, rename: nil, newFolder: nil)
+        SidebarMenus.row(m, tid: tid, rename: { [tid] in SidebarMenus.promptRename(tid) }, newFolder: nil)
         return m
+    }
+
+    // A button to VoiceOver, named like its tooltip.
+    override func isAccessibilityElement() -> Bool { true }
+    override func accessibilityRole() -> NSAccessibility.Role? { .button }
+    override func accessibilityLabel() -> String? { toolTip }
+    override func accessibilityPerformPress() -> Bool {
+        Store.shared.activateTab(tid)
+        return true
     }
 }
 

@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 import TermorcCore
 
-// "All Spaces" (⌃↑ or pinch): one card per Space over a dark backdrop. Click a card to
+// "All Spaces" (⌃⌥↑ or pinch): one card per Space over a dark backdrop. Click a card to
 // switch, a row to open that session; drag rows between cards to move them.
 @MainActor
 final class OverviewPanel {
@@ -107,7 +107,7 @@ struct OverviewView: View {
                 }
                 .padding(.horizontal, 40)
             }
-            Text("Drag sessions between cards to move them · Pinch in or esc to return · ⌃1–9 jumps").font(.caption).foregroundStyle(.secondary)
+            Text("Drag sessions between cards to move them · Pinch out or esc to return · ⌃1–9 jumps").font(.caption).foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .contentShape(Rectangle())
@@ -131,20 +131,24 @@ struct OverviewView: View {
             }
             .padding(12)
             .background(color.opacity(0.16))
-            VStack(alignment: .leading, spacing: 2) {
-                if sp.allTabs.isEmpty { Text("No sessions yet").font(.caption).foregroundStyle(.secondary).padding(8) }
-                ForEach(sp.pinned, id: \.self) { row($0, active: current && sp.activeTabId == $0) }
-                ForEach(sp.folders.filter { !$0.tabs.isEmpty }) { f in
-                    Text(f.name).font(.caption.weight(.semibold)).foregroundStyle(.secondary).padding(.top, 6).padding(.leading, 8)
-                    ForEach(f.tabs, id: \.self) { row($0, active: current && sp.activeTabId == $0) }
+            // A Space with more sessions than the card shows scrolls rather than cutting off.
+            ScrollView(.vertical) {
+                VStack(alignment: .leading, spacing: 2) {
+                    if sp.allTabs.isEmpty { Text("No sessions yet").font(.caption).foregroundStyle(.secondary).padding(8) }
+                    ForEach(sp.pinned, id: \.self) { row($0, active: current && sp.activeTabId == $0) }
+                    ForEach(sp.folders.filter { !$0.tabs.isEmpty }) { f in
+                        Text(f.name).font(.caption.weight(.semibold)).foregroundStyle(.secondary).padding(.top, 6).padding(.leading, 8)
+                        ForEach(f.tabs, id: \.self) { row($0, active: current && sp.activeTabId == $0) }
+                    }
+                    if !sp.today.isEmpty {
+                        Text("Today").font(.caption.weight(.semibold)).foregroundStyle(.secondary).padding(.top, 6).padding(.leading, 8)
+                        ForEach(sp.today, id: \.self) { row($0, active: current && sp.activeTabId == $0) }
+                    }
                 }
-                if !sp.today.isEmpty {
-                    Text("Today").font(.caption.weight(.semibold)).foregroundStyle(.secondary).padding(.top, 6).padding(.leading, 8)
-                    ForEach(sp.today, id: \.self) { row($0, active: current && sp.activeTabId == $0) }
-                }
-                Spacer(minLength: 0)
+                .padding(6)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .padding(6)
+            .scrollIndicators(.automatic)
         }
         .frame(width: 240, height: 300, alignment: .top)
         .background(Color.white.opacity(highlighted ? 0.12 : 0.06), in: RoundedRectangle(cornerRadius: 14))

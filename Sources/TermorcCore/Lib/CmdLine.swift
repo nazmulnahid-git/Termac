@@ -137,12 +137,13 @@ public enum CmdLine {
     static let builtins = ["alias", "bg", "builtin", "cd", "command", "echo", "eval", "exec", "exit", "export", "fg", "history", "jobs", "kill", "popd", "printf", "pushd", "pwd", "read", "set", "source", "type", "unset", "which"]
 
     nonisolated(unsafe) static var commandCache: [String]?
+    private static let commandLock = NSLock() // completions run off the main thread, a pane each
 
     // Executables on the login PATH, plus shell builtins. Called from the input bar, so it
     // doesn't wait for the login shell: until its PATH is known the app's own is used, and
     // that list isn't cached.
     public static func commands(path: String? = nil) -> [String] {
-        if let c = commandCache { return c }
+        if let c = commandLock.withLock({ commandCache }) { return c }
         let login = System.loginPathIfReady
         var names = Set(builtins)
         for dir in (path ?? login ?? ProcessInfo.processInfo.environment["PATH"] ?? "").split(separator: ":") {
@@ -150,7 +151,7 @@ public enum CmdLine {
             for n in items where FileManager.default.isExecutableFile(atPath: "\(dir)/\(n)") { names.insert(n) }
         }
         let sorted = names.sorted()
-        if path != nil || login != nil { commandCache = sorted }
+        if path != nil || login != nil { commandLock.withLock { commandCache = sorted } }
         return sorted
     }
 

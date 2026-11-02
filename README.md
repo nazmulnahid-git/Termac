@@ -61,7 +61,7 @@ If you keep a dozen terminal tabs open across a few projects, Termorc gives them
 ## Features
 
 **Spaces and the sidebar**
-- Spaces with their own color, icon, pinned sessions, folders, start directory and shell profile. Switch with ⌃1–9, ⌃← / ⌃→, a two-finger swipe, or the All Spaces overview (⌃↑ or pinch).
+- Spaces with their own color, icon, pinned sessions, folders, start directory and shell profile. Switch with ⌃1–9, ⌃⌥← / ⌃⌥→, a two-finger swipe, or the All Spaces overview (⌃⌥↑ or pinch).
 - Favorites (shared by every Space), Pinned sessions in collapsible folders, and Today for throwaway sessions.
 - Live status on every row: running, idle, ✓ done, ✗ failed (hover for the exit code, click to jump to the error), and a bell badge.
 - Right-click a row and choose **Icon & Color…** to give it its own icon and a tinted row.
@@ -96,7 +96,7 @@ If you keep a dozen terminal tabs open across a few projects, Termorc gives them
    ```
 
    Termorc isn't signed with an Apple Developer ID yet, so without this step macOS refuses to open it, saying it's damaged or can't be opened.
-3. Open Termorc from Applications. It starts with a **Home** Space; ⌃N creates more.
+3. Open Termorc from Applications. It starts with a **Home** Space; ⇧⌘N creates more.
 
 **Build from source** instead (needs Xcode 16+ or its command-line tools):
 
@@ -116,7 +116,7 @@ For the macOS 26 Dock icon (light, dark, clear and tinted looks), point the comm
 | **⌘T** command bar | **⌘N** new terminal |
 | **⌘D / ⇧⌘D** split right / down | **⌘W** close pane |
 | **⌃1–9** go to Space | **⌘1–9** go to session |
-| **⌃↑** All Spaces | **⌘Y** Library |
+| **⌃⌥↑** All Spaces | **⌘Y** Library |
 | **⌥Space** Quick Terminal | **⌘S** show / hide sidebar |
 | **⇧⌘C** copy last output | **⌘,** Settings |
 

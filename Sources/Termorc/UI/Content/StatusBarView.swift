@@ -32,18 +32,13 @@ final class StatusBarView: NSView {
         stack.arrangedSubviews.forEach { $0.removeFromSuperview() }
         for (i, sp) in store.model.spaces.enumerated() {
             let b = SpaceTab(space: sp, active: sp.id == store.model.activeSpaceId, flag: sp.id != store.model.activeSpaceId && unseen.contains(sp.id))
-            b.toolTip = "\(sp.name)  ⌃\(i + 1)"
+            b.toolTip = i < 9 ? "\(sp.name)  ⌃\(i + 1)" : sp.name // ⌃1–9 only
             stack.addArrangedSubview(b)
         }
-        let add = NSButton(image: NSImage(systemSymbolName: "plus", accessibilityDescription: "New Space")!, target: self, action: #selector(newSpace))
-        add.isBordered = false
-        add.symbolConfiguration = .init(pointSize: 11, weight: .medium)
-        add.contentTintColor = .secondaryLabelColor
-        add.toolTip = "New Space"
+        let add = RowButton(symbol: "plus", tip: "New Space", size: 22)
+        add.action = { [store] in store.ui.overlay = .spaceEditor(nil) }
         stack.addArrangedSubview(add)
     }
-
-    @objc private func newSpace() { store.ui.overlay = .spaceEditor(nil) }
 }
 
 @MainActor
@@ -62,6 +57,9 @@ final class SpaceTab: NSView {
         super.init(frame: .zero)
         let g = SpaceIcon.view(space, size: UI.font(1).pointSize, color: color)
         let t = NSTextField(labelWithString: space.name)
+        // Many Spaces: names shorten rather than run off the bar.
+        t.lineBreakMode = .byTruncatingTail
+        t.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         t.font = UI.font(0.95, active ? .medium : .regular)
         t.textColor = active ? .labelColor : .secondaryLabelColor
         var views: [NSView] = [g, t]
@@ -103,6 +101,15 @@ final class SpaceTab: NSView {
 
     override func mouseEntered(with event: NSEvent) { hover = true }
     override func mouseExited(with event: NSEvent) { hover = false }
+
+    // A button to VoiceOver, named like its tooltip.
+    override func isAccessibilityElement() -> Bool { true }
+    override func accessibilityRole() -> NSAccessibility.Role? { .button }
+    override func accessibilityLabel() -> String? { toolTip }
+    override func accessibilityPerformPress() -> Bool {
+        Store.shared.switchSpace(spaceId)
+        return true
+    }
 
     override func mouseUp(with event: NSEvent) {
         if event.clickCount == 2 { Store.shared.ui.overlay = .spaceEditor(spaceId) }

@@ -339,6 +339,17 @@ private func grid() -> Layout {
         #expect(r.settings.keybindings["toggleReview"] == nil)
     }
 
+    @Test func formerDefaultBindingsMoveToNewOnes() throws {
+        let text = #"{ "keybindings": { "prevSpace": "Ctrl+Left", "overview": "Ctrl+Up", "newSpace": "Ctrl+N", "nextSpace": "Ctrl+Shift+Right" } }"#
+        let r = try SettingsFile.parse(text, upgradeBindings: true)
+        #expect(r.settings.keybindings["prevSpace"] == "Ctrl+Alt+Left")
+        #expect(r.settings.keybindings["overview"] == "Ctrl+Alt+Up")
+        #expect(r.settings.keybindings["newSpace"] == "Shift+Cmd+N")
+        #expect(r.settings.keybindings["nextSpace"] == "Ctrl+Shift+Right") // chosen by hand: kept
+        // Only once: after that, ⌃← is a choice like any other.
+        #expect(try SettingsFile.parse(text).settings.keybindings["prevSpace"] == "Ctrl+Left")
+    }
+
     @Test func syntaxErrorThrows() {
         #expect(throws: SettingsFile.ParseError.self) { try SettingsFile.parse(#"{ "appearance": "#) }
     }

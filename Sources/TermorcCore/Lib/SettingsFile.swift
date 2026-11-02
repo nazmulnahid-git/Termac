@@ -117,7 +117,8 @@ public enum SettingsFile {
     // Text → the settings it describes, over `current` (so state-only settings survive).
     // Missing keys get their default, invalid ones fall back (numbers are clamped) and are
     // listed in `warnings`. A syntax error throws.
-    public static func parse(_ text: String, over current: Settings = Settings()) throws -> Parsed {
+    // `upgradeBindings`: once, shortcuts left at a former default take the new one (Keys).
+    public static func parse(_ text: String, over current: Settings = Settings(), upgradeBindings: Bool = false) throws -> Parsed {
         let obj: Any
         do {
             obj = try JSONSerialization.jsonObject(with: Data(stripJsonc(text).utf8), options: [.fragmentsAllowed])
@@ -145,7 +146,7 @@ public enum SettingsFile {
                 for (action, accel) in kb.sorted(by: { $0.key < $1.key }) {
                     if retiredActions.contains(action) { continue }
                     if defaults.keybindings[action] == nil { warnings.append("keybindings.\(action): unknown action") }
-                    else if let a = accel as? String { settings.keybindings[action] = a.trimmingCharacters(in: .whitespaces) }
+                    else if let a = accel as? String { settings.keybindings[action] = upgradeBindings ? Keys.upgraded(action, a.trimmingCharacters(in: .whitespaces)) : a.trimmingCharacters(in: .whitespaces) }
                     else { warnings.append("keybindings.\(action): expected a shortcut like \"Cmd+T\", or \"\" to turn it off") }
                 }
             } else {

@@ -276,8 +276,19 @@ extension Store {
                 let ok = whole ? await okToClose(tids: [tab.id]) : await okToClose(sids: [sid])
                 guard ok else { return }
             }
-            removeSessionFromTab(sid)
+            if whole { close(tab) } else { removeSessionFromTab(sid) }
             ensureSession(closed: true)
+        }
+    }
+
+    // A closed session goes to the Library, with Undo, so a stray ✕ or ⌘W doesn't lose its
+    // output; one that never ran anything just closes.
+    private func close(_ tab: Tab) {
+        let empty = tab.layout.leaves.allSatisfy { sessions[$0].map { $0.cmds.isEmpty && $0.isBlank } ?? true }
+        if empty {
+            for sid in tab.layout.leaves { removeSessionFromTab(sid) }
+        } else {
+            tidy([tab.id], reason: "closed")
         }
     }
 
@@ -309,7 +320,7 @@ extension Store {
         guard let tab = model.tabs[tid] else { return }
         Task {
             guard await okToClose(tids: [tid]) else { return }
-            for sid in tab.layout.leaves { removeSessionFromTab(sid) }
+            close(tab)
             ensureSession(closed: true)
         }
     }
@@ -481,12 +492,15 @@ extension Store {
         fn(&model.spaces[i])
     }
 
-    func deleteSpace(_ id: String) {
+    // `confirmed` runs once the delete is agreed to (the Space editor closes then, not before,
+    // so Cancel keeps its edits).
+    func deleteSpace(_ id: String, confirmed: (() -> Void)? = nil) {
         guard model.spaces.count > 1, let sp = space(id) else { return }
         let n = sp.allTabs.count
         Task {
             let detail = n > 0 ? "Its \(n) session\(n > 1 ? "s" : "") will be moved to the Library." : "This can't be undone."
             guard await confirm("Delete “\(sp.name)”?", detail: detail, ok: "Delete Space") else { return }
+            confirmed?()
             if n > 0 { commitArchive(sp.allTabs, reason: "closed") }
             var next = model
             next.spaces.removeAll { $0.id == id }
@@ -710,15 +724,19 @@ extension Store {
     // Runs a command typed in the input bar, with the same production guard as typing it in
     // the terminal. Multi-line input goes as one bracketed paste so the shell runs it whole.
     @discardableResult
-    func submitCommand(_ sid: String, _ command: String) -> Bool {
+    // `sent` runs once the command is written: now, or after the production guard's confirm.
+    func submitCommand(_ sid: String, _ command: String, sent: @escaping () -> Void) {
         if let s = sessions[sid], !s.alive { startSession(sid) }
         let data = command.contains("\n") ? "\u{1b}[200~\(command)\u{1b}[201~\r" : command + "\r"
         if isDanger(sid), Routing.isRiskyCommand(command) {
-            confirmThen(sid, title: "Run this on production?", detail: "You're about to run a privileged command on production.", label: "Run", danger: true) { [weak self] in self?.sessions[sid]?.write(data) }
-            return false
+            confirmThen(sid, title: "Run this on production?", detail: "You're about to run a privileged command on production.", label: "Run", danger: true) { [weak self] in
+                self?.sessions[sid]?.write(data)
+                sent()
+            }
+            return
         }
         sessions[sid]?.write(data)
-        return true
+        sent()
     }
 
     func runInSession(_ command: String, _ sid: String? = nil) {
@@ -815,7 +833,7 @@ extension Store {
                     startedAt: meta?.createdAt ?? nowMillis(), endedAt: nowMillis(),
                     idleSince: session.map { Millis($0.lastActivity.timeIntervalSince1970 * 1000) } ?? nowMillis(),
                     reason: reason, commands: Array(cmds.suffix(100)), lines: 0)
-                if let session { library.add(entry, ansi: session.saveHistory(scrollback: 5000)) }
+                if let session { archiveHistory(entry, session) }
                 disposeSession(sid)
                 Persistence.removeScrollback(sid, paths)
             }
@@ -868,11 +886,20 @@ extension Store {
         if ui.dark != dark { ui.dark = dark }
         if ui.termTheme != theme { ui.termTheme = theme }
         for s in sessions.values { configure(s) }
+        QuickTerminal.shared.applySettings()
         MainMenu.rebuild()
     }
 
+    // ⌘= / ⌘− change the terminal's font size; ⌘0 puts both it and Settings › Zoom back.
     func zoom(_ delta: Double) {
-        setSettings { s in s.fontSize = delta == 0 ? Settings().fontSize : min(28, max(9, s.fontSize + delta)) }
+        setSettings { s in
+            if delta == 0 {
+                s.fontSize = Settings().fontSize
+                s.zoomLevel = Settings().zoomLevel
+            } else {
+                s.fontSize = min(28, max(9, s.fontSize + delta))
+            }
+        }
     }
 
     // ⌘S: hide completely, like a native sidebar, then bring back whichever mode was showing.

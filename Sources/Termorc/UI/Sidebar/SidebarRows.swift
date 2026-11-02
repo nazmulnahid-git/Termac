@@ -276,7 +276,6 @@ final class SessionRowView: NSTableCellView, NSTextFieldDelegate {
     private func updateHover() {
         let show = hover && !name.isEditable && closable && !SidebarDrag.active
         close.isHidden = !show
-        (superview as? SidebarRowBackground)?.hovered = hover && !SidebarDrag.active
         // The ✕ takes the status mark's place, unless that's a bell or a running command.
         status.isHidden = show && current != .bell && current != .run
     }
@@ -294,17 +293,6 @@ final class SessionRowView: NSTableCellView, NSTextFieldDelegate {
         tracking = NSTrackingArea(rect: bounds, options: [.mouseEnteredAndExited, .activeInActiveApp, .inVisibleRect], owner: self)
         addTrackingArea(tracking!)
         syncHover()
-    }
-
-    // A reused cell leaves its old row: that row mustn't stay lit.
-    override func viewWillMove(toSuperview newSuperview: NSView?) {
-        (superview as? SidebarRowBackground)?.hovered = false
-        super.viewWillMove(toSuperview: newSuperview)
-    }
-
-    override func viewDidMoveToSuperview() {
-        super.viewDidMoveToSuperview()
-        updateHover()
     }
 
     override func mouseEntered(with event: NSEvent) {
@@ -447,6 +435,15 @@ final class SegmentView: NSView {
 
     override func mouseEntered(with event: NSEvent) { hover = true }
     override func mouseExited(with event: NSEvent) { hover = false }
+
+    // A button to VoiceOver, named like its tooltip.
+    override func isAccessibilityElement() -> Bool { true }
+    override func accessibilityRole() -> NSAccessibility.Role? { .button }
+    override func accessibilityLabel() -> String? { toolTip }
+    override func accessibilityPerformPress() -> Bool {
+        Store.shared.focusSession(sid)
+        return true
+    }
 
     // A press may drag the whole row; one that comes up in place focuses this pane.
     override func mouseDown(with event: NSEvent) {
@@ -617,7 +614,7 @@ final class FolderRowView: NSTableCellView, NSTextFieldDelegate {
     private let name = NSTextField(labelWithString: "")
     private let count = NSTextField(labelWithString: "")
     private let run = NSProgressIndicator()
-    private let add = NSButton()
+    private let add = RowButton(symbol: "plus", tip: "New terminal in folder")
     private var onRename: ((String?) -> Void)?
     var onAdd: (() -> Void)?
 
@@ -636,13 +633,7 @@ final class FolderRowView: NSTableCellView, NSTextFieldDelegate {
         count.textColor = .tertiaryLabelColor
         run.style = .spinning
         run.controlSize = .mini
-        add.image = NSImage(systemSymbolName: "plus", accessibilityDescription: "New terminal in folder")
-        add.isBordered = false
-        add.symbolConfiguration = .init(pointSize: 10, weight: .semibold)
-        add.contentTintColor = .secondaryLabelColor
-        add.toolTip = "New terminal in folder"
-        add.target = self
-        add.action = #selector(addClicked)
+        add.action = { [weak self] in self?.onAdd?() }
         let spacer = NSView()
         spacer.setContentHuggingPriority(.init(1), for: .horizontal)
         let stack = NSStackView(views: [chevron, icon, name, spacer, run, count, add])
@@ -685,7 +676,6 @@ final class FolderRowView: NSTableCellView, NSTextFieldDelegate {
         }
     }
 
-    @objc private func addClicked() { onAdd?() }
 
     func control(_ control: NSControl, textView: NSTextView, doCommandBy sel: Selector) -> Bool {
         if sel == #selector(cancelOperation(_:)) { finish(nil); return true }

@@ -93,6 +93,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         switch action {
         case "commandBar": toggleOverlay(.commandBar(""))
         case "newTerminal": store.openTerminal()
+        case "quickTerminal": QuickTerminal.shared.toggle()
         case "toggleSidebar", "focusMode": store.toggleSidebar()
         case "splitRight": store.splitActive(.right)
         case "splitDown": store.splitActive(.bottom)
@@ -171,7 +172,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let inTerminal = e.window?.firstResponder is TermView
         let chars = e.charactersIgnoringModifiers ?? ""
 
-        if store.ui.confirm != nil, inTerminal {
+        // The production guard's confirm: from the terminal or the input bar alike (in the
+        // input bar, Esc would otherwise clear the command and leave the confirm up).
+        if store.ui.confirm != nil, store.ui.view == .terminal, store.ui.overlay == nil {
             if e.keyCode == 53 { store.resolveConfirm(false); return nil } // Esc
             if e.keyCode == 36, mods == .command { store.resolveConfirm(true); return nil }
         }

@@ -365,6 +365,10 @@ final class SpaceList: NSObject, NSOutlineViewDataSource, NSOutlineViewDelegate,
         if case .tab(let tid) = (item as? SidebarItemBox)?.item { rv.tint = store.model.tabs[tid]?.color.map { NSColor(hex: $0) } }
         rv.drop = dropStyle((item as? SidebarItemBox)?.item)
         rv.split = isSplit((item as? SidebarItemBox)?.item)
+        switch (item as? SidebarItemBox)?.item {
+        case .tab, .settings, .newTerminal, .folder: rv.hoverable = true
+        default: break
+        }
         return rv
     }
 
@@ -387,7 +391,7 @@ final class SpaceList: NSObject, NSOutlineViewDataSource, NSOutlineViewDelegate,
             ])
         case (.todayHeader(let sid), let c as SectionHeaderView):
             let n = store.space(sid)?.today.count ?? 0
-            c.configure(title: "Today", glyph: nil, color: nil, actions: n > 0 ? [("archivebox", "Move idle sessions to the Library", { [weak self] in self?.tidyNow() })] : [])
+            c.configure(title: "Today", glyph: nil, color: nil, actions: n > 0 ? [("archivebox", "Move sessions that aren't running to the Library", { [weak self] in self?.tidyNow() })] : [])
         case (.folder(let sid, let fid), let c as FolderRowView):
             guard let f = store.space(sid)?.folders.first(where: { $0.id == fid }) else { return }
             let running = f.tabs.contains { store.model.tabs[$0]?.layout.leaves.contains { store.rt[$0]?.status == .run } ?? false }
@@ -471,7 +475,8 @@ final class SpaceList: NSObject, NSOutlineViewDataSource, NSOutlineViewDelegate,
             guard tid != sp.activeTabId, let tab = store.model.tabs[tid], !tab.has("noArchive") else { return false }
             return tab.layout.leaves.allSatisfy { store.rt[$0]?.status != .run }
         }
-        if tids.isEmpty { store.toast("Nothing to tidy", detail: "Running sessions and the open one stay put.") } else { store.tidy(tids) }
+        // Every one that isn't running, however recently used: not "idle" as auto-archive means it.
+        if tids.isEmpty { store.toast("Nothing to tidy", detail: "Running sessions and the open one stay put.") } else { store.tidy(tids, reason: "closed") }
     }
 
     // ---- Menus ------------------------------------------------------------------------------
@@ -613,7 +618,23 @@ final class SidebarRowBackground: NSTableRowView {
     enum Drop { case none, soft, ready }
     var drop = Drop.none { didSet { if drop != oldValue { needsDisplay = true } } }
     var split = false { didSet { if split != oldValue { needsDisplay = true } } }
-    var hovered = false { didSet { if hovered != oldValue { needsDisplay = true } } } // set by its SessionRowView
+    // Clickable rows light up under the pointer, like Arc. Rows are made afresh as the list
+    // reloads, so hover is read from where the pointer is, not only from enter and exit.
+    var hoverable = false
+    private var hovered = false { didSet { if hovered != oldValue { needsDisplay = true } } }
+    private var tracking: NSTrackingArea?
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let tracking { removeTrackingArea(tracking) }
+        tracking = NSTrackingArea(rect: bounds, options: [.mouseEnteredAndExited, .activeInActiveApp, .inVisibleRect], owner: self)
+        addTrackingArea(tracking!)
+        let inside = window.map { visibleRect.contains(convert($0.mouseLocationOutsideOfEventStream, from: nil)) } ?? false
+        hovered = hoverable && inside && NSApp.isActive && !SidebarDrag.active
+    }
+
+    override func mouseEntered(with event: NSEvent) { hovered = hoverable && !SidebarDrag.active }
+    override func mouseExited(with event: NSEvent) { hovered = false }
 
     override func drawSelection(in dirtyRect: NSRect) {
         if !split { super.drawSelection(in: dirtyRect) }

@@ -151,6 +151,8 @@ extension Store: TermSessionHooks {
             DispatchQueue.main.async { Store.shared.ui.sshHosts = hosts }
         }
         System.warmLoginPath()
+        // The command list ⇥ completes from, ready before the first ⇥.
+        DispatchQueue.global(qos: .utility).async { _ = System.loginPath; _ = CmdLine.commands() }
         DispatchQueue.global(qos: .utility).async { [library, days = s.settings.libraryDays] in library.prune(days: days) }
 
         func every(_ seconds: TimeInterval, _ fn: @escaping @MainActor () -> Void) {
@@ -166,19 +168,32 @@ extension Store: TermSessionHooks {
     // something since the last pass, so a crash or force-quit still restores their output.
     // Serializing thousands of rows per session is slow, so it runs off the main thread.
     private static var checkpointedAt: [String: Date] = [:]
-    private static let checkpointQueue = DispatchQueue(label: "termorc.checkpoint", qos: .utility)
+    private static let historyQueue = DispatchQueue(label: "termorc.history", qos: .utility)
 
     func checkpointScrollback() {
         for (sid, s) in sessions where model.sessions[sid] != nil {
             if let at = Store.checkpointedAt[sid], at >= s.lastActivity { continue }
             Store.checkpointedAt[sid] = Date()
             let (view, cmds, dividers, paths) = (s.view, s.cmds, s.dividers, paths)
-            Store.checkpointQueue.async {
+            Store.historyQueue.async {
                 let text = TermSession.history(of: view, cmds: cmds, dividers: dividers, scrollback: 3000)
                 // A closed session's terminal has nothing to copy: keep what's saved.
                 if !text.isEmpty { Persistence.writeScrollback(sid, text, paths) }
                 // The view is AppKit's: let the main thread drop the last reference to it.
                 DispatchQueue.main.async { _ = view }
+            }
+        }
+    }
+
+    // A session's scrollback into the Library, serialized off the main thread like a checkpoint.
+    // The Library list refreshes once it's written.
+    func archiveHistory(_ entry: LibraryEntry, _ s: TermSession) {
+        let (view, cmds, dividers, library) = (s.view, s.cmds, s.dividers, library)
+        Store.historyQueue.async {
+            library.add(entry, ansi: TermSession.history(of: view, cmds: cmds, dividers: dividers, scrollback: 5000))
+            DispatchQueue.main.async {
+                Store.shared.objectWillChange.send()
+                _ = view // released on the main thread
             }
         }
     }
@@ -193,8 +208,8 @@ extension Store: TermSessionHooks {
             if !ok { return false }
         }
         quitting = true
-        // A checkpoint still writing must not land after the final save below.
-        Store.checkpointQueue.sync {}
+        // A checkpoint or archive still writing must finish, and not land after the final save.
+        Store.historyQueue.sync {}
         for (sid, s) in sessions where model.sessions[sid] != nil {
             Persistence.writeScrollback(sid, s.saveHistory(), paths)
         }

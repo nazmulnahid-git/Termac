@@ -350,15 +350,21 @@ final class MainSplitViewController: NSSplitViewController {
     }
 
     func applySidebarMode(_ mode: String) {
+        // Zoom widens the sidebar with its text; the rail never gets narrower than the
+        // traffic lights need.
+        let width = mode == "compact" ? max(Self.railWidth, UI.px(Self.railWidth)) : UI.px(Self.sidebarWidth)
+        if width > sidebarItem.maximumThickness {
+            sidebarItem.maximumThickness = width
+            sidebarItem.minimumThickness = width
+        } else {
+            sidebarItem.minimumThickness = width
+            sidebarItem.maximumThickness = width
+        }
         guard mode != lastMode else { return }
         let first = lastMode == nil
         lastMode = mode
         revealed = false
-        let compact = mode == "compact"
-        sidebar.compact = compact
-        let width = compact ? Self.railWidth : Self.sidebarWidth
-        sidebarItem.minimumThickness = width
-        sidebarItem.maximumThickness = width
+        sidebar.compact = mode == "compact"
         let collapse = mode == "hidden"
         if sidebarItem.isCollapsed != collapse {
             if first { sidebarItem.isCollapsed = collapse } else { sidebarItem.animator().isCollapsed = collapse }

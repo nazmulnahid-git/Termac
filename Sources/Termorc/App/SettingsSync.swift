@@ -26,21 +26,29 @@ final class SettingsSync {
     var paths: Paths { Store.shared.paths }
     var schemaUrl: String { "file://" + paths.schemaFile.path }
 
-    // At boot: the file wins over state.json. With no file yet, write one.
+    // At boot: the file wins over state.json. With no file yet, write one. The first launch
+    // after default shortcuts changed upgrades the ones left at the old defaults, and writes
+    // the file back so it shows them (a later hand-edit back to one is kept).
+    private static let bindingsUpgradedKey = "keybindingsUpgraded"
+    private var upgraded = false
+
     func load(into settings: inout Settings) {
         try? Persistence.writeIfChanged(paths.schemaFile, SettingsFile.schema())
         let text = try? String(contentsOf: paths.settingsFile, encoding: .utf8)
         knownText = text
         status.text = text
-        if let text, let parsed = parse(text, over: settings) {
+        let upgrade = !UserDefaults.standard.bool(forKey: Self.bindingsUpgradedKey)
+        if let text, let parsed = parse(text, over: settings, upgradeBindings: upgrade) {
             settings = parsed
+            upgraded = upgrade
         }
+        if text == nil || upgraded { UserDefaults.standard.set(true, forKey: Self.bindingsUpgradedKey) }
         fileSettings = text == nil ? nil : settings
     }
 
     func start() {
         let store = Store.shared
-        if status.text == nil { write(store.model.settings) }
+        if status.text == nil || upgraded { write(store.model.settings) }
         if let e = status.error { store.toast("settings.json has an error", detail: e, action: ("Open", { self.openFile() }), seconds: 8) }
         else if !status.warnings.isEmpty { store.toast("settings.json has problems", detail: status.warnings.prefix(2).joined(separator: " · "), action: ("Open", { self.openFile() }), seconds: 8) }
         watch()
@@ -74,9 +82,9 @@ final class SettingsSync {
         sealed = true
     }
 
-    private func parse(_ text: String, over current: Settings) -> Settings? {
+    private func parse(_ text: String, over current: Settings, upgradeBindings: Bool = false) -> Settings? {
         do {
-            let r = try SettingsFile.parse(text, over: current)
+            let r = try SettingsFile.parse(text, over: current, upgradeBindings: upgradeBindings)
             status.error = nil
             status.warnings = r.warnings
             return r.settings

@@ -47,8 +47,8 @@ final class PaneView: NSView {
         addSubview(termHost)
         header.addSubview(headerLine)
 
+        prodChip.text = (0.8, .bold)
         prodChip.set(symbol: nil, text: "PRODUCTION")
-        prodChip.label.font = .systemFont(ofSize: 10, weight: .bold)
         prodChip.label.textColor = .systemRed
         dirChip.onClick = { [weak self] in self?.dirMenu() }
         branchChip.onClick = { [weak self] in self?.branchMenu() }
@@ -296,17 +296,25 @@ final class PaneView: NSView {
     // ---- Switchers --------------------------------------------------------------------
     // Picking an entry types the command (cd / git switch) into the shell, so it shows up
     // in history like anything else.
+    // The folder's subfolders are listed off the main thread (a large or network folder would
+    // freeze the window); the menu opens when that's done.
     private func dirMenu() {
         let cwd = store.rt[sid]?.cwd ?? store.model.sessions[sid]?.cwd ?? store.home
+        Task.detached(priority: .userInitiated) {
+            let names = ((try? FileManager.default.contentsOfDirectory(atPath: cwd)) ?? [])
+                .filter { !$0.hasPrefix(".") && System.isDir((cwd as NSString).appendingPathComponent($0)) }
+                .sorted(by: System.naturalLess).prefix(300)
+            await MainActor.run { [weak self] in self?.dirMenu(cwd, Array(names)) }
+        }
+    }
+
+    private func dirMenu(_ cwd: String, _ names: [String]) {
         let menu = NSMenu()
         let cd = { [weak self] (path: String) in _ = self?.store.typeCommand(self?.sid, "cd \(Store.shellQuote(path))") }
         if cwd != "/" {
             let parent = (cwd as NSString).deletingLastPathComponent
             SidebarMenus.add(menu, "..  \(Routing.tildify(parent, home: store.home))") { cd(parent) }
         }
-        let names = ((try? FileManager.default.contentsOfDirectory(atPath: cwd)) ?? [])
-            .filter { !$0.hasPrefix(".") && System.isDir((cwd as NSString).appendingPathComponent($0)) }
-            .sorted(by: System.naturalLess).prefix(300)
         if !names.isEmpty {
             menu.addItem(.sectionHeader(title: "Folders"))
             for n in names { SidebarMenus.add(menu, "\(n)/") { cd((cwd as NSString).appendingPathComponent(n)) } }
@@ -375,6 +383,9 @@ final class Chip: NSButton {
     var onClick: (() -> Void)?
     var leadingInset: CGFloat = 8 { didSet { leading.constant = icon.isHidden ? leadingInset : leadingInset } }
     private var leading: NSLayoutConstraint!
+    private var height: NSLayoutConstraint!
+    var text: (em: CGFloat, weight: NSFont.Weight) = (0.92, .regular) { didSet { applyZoom() } } // the label's size, relative to UI.font
+    private var hover = false { didSet { if hover != oldValue { layer?.backgroundColor = hover && onClick != nil ? NSColor.labelColor.withAlphaComponent(0.08).cgColor : nil } } }
 
     init() {
         super.init(frame: .zero)
@@ -384,8 +395,6 @@ final class Chip: NSButton {
         layer?.cornerRadius = 6
         target = self
         action = #selector(tap)
-        icon.symbolConfiguration = .init(pointSize: 11, weight: .medium)
-        label.font = .systemFont(ofSize: 12)
         label.lineBreakMode = .byTruncatingTail
         // Just above the header stacks' hugging (250): tied, Auto Layout could settle with the
         // text squashed to nothing. Still below required, so a narrow pane truncates it.
@@ -395,13 +404,28 @@ final class Chip: NSButton {
         stack.translatesAutoresizingMaskIntoConstraints = false
         addSubview(stack)
         leading = stack.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 8)
-        NSLayoutConstraint.activate([leading, stack.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -8), stack.centerYAnchor.constraint(equalTo: centerYAnchor), heightAnchor.constraint(equalToConstant: 22)])
+        height = heightAnchor.constraint(equalToConstant: 22)
+        NSLayoutConstraint.activate([leading, stack.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -8), stack.centerYAnchor.constraint(equalTo: centerYAnchor), height])
         setContentCompressionResistancePriority(.init(251), for: .horizontal)
+        addTrackingArea(NSTrackingArea(rect: .zero, options: [.mouseEnteredAndExited, .activeInActiveApp, .inVisibleRect], owner: self))
+        applyZoom()
     }
+
+    // Sizes follow Settings › Zoom; read again on every update.
+    private func applyZoom() {
+        let font = UI.font(text.em, text.weight)
+        if label.font != font { label.font = font }
+        icon.symbolConfiguration = .init(pointSize: UI.font(0.85).pointSize, weight: .medium)
+        height.constant = UI.px(22)
+    }
+
+    override func mouseEntered(with event: NSEvent) { hover = true }
+    override func mouseExited(with event: NSEvent) { hover = false }
 
     required init?(coder: NSCoder) { fatalError() }
 
     func set(symbol: String?, text: String) {
+        applyZoom()
         icon.image = symbol.flatMap { NSImage(systemSymbolName: $0, accessibilityDescription: nil) }
         icon.isHidden = symbol == nil
         if label.stringValue != text { label.stringValue = text }
@@ -428,7 +452,7 @@ final class PillButton: NSVisualEffectView {
         wantsLayer = true
         layer?.cornerRadius = 15
         chip.translatesAutoresizingMaskIntoConstraints = false
-        chip.label.font = .systemFont(ofSize: 12, weight: .medium)
+        chip.text = (0.96, .medium)
         addSubview(chip)
         NSLayoutConstraint.activate([chip.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 6), chip.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -6), chip.topAnchor.constraint(equalTo: topAnchor, constant: 4), chip.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -4)])
     }
@@ -455,9 +479,9 @@ final class SheetView: NSVisualEffectView {
         let bang = NSImageView(image: NSImage(systemSymbolName: "exclamationmark.triangle.fill", accessibilityDescription: nil)!)
         bang.contentTintColor = danger ? .systemRed : .systemOrange
         let t = NSTextField(labelWithString: title)
-        t.font = .systemFont(ofSize: 13, weight: .semibold)
+        t.font = UI.font(1.04, .semibold)
         let d = NSTextField(wrappingLabelWithString: detail)
-        d.font = .systemFont(ofSize: 12)
+        d.font = UI.font(0.96)
         d.textColor = .secondaryLabelColor
         let texts = NSStackView(views: [t, d])
         texts.orientation = .vertical

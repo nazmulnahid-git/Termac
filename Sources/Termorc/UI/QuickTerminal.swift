@@ -42,7 +42,24 @@ final class QuickTerminal: NSObject, TermSessionHooks {
         if mods.contains("Ctrl") { m |= UInt32(controlKey) }
         if mods.contains("Shift") { m |= UInt32(shiftKey) }
         let id = EventHotKeyID(signature: OSType(0x544D5243), id: 1) // 'TMRC'
-        RegisterEventHotKey(UInt32(code), m, id, GetApplicationEventTarget(), 0, &hotKeyRef)
+        // Another app (a launcher, an assistant) may own the shortcut: say so, rather than
+        // the shortcut silently doing nothing.
+        if RegisterEventHotKey(UInt32(code), m, id, GetApplicationEventTarget(), 0, &hotKeyRef) != noErr {
+            hotKeyRef = nil
+            Store.shared.toast("\(Keys.format(accel)) is taken by another app", detail: "Open the Quick Terminal from the Shell menu, or pick another shortcut in Settings › Keybindings.")
+        }
+    }
+
+    // Settings changed (theme, font, zoom): the drop-down follows, like the main window's sessions.
+    func applySettings() {
+        let store = Store.shared
+        let look = store.look(for: nil)
+        if let s = session {
+            store.configure(s)
+            store.applyLook(look, to: s)
+        }
+        panel?.contentView?.layer?.backgroundColor = NSColor(hex: look.bg).cgColor
+        panel?.appearance = NSAppearance(named: look.dark ? .darkAqua : .aqua)
     }
 
     static let keyCodes: [String: Int] = {
@@ -64,9 +81,18 @@ final class QuickTerminal: NSObject, TermSessionHooks {
     }
 
     func show() {
-        // Read Finder's folder before we come to the front and it stops being frontmost.
-        let finder = Self.frontmostFinderFolder()
         previousApp = NSWorkspace.shared.frontmostApplication
+        // A new session opens in Finder's folder when Finder is in front. Asking Finder takes
+        // a moment (and the first time, a permission prompt), so it's off the main thread,
+        // before we come to the front and Finder stops being frontmost.
+        guard session?.alive != true, previousApp?.bundleIdentifier == "com.apple.finder" else { return present(finder: nil) }
+        Task.detached(priority: .userInitiated) {
+            let finder = Self.frontmostFinderFolder()
+            await MainActor.run { QuickTerminal.shared.present(finder: finder) }
+        }
+    }
+
+    private func present(finder: String?) {
         let p = panel ?? makePanel()
         panel = p
         archiveTimer?.invalidate()
@@ -101,7 +127,7 @@ final class QuickTerminal: NSObject, TermSessionHooks {
     }
 
     // Folder of the frontmost Finder window, if Finder is frontmost. No other app is probed.
-    static func frontmostFinderFolder() -> String? {
+    nonisolated static func frontmostFinderFolder() -> String? {
         guard NSWorkspace.shared.frontmostApplication?.bundleIdentifier == "com.apple.finder" else { return nil }
         let script = #"tell application "Finder" to if (count of Finder windows) > 0 then get POSIX path of (target of front window as alias)"#
         return System.run("/usr/bin/osascript", ["-e", script], timeout: 1.5).flatMap { $0.isEmpty ? nil : $0 }
@@ -155,7 +181,7 @@ final class QuickTerminal: NSObject, TermSessionHooks {
             let entry = LibraryEntry(id: s.sid, name: Meta.leafOf(dir, home: store.home), spaceId: nil, spaceName: "Quick Terminal", cwd: dir, host: ssh?.host ?? "local",
                                      status: lastExit == nil ? "idle" : lastExit == 0 ? "ok" : "fail", exitCode: lastExit, startedAt: startedAt, endedAt: nowMillis(),
                                      idleSince: Millis(s.lastActivity.timeIntervalSince1970 * 1000), reason: "quick", commands: Array(cmds.suffix(100)), lines: 0)
-            store.library.add(entry, ansi: s.saveHistory(scrollback: 5000))
+            store.archiveHistory(entry, s)
         }
         endSession(kill: true)
     }

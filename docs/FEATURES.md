@@ -29,7 +29,7 @@ Built in Swift with AppKit and SwiftUI. Light and dark follow the system, and ev
 
 ## Spaces and the sidebar
 
-Each project gets a **Space** with its own color, icon, start directory and shell profile. The bar along the bottom lists your Spaces; switch with ⌃1–9, ⌃← / ⌃→, or a two-finger swipe on the sidebar.
+Each project gets a **Space** with its own color, icon, start directory and shell profile. The bar along the bottom lists your Spaces; switch with ⌃1–9, ⌃⌥← / ⌃⌥→, or a two-finger swipe on the sidebar.
 
 The sidebar has three parts:
 
@@ -102,7 +102,7 @@ Prefixes narrow it down, and ⇥ cycles through the filters:
 
 ![The All Spaces overview with cards for Acme, Personal and Ops](screenshots/overview.png)
 
-**⌃↑**, or a pinch on the trackpad, shows every Space as a card with its sessions and their status. Drag a session from one card to another to move it. ⌃1–9 jumps straight to a Space, and Esc (or pinching out) returns.
+**⌃⌥↑**, or a pinch on the trackpad, shows every Space as a card with its sessions and their status. Drag a session from one card to another to move it. ⌃1–9 jumps straight to a Space, and Esc (or pinching out) returns.
 
 ## Peek
 
@@ -168,10 +168,10 @@ All of these can be changed in **Settings › Keybindings**.
 | ⌥⌘ ← → ↑ ↓ | Move focus between panes |
 | ⇧⌘[ / ⇧⌘] | Previous / next session |
 | ⌘1–9 | Go to session 1–9 |
-| ⌃← / ⌃→ | Previous / next Space |
+| ⌃⌥← / ⌃⌥→ | Previous / next Space |
 | ⌃1–9 | Go to Space 1–9 |
-| ⌃↑ | All Spaces |
-| ⌃N | New Space |
+| ⌃⌥↑ | All Spaces |
+| ⇧⌘N | New Space |
 | ⌘Y | Library |
 | ⇧⌘C | Copy the last command's output |
 | ⌘K | Clear scrollback |

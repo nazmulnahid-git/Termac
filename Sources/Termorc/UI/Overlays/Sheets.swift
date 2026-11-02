@@ -8,15 +8,19 @@ struct SpaceEditor: View {
     @EnvironmentObject var store: Store
     let spaceId: String?
     let close: () -> Void
+    let changed: (Bool) -> Void // the form differs from what it opened with
     @State private var form: Space
+    private let original: Space
     @FocusState private var nameFocused: Bool
 
-    init(spaceId: String?, close: @escaping () -> Void) {
+    init(spaceId: String?, close: @escaping () -> Void, changed: @escaping (Bool) -> Void = { _ in }) {
         self.spaceId = spaceId
         self.close = close
+        self.changed = changed
         let s = Store.shared.model
         if let sp = s.spaces.first(where: { $0.id == spaceId }) {
             _form = State(initialValue: sp)
+            original = sp
         } else {
             // A new Space: the first color and glyph not already taken.
             let color = Meta.spaceColors.first { c in !s.spaces.contains { $0.color.lowercased() == c } } ?? Meta.spaceColors[0]
@@ -24,6 +28,7 @@ struct SpaceEditor: View {
             var sp = Space(name: "", glyph: glyph, color: color)
             sp.term = Look()
             _form = State(initialValue: sp)
+            original = sp
         }
     }
 
@@ -126,7 +131,7 @@ struct SpaceEditor: View {
             .frame(maxHeight: .infinity)
             HStack {
                 if editing && store.model.spaces.count > 1 {
-                    Button("Delete Space…", role: .destructive) { close(); store.deleteSpace(form.id) }
+                    Button("Delete Space…", role: .destructive) { store.deleteSpace(form.id, confirmed: close) }
                 }
                 Spacer()
                 Button("Cancel", action: close).keyboardShortcut(.cancelAction)
@@ -137,6 +142,7 @@ struct SpaceEditor: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear { nameFocused = true }
+        .onChange(of: form) { _, f in changed(f != original) }
     }
 
     private var iconImage: NSImage? {
@@ -318,7 +324,9 @@ final class Overlays {
         case .spaceEditor(let id):
             // Its form's natural height, a little taller when a background image adds rows.
             let image = id.flatMap { store.space($0)?.term.image } != nil
-            present(AnyView(SpaceEditor(spaceId: id, close: { [weak self] in self?.endSheet() })), width: 560, height: image ? 790 : 690, on: window)
+            var edited = false
+            let editor = SpaceEditor(spaceId: id, close: { [weak self] in self?.endSheet() }, changed: { edited = $0 })
+            present(AnyView(editor), width: 560, height: image ? 790 : 690, on: window, keepOpen: { edited })
         case .tabStyle(let tid):
             present(AnyView(TabStyleEditor(tid: tid, close: { [weak self] in self?.endSheet() })), width: 460, height: nil, on: window)
         case .overview:
@@ -333,13 +341,15 @@ final class Overlays {
 
     // `height` is what the card would like; it never grows past the window. Without one the
     // card takes the content's own height.
-    private func present(_ view: AnyView, width: CGFloat, height: CGFloat?, on window: NSWindow) {
+    // `keepOpen` says a backdrop click would lose edits: it beeps instead.
+    private func present(_ view: AnyView, width: CGFloat, height: CGFloat?, on window: NSWindow, keepOpen: (() -> Bool)? = nil) {
         guard let root = window.contentView else { return }
         let host = NSHostingView(rootView: view.environmentObject(Store.shared))
         let h = height ?? host.fittingSize.height
         host.sizingOptions = []
         let m = ModalOverlay(content: host, width: width, height: h)
         m.onDismiss = { [weak self] in self?.endSheet() }
+        m.keepOpen = keepOpen
         modal = m
         m.show(in: root)
     }
@@ -387,10 +397,11 @@ struct SpaceGlyph: View {
 
 // A sheet inside the window: a faint backdrop over the window and a card
 // centred on it that never grows past the window (its form scrolls instead). A click on the
-// backdrop or Esc closes it.
+// backdrop (unless it has unsaved edits) or Esc closes it.
 @MainActor
 final class ModalOverlay: NSView {
     var onDismiss: (() -> Void)?
+    var keepOpen: (() -> Bool)? // a backdrop click would lose edits: beep instead (Esc still closes)
     private let frameView = NSView() // carries the shadow; the card inside clips to its corners
     private let card = NSView()
 
@@ -482,7 +493,8 @@ final class ModalOverlay: NSView {
     }
 
     override func mouseDown(with event: NSEvent) {
-        if !frameView.frame.contains(convert(event.locationInWindow, from: nil)) { onDismiss?() }
+        guard !frameView.frame.contains(convert(event.locationInWindow, from: nil)) else { return }
+        if keepOpen?() == true { NSSound.beep() } else { onDismiss?() }
     }
 
     // Nothing behind the backdrop reacts to the pointer.

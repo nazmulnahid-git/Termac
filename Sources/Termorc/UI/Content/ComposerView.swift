@@ -338,9 +338,10 @@ final class ComposerView: NSView, NSTextViewDelegate {
     func submit() {
         let cmd = editor.string.replacingOccurrences(of: #"\s+$"#, with: "", options: .regularExpression)
         guard !cmd.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, mode == .input else { return }
-        guard store.submitCommand(sid, cmd) else { return }
-        ComposerHistory.remember(cmd)
-        clear()
+        store.submitCommand(sid, cmd) { [weak self] in
+            ComposerHistory.remember(cmd)
+            self?.clear()
+        }
     }
 
     // ---- Keys -----------------------------------------------------------------------------
@@ -405,11 +406,29 @@ final class ComposerView: NSView, NSTextViewDelegate {
     }
 
     // ⇥: one match fills in; several fill in what they share, then offer a menu at the caret.
+    // Finding them lists folders and may run git, so that's off the main thread; the result
+    // is dropped if the line changed meanwhile.
+    private var completing = false
+
     private func complete() {
+        guard !completing else { return }
         let cwd = store.rt[sid]?.cwd ?? store.model.sessions[sid]?.cwd ?? store.home
-        let s = editor.string as NSString
-        let line = s.substring(to: caret)
-        let res = CmdLine.complete(cwd: cwd, line: line)
+        let text = editor.string
+        let at = caret
+        let line = (text as NSString).substring(to: at)
+        completing = true
+        Task.detached(priority: .userInitiated) {
+            let res = CmdLine.complete(cwd: cwd, line: line)
+            await MainActor.run { [weak self] in
+                guard let self else { return }
+                completing = false
+                guard editor.string == text, caret == at else { return }
+                complete(res, line: line)
+            }
+        }
+    }
+
+    private func complete(_ res: (start: Int, items: [CmdLine.Completion]), line: String) {
         guard !res.items.isEmpty else { NSSound.beep(); return }
         let lineChars = Array(line)
         if res.items.count == 1 {
@@ -502,6 +521,7 @@ final class HistorySearch: NSObject, NSTextFieldDelegate, NSTableViewDataSource,
     private let panel = OverlayPanel(size: NSSize(width: 560, height: 340))
     private let field = NSTextField()
     private let table = NSTableView()
+    private let empty = NSTextField(labelWithString: "No matches")
     private var items: [String] = []
     private var done: ((String?) -> Void)?
     private static var current: HistorySearch?
@@ -527,7 +547,9 @@ final class HistorySearch: NSObject, NSTextFieldDelegate, NSTableViewDataSource,
         let scroll = NSScrollView()
         scroll.documentView = table
         scroll.drawsBackground = false
-        for v in [field, scroll] {
+        empty.textColor = .secondaryLabelColor
+        empty.isHidden = true
+        for v in [field, scroll, empty] {
             v.translatesAutoresizingMaskIntoConstraints = false
             panel.content.addSubview(v)
         }
@@ -536,6 +558,7 @@ final class HistorySearch: NSObject, NSTextFieldDelegate, NSTableViewDataSource,
             field.trailingAnchor.constraint(equalTo: panel.content.trailingAnchor, constant: -14),
             scroll.topAnchor.constraint(equalTo: field.bottomAnchor, constant: 8), scroll.leadingAnchor.constraint(equalTo: panel.content.leadingAnchor, constant: 6),
             scroll.trailingAnchor.constraint(equalTo: panel.content.trailingAnchor, constant: -6), scroll.bottomAnchor.constraint(equalTo: panel.content.bottomAnchor, constant: -6),
+            empty.centerXAnchor.constraint(equalTo: scroll.centerXAnchor), empty.centerYAnchor.constraint(equalTo: scroll.centerYAnchor),
         ])
         filter()
     }
@@ -559,6 +582,8 @@ final class HistorySearch: NSObject, NSTextFieldDelegate, NSTableViewDataSource,
             items = scored.sorted { $0.1 > $1.1 }.prefix(50).map(\.0)
         }
         table.reloadData()
+        empty.stringValue = q.isEmpty ? "No history yet" : "No matches"
+        empty.isHidden = !items.isEmpty
         if !items.isEmpty { table.selectRowIndexes([0], byExtendingSelection: false) }
     }
 
