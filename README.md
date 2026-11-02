@@ -153,7 +153,15 @@ scripts/build-app.sh                # debug build   → .build/Termorc.app
 scripts/build-app.sh release        # release build → .build/release-app/Termorc.app
 scripts/build-app.sh debug run      # build, then open it
 scripts/make-dmg.sh                 # release build plus a styled .dmg (pip3 install dmgbuild)
+scripts/screenshots.sh              # retake docs/screenshots in a demo world (see below)
 ```
+
+**Screenshots.** `scripts/screenshots.sh` rebuilds every image in `docs/screenshots` from made-up Spaces, sessions and projects (`scripts/screenshots/demo.py`), so none of your own show. It opens a second Termorc and drives it with keystrokes and the pointer for about three minutes. Before running it:
+- Give the app you run it from Accessibility and Screen Recording access (System Settings › Privacy & Security).
+- Stay on the built-in display, on a normal desktop, with Stage Manager off.
+- Don't touch the keyboard or mouse while it runs.
+
+Pass names to retake only some shots: `scripts/screenshots.sh library peek`.
 
 **Run a build on its own data.** Set `TERMORC_DATA_DIR` so a development build doesn't touch your everyday sessions and settings:
 
