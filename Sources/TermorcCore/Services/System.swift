@@ -2,7 +2,9 @@ import Foundation
 
 // Filesystem and process lookups used by the UI. Everything here is cheap or cached.
 public enum System {
-    public static let home = FileManager.default.homeDirectoryForCurrentUser.path
+    // TERMORC_HOME stands in for the home folder (shell history, SSH hosts), so a demo or
+    // screenshot run (with TERMORC_DATA_DIR) shows none of yours.
+    public static let home = ProcessInfo.processInfo.environment["TERMORC_HOME"] ?? FileManager.default.homeDirectoryForCurrentUser.path
 
     // Apps opened from Finder get launchd's bare PATH; git hooks and gh expect the one the
     // user's login shell sets up, so read it once (in the background) and hand it to children.
