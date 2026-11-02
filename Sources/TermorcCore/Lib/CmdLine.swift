@@ -138,16 +138,19 @@ public enum CmdLine {
 
     nonisolated(unsafe) static var commandCache: [String]?
 
-    // Executables on the login PATH, plus shell builtins.
-    public static func commands(path: String? = System.loginPath ?? ProcessInfo.processInfo.environment["PATH"]) -> [String] {
+    // Executables on the login PATH, plus shell builtins. Called from the input bar, so it
+    // doesn't wait for the login shell: until its PATH is known the app's own is used, and
+    // that list isn't cached.
+    public static func commands(path: String? = nil) -> [String] {
         if let c = commandCache { return c }
+        let login = System.loginPathIfReady
         var names = Set(builtins)
-        for dir in (path ?? "").split(separator: ":") {
+        for dir in (path ?? login ?? ProcessInfo.processInfo.environment["PATH"] ?? "").split(separator: ":") {
             guard let items = try? FileManager.default.contentsOfDirectory(atPath: String(dir)) else { continue }
             for n in items where FileManager.default.isExecutableFile(atPath: "\(dir)/\(n)") { names.insert(n) }
         }
         let sorted = names.sorted()
-        commandCache = sorted
+        if path != nil || login != nil { commandCache = sorted }
         return sorted
     }
 
@@ -179,7 +182,7 @@ public enum CmdLine {
         let words = before.split(whereSeparator: \.isWhitespace).map(String.init)
         let gitSubs: Set<String> = ["checkout", "switch", "merge", "rebase", "branch", "push", "pull", "log", "diff", "reset"]
         if words.first == "git", words.count > 1, gitSubs.contains(words[1]), !word.hasPrefix("-") {
-            let out = System.run("git", ["-C", cwd, "for-each-ref", "--format=%(refname:short)", "refs/heads", "refs/remotes"]) ?? ""
+            let out = System.run("git", ["-C", cwd, "for-each-ref", "--format=%(refname:short)", "refs/heads", "refs/remotes"], timeout: 1) ?? ""
             items += out.split(separator: "\n").map(String.init).filter { $0.hasPrefix(word) && !$0.hasSuffix("/HEAD") }.prefix(60).map { Completion(value: $0, kind: .branch) }
         }
 

@@ -7,14 +7,22 @@ public enum System {
     // Apps opened from Finder get launchd's bare PATH; git hooks and gh expect the one the
     // user's login shell sets up, so read it once (in the background) and hand it to children.
     nonisolated(unsafe) private static var loginPathValue: String?
+    private static let loginPathLock = NSLock()
     private static let loginPathOnce: Void = {
         let shell = ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
-        loginPathValue = run(shell, ["-l", "-c", "printf %s \"$PATH\""], timeout: 4, usePath: false)
+        let path = run(shell, ["-l", "-c", "printf %s \"$PATH\""], timeout: 4, usePath: false)
+        loginPathLock.withLock { loginPathValue = path }
     }()
 
+    // Waits for the login shell (up to its timeout) the first time: never on the main thread.
     public static var loginPath: String? {
         _ = loginPathOnce
-        return loginPathValue
+        return loginPathIfReady
+    }
+
+    // The login PATH if it's been read already, without waiting for it.
+    public static var loginPathIfReady: String? {
+        loginPathLock.withLock { loginPathValue }
     }
 
     public static func warmLoginPath() {
@@ -33,7 +41,8 @@ public enum System {
             p.arguments = [cmd] + args
         }
         var env = ProcessInfo.processInfo.environment
-        if usePath, let path = loginPath { env["PATH"] = path }
+        // The main thread never waits on the login shell; it uses the PATH once it's known.
+        if usePath, let path = Thread.isMainThread ? loginPathIfReady : loginPath { env["PATH"] = path }
         // Never sit waiting on a credentials prompt nobody can see.
         env["GIT_TERMINAL_PROMPT"] = "0"
         env["GH_PROMPT_DISABLED"] = "1"
@@ -44,18 +53,22 @@ public enum System {
         p.standardOutput = out
         p.standardError = FileHandle.nullDevice
         p.standardInput = FileHandle.nullDevice
+        let exited = DispatchSemaphore(value: 0)
+        p.terminationHandler = { _ in exited.signal() }
         do { try p.run() } catch { return nil }
-        let done = DispatchSemaphore(value: 0)
+        let deadline = DispatchTime.now() + timeout
+        let read = DispatchSemaphore(value: 0)
         var data = Data()
         DispatchQueue.global().async {
             data = out.fileHandleForReading.readDataToEndOfFile()
-            done.signal()
+            read.signal()
         }
-        if done.wait(timeout: .now() + timeout) == .timedOut {
+        // The timeout covers the exit too: waitUntilExit has none (a child that closes its
+        // output but never exits would hang the caller) and spins the caller's run loop.
+        guard read.wait(timeout: deadline) == .success, exited.wait(timeout: deadline) == .success else {
             p.terminate()
             return nil
         }
-        p.waitUntilExit()
         guard p.terminationStatus == 0 else { return nil }
         let text = String(decoding: data, as: UTF8.self)
         return raw ? text : text.trimmingCharacters(in: .whitespacesAndNewlines)

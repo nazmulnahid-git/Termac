@@ -190,9 +190,9 @@ final class TermSession: NSObject {
         }
     }
 
-    // The cursor's scroll-invariant row right now.
+    // The cursor's scroll-invariant row right now (only the screen's rows are copied).
     func cursorRow() -> Int? {
-        view.terminalContentSnapshot(region: .history(maximumScrollbackRows: -1))?.cursorRow
+        view.terminalContentSnapshot(region: .history(maximumScrollbackRows: 0))?.cursorRow
     }
 
     // ---- Shell integration marks ------------------------------------------------------
@@ -292,7 +292,7 @@ final class TermSession: NSObject {
     }
 
     func scrollToBottom() {
-        guard let snap = view.terminalContentSnapshot(region: .history(maximumScrollbackRows: -1)), let vp = viewportTop() else { return }
+        guard let snap = view.terminalContentSnapshot(region: .history(maximumScrollbackRows: 0)), let vp = viewportTop() else { return }
         view.scrollTo(row: snap.liveTopRow - vp.trimmed)
     }
 
@@ -310,6 +310,12 @@ final class TermSession: NSObject {
     static let legacyBanner = try! NSRegularExpression(pattern: "(?:\\r\\n)?(?:\\u001b\\[[0-9;]*m)*─{4} restored · [^\\r\\n]*?─{4}(?:\\u001b\\[[0-9;]*m)*")
 
     func saveHistory(scrollback: Int = 3000) -> String {
+        Self.history(of: view, cmds: cmds, dividers: dividers, scrollback: scrollback)
+    }
+
+    // Copying and serializing thousands of rows is slow, so the periodic checkpoint runs this
+    // off the main thread; SwiftTerm's snapshots are safe to take from any thread.
+    nonisolated static func history(of view: TermView, cmds: [Command], dividers: [Divider], scrollback: Int) -> String {
         let termRows = view.terminalInputStateSnapshot()?.dimensions.rows ?? 24
         let cols = view.terminalInputStateSnapshot()?.dimensions.cols ?? 80
         guard let snap = view.terminalContentSnapshot(region: .history(maximumScrollbackRows: scrollback + termRows), buffer: .normal) else { return "" }

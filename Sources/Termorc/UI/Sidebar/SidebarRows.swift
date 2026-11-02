@@ -146,8 +146,9 @@ final class StatusMarkView: NSView {
 }
 
 // One session row, or for a split session an Arc-style row with a segment per pane. Under
-// the pointer it shows ✕ to close it, or − on a pinned row: that stops its shells but keeps
-// the row, dimmed, to start again with a click.
+// the pointer it shows ✕ at its start, in the icon's place, to close it (every pane of a split
+// row), or − on a pinned row: that stops its shells but keeps the row, dimmed, to start again
+// with a click.
 final class SessionRowView: NSTableCellView, NSTextFieldDelegate {
     static let id = NSUserInterfaceItemIdentifier("session")
     private let icon = NSImageView()
@@ -156,13 +157,14 @@ final class SessionRowView: NSTableCellView, NSTextFieldDelegate {
     private let segs = NSStackView()
     private let prod = NSTextField(labelWithString: "PROD")
     private let status = StatusMarkView()
-    private let close = RowButton(symbol: "xmark", tip: "Close")
+    private let close = RowButton(symbol: "xmark", tip: "Close", size: 18)
     private var tracking: NSTrackingArea?
     private var hover = false { didSet { updateHover() } }
     private var onRename: ((String?) -> Void)?
-    private var current: TabView.Status = .idle
     private var split = false
     private var closable = true
+    private var hasIcon = false
+    private var hasGlyph = false
     var onClose: (() -> Void)?
 
     init() {
@@ -189,7 +191,7 @@ final class SessionRowView: NSTableCellView, NSTextFieldDelegate {
         segs.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         segs.setContentHuggingPriority(.init(1), for: .horizontal) // the segments share the row's width
         // Not the cell's textField / imageView: AppKit would recolor them on selection.
-        let stack = NSStackView(views: [icon, glyph, name, segs, prod, close, status])
+        let stack = NSStackView(views: [close, icon, glyph, name, segs, prod, status])
         stack.loosen()
         stack.spacing = 7
         stack.translatesAutoresizingMaskIntoConstraints = false
@@ -221,9 +223,9 @@ final class SessionRowView: NSTableCellView, NSTextFieldDelegate {
         // A split row shows the session's own icon only if it was given one.
         let (img, text) = split ? (v.tab.icon.flatMap { KindIcons.image(kind: ">_", icon: $0).0 }, nil) : KindIcons.image(kind: v.active?.kind ?? ">_", icon: v.tab.icon)
         icon.image = img
-        icon.isHidden = img == nil
+        hasIcon = img != nil
         glyph.stringValue = text ?? ""
-        glyph.isHidden = text == nil
+        hasGlyph = text != nil
         icon.contentTintColor = tint ?? (active ? accent : nil) ?? .secondaryLabelColor
         name.isHidden = split
         segs.isHidden = !split
@@ -259,22 +261,29 @@ final class SessionRowView: NSTableCellView, NSTextFieldDelegate {
         // Pinned: − unloads (nothing to unload once it's asleep). Elsewhere ✕ closes.
         close.symbol = pinned ? "minus" : "xmark"
         close.toolTip = pinned ? "Close (stays pinned)" : "Close"
-        // A split row has no ✕ of its own: each segment closes its own pane.
-        closable = !split && !(pinned && v.panes.allSatisfy { !$0.rt.alive })
-        current = v.status
+        // On a split row it closes every pane; each segment's own ✕ closes just that one.
+        closable = !(pinned && v.panes.allSatisfy { !$0.rt.alive })
         status.set(v.status, bell: v.bell, accent: .controlAccentColor)
         if v.status == .fail, let f = v.fail, let r = store.rt[f] {
             status.toolTip = "exit \(r.exitCode ?? 1) · failed \(r.endedAt.map { Meta.timeAgo($0) } ?? "") · \(Meta.formatDuration(r.duration))"
         } else {
             status.toolTip = nil
         }
-        updateHover()
+        syncHover()
     }
 
     private func updateHover() {
-        let dragging = SidebarDrag.active
-        close.isHidden = !hover || name.isEditable || !closable || dragging
-        status.isHidden = !close.isHidden && current != .bell && current != .run
+        let show = hover && !name.isEditable && closable && !SidebarDrag.active
+        close.isHidden = !show
+        icon.isHidden = !hasIcon || show
+        glyph.isHidden = !hasGlyph || show
+    }
+
+    // Rows are reused as the list reloads (closing a row shifts the next one under the
+    // pointer), so hover follows where the pointer is, not the last enter or exit this view saw.
+    private func syncHover() {
+        guard let window, NSApp.isActive else { hover = false; return }
+        hover = visibleRect.contains(convert(window.mouseLocationOutsideOfEventStream, from: nil))
     }
 
     override func updateTrackingAreas() {
@@ -282,6 +291,7 @@ final class SessionRowView: NSTableCellView, NSTextFieldDelegate {
         if let tracking { removeTrackingArea(tracking) }
         tracking = NSTrackingArea(rect: bounds, options: [.mouseEnteredAndExited, .activeInActiveApp, .inVisibleRect], owner: self)
         addTrackingArea(tracking!)
+        syncHover()
     }
 
     override func mouseEntered(with event: NSEvent) {
@@ -480,6 +490,19 @@ final class RowButton: NSView {
     override func mouseEntered(with event: NSEvent) { hover = true }
     override func mouseExited(with event: NSEvent) { hover = false }
     override func mouseDown(with event: NSEvent) { pressed = true }
+
+    // Shown and hidden with its row's hover, so no enter or exit arrives for the pointer
+    // already over it: read where the pointer is instead.
+    override func viewDidHide() {
+        super.viewDidHide()
+        hover = false
+        pressed = false
+    }
+
+    override func viewDidUnhide() {
+        super.viewDidUnhide()
+        if let window { hover = bounds.contains(convert(window.mouseLocationOutsideOfEventStream, from: nil)) }
+    }
 
     override func mouseUp(with event: NSEvent) {
         pressed = false

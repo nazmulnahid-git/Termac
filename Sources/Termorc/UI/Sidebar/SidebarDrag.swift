@@ -93,6 +93,19 @@ final class SidebarDrag {
                 }
                 drag?.update(last)
             case .periodic:
+                // A release that never reached this window (another app or a system dialog
+                // took it) would leave this loop, and Termorc, waiting forever.
+                if NSEvent.pressedMouseButtons & 1 == 0 {
+                    guard let drag else {
+                        if let up = NSEvent.mouseEvent(with: .leftMouseUp, location: last, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+                                                       windowNumber: window.windowNumber, context: nil, eventNumber: 0, clickCount: 1, pressure: 0) {
+                            window.postEvent(up, atStart: true)
+                        }
+                        return false
+                    }
+                    drag.finish(cancel: false)
+                    return true
+                }
                 if let drag, drag.autoscroll(last) { drag.update(last) }
             case .keyDown where e.keyCode == 53: // Esc
                 guard let drag else { continue }

@@ -164,15 +164,22 @@ extension Store: TermSessionHooks {
 
     // Scrollback is otherwise written only on a clean quit. Checkpoint sessions that printed
     // something since the last pass, so a crash or force-quit still restores their output.
+    // Serializing thousands of rows per session is slow, so it runs off the main thread.
     private static var checkpointedAt: [String: Date] = [:]
+    private static let checkpointQueue = DispatchQueue(label: "termorc.checkpoint", qos: .utility)
 
     func checkpointScrollback() {
         for (sid, s) in sessions where model.sessions[sid] != nil {
             if let at = Store.checkpointedAt[sid], at >= s.lastActivity { continue }
             Store.checkpointedAt[sid] = Date()
-            let text = s.saveHistory()
-            let paths = paths
-            DispatchQueue.global(qos: .utility).async { Persistence.writeScrollback(sid, text, paths) }
+            let (view, cmds, dividers, paths) = (s.view, s.cmds, s.dividers, paths)
+            Store.checkpointQueue.async {
+                let text = TermSession.history(of: view, cmds: cmds, dividers: dividers, scrollback: 3000)
+                // A closed session's terminal has nothing to copy: keep what's saved.
+                if !text.isEmpty { Persistence.writeScrollback(sid, text, paths) }
+                // The view is AppKit's: let the main thread drop the last reference to it.
+                DispatchQueue.main.async { _ = view }
+            }
         }
     }
 
@@ -186,6 +193,8 @@ extension Store: TermSessionHooks {
             if !ok { return false }
         }
         quitting = true
+        // A checkpoint still writing must not land after the final save below.
+        Store.checkpointQueue.sync {}
         for (sid, s) in sessions where model.sessions[sid] != nil {
             Persistence.writeScrollback(sid, s.saveHistory(), paths)
         }

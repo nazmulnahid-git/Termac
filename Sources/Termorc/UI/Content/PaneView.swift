@@ -325,11 +325,23 @@ final class PaneView: NSView {
         menu.popUp(positioning: nil, at: NSPoint(x: 0, y: dirChip.bounds.minY - 4), in: dirChip)
     }
 
-    private func branchMenu() {
+    // git runs off the main thread (a slow repo, or a Mac without the command line tools,
+    // would otherwise freeze the window); the menu opens when it's done.
+    private func git(_ args: [String], raw: Bool = false, then show: @escaping @MainActor (String) -> Void) {
         let cwd = store.rt[sid]?.cwd ?? ""
+        Task.detached(priority: .userInitiated) {
+            let out = System.run("git", ["-C", cwd] + args, raw: raw) ?? ""
+            await MainActor.run { show(out) }
+        }
+    }
+
+    private func branchMenu() {
+        git(["for-each-ref", "--sort=-committerdate", "--count=80", "--format=%(refname:short)", "refs/heads"]) { [weak self] out in self?.branchMenu(out) }
+    }
+
+    private func branchMenu(_ out: String) {
         let current = store.rt[sid]?.branch
         let menu = NSMenu()
-        let out = System.run("git", ["-C", cwd, "for-each-ref", "--sort=-committerdate", "--count=80", "--format=%(refname:short)", "refs/heads"]) ?? ""
         menu.addItem(.sectionHeader(title: "Branches"))
         for b in out.split(separator: "\n").map(String.init) {
             SidebarMenus.add(menu, b, checked: b == current) { [weak self] in _ = self?.store.typeCommand(self?.sid, "git switch \(Store.shellQuote(b))") }
@@ -338,9 +350,11 @@ final class PaneView: NSView {
     }
 
     private func diffMenu() {
-        let cwd = store.rt[sid]?.cwd ?? ""
+        git(["status", "--porcelain=v1"], raw: true) { [weak self] out in self?.diffMenu(out) }
+    }
+
+    private func diffMenu(_ out: String) {
         let menu = NSMenu()
-        let out = System.run("git", ["-C", cwd, "status", "--porcelain=v1"], raw: true) ?? ""
         let files = out.split(separator: "\n").map { String($0) }
         if files.isEmpty { SidebarMenus.add(menu, "Working tree clean", enabled: false) {} }
         for f in files.prefix(60) {
